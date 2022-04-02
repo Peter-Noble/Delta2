@@ -1,0 +1,63 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(gdb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Delta2.debug",
+            "args": ["-f 5.0", "--gui", "-t 0.1"],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [
+                { "name": "MESH_DIR", "value": "/home/peter/Documents/particles/meshes"},
+                { "name": "EXPORT_DIR", "value": "/home/peter/Documents/particles/export"},
+                { "name": "LD_LIBRARY_PATH", "value": "$LD_LIBRARY_PATH:/home/peter/Documents/embree-3.13.2.x86_64.linux/lib/:/opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin/:/opt/intel/oneapi/compiler/latest/linux/lib/:/home/peter/Documents/likwid-5.2.0"},
+                { "name": "OMP_NUM_THREADS", "value": "4" }
+            ],
+            //"envFile": "${workspaceFolder}/.env",
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable break on all exceptions",
+                    "text": "catch throw",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+
+        {
+            "name": "Test cases",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Delta2",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "preLaunchTask": "Source embree",
+            "environment": [
+                { "name": "MESH_DIR", "value": "/home/peter/Documents/particles/meshes"},
+                { "name": "EXPORT_DIR", "value": "/home/peter/Documents/particles/export"},
+                { "name": "LD_LIBRARY_PATH", "value": "$LD_LIBRARY_PATH:/home/peter/Documents/embree-3.13.2.x86_64.linux/lib/:/opt/intel/oneapi/compiler/latest/linux/compiler/lib/intel64_lin/:/opt/intel/oneapi/compiler/latest/linux/lib/"}
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}

@@ -1,0 +1,66 @@
+{
+	"version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "type": "shell",
+            "command": "make",
+            "args": [
+                "debug",
+                "-j8"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "clear": true
+            },
+            "options": {
+                "cwd": "${workspaceFolder}/src"
+            }
+        },
+        {
+            "label": "Source Intel conda",
+            "type": "shell",
+            "command": "source",
+            "args": [
+                "/opt/intel/oneapi/intelpython/python3.7/etc/profile.d/conda.sh"
+            ]
+        },
+        {
+            "label": "Source embree",
+            "type": "shell",
+            "command": "source",
+            "args": [
+                "/home/peter/Documents/embree-3.13.2.x86_64.linux/embree-vars.sh"
+            ]
+        },
+        {
+            "label": "Source sycl",
+            "type": "shell",
+            "command": "source",
+            "args": [
+                "/opt/intel/oneapi/intelpython/python3.7/etc/profile.d/conda.sh;",
+                "source",
+                "/opt/intel/oneapi/setvars.sh",
+                "--force"
+            ]
+        },
+        {
+            "label": "Pause",
+            "type": "shell",
+            "command": "read"
+        },
+        {
+            "label": "Set environment",
+            "type": "shell",
+            "command": "",
+            "args": [
+                "printenv > /home/peter/Documents/particles/env.txt;",
+                "read"
+            ]
+        }
+    ]
+}

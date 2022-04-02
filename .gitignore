@@ -1,3 +1,4 @@
+# Delta2
 
 .vs/
 .vscode/
@@ -54,3 +55,4 @@ new x64/particles.log
 AdvisorFromHamilton/
 
 bf_results/variable_s1_bf/
+.env

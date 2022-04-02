@@ -1,0 +1,21 @@
+# Delta2
+
+Install oneAPI core
+
+Install VSCode
+
+Run VSCode command to initialise oneapi environment variables.
+
+Install:
+catch2
+Eigen
+Embree
+GLAD
+libigl
+simde
+tetgen1.6.0
+
+sudo apt-get install libglfw3
+sudo apt-get install libglfw3-dev
+
+sudo apt-get install libgmp3-dev
