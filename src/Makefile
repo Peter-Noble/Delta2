@@ -24,8 +24,10 @@ DEFINES = -DTASKING_INTERNAL
 # DEFINES = -DEXCLUDE_GOOGLE_BENCH -DLIKWID_PERFMON
 
 #-I/ddn/home/wxmv95/catch2 -I/ddn/apps/Cluster-Apps/likwid/5.0.1/include/ 
-INCLUDE = -I/home/peter/Documents/eigen -I/opt/intel/oneapi/vtune/latest/include -I/home/peter/Documents/simde -I/home/peter/Documents/likwid-5.2.0/src/includes -I/home/peter/Documents/embree-3.13.2.x86_64.linux/include/embree3 -I/home/peter/Documents/embree-3.13.2.x86_64.linux/include -I/home/peter/Documents/Catch2/single_include -I/home/peter/Documents/libigl/include -I/home/peter/Documents/tetgen1.6.0 -I/home/peter/Documents/glad/include -I/usr/include
-LIBS = -L/home/peter/Documents/likwid-5.2.0 -L/home/peter/Documents/embree-3.13.2.x86_64.linux/lib -lgmp
+# -I/home/peter/Documents/likwid-5.2.0/src/includes
+# -L/home/peter/Documents/likwid-5.2.0
+INCLUDE = -I/home/peter/Documents/eigen -I/opt/intel/oneapi/vtune/latest/include -I/home/peter/Documents/simde -I/home/peter/Documents/embree-3.13.2.x86_64.linux/include/embree3 -I/home/peter/Documents/embree-3.13.2.x86_64.linux/include -I/home/peter/Documents/Catch2/single_include -I/home/peter/Documents/libigl/include -I/home/peter/Documents/tetgen1.6.0 -I/home/peter/Documents/glad/include -I/usr/include
+LIBS = -L/home/peter/Documents/embree-3.13.2.x86_64.linux/lib -lgmp
 LIBNAMES = /opt/intel/oneapi/vtune/latest/sdk/lib64/libittnotify.a /home/peter/Documents/embree-3.13.2.x86_64.linux/lib/libembree3.so.3 /home/peter/Documents/tetgen1.6.0/libtet.a /home/peter/Documents/glad/src/libglad.a /usr/lib/x86_64-linux-gnu/libglfw.so.3.3
 
 release: mainrelease
@@ -36,10 +38,10 @@ mainrelease: $(release_obj) runner/main.o.release
 	$(CC) $(FLAGS) $(LIBS) -o ../build/Delta2 $^ $(LIBNAMES)
 
 maindebug: $(obj) runner/main.o
-	$(CC) $(FLAGS) -llikwid $(LIBS) -o ../build/Delta2.debug $^ $(LIBNAMES)
+	$(CC) $(FLAGS) $(LIBS) -o ../build/Delta2.debug $^ $(LIBNAMES)
 
 test: $(all_obj) runner/unit_test_runner.o 
-	$(CC) $(FLAGS) -llikwid $(LIBS) -o ../build/test_Delta2 $^ $(LIBNAMES)
+	$(CC) $(FLAGS) $(LIBS) -o ../build/test_Delta2 $^ $(LIBNAMES)
 
  -include $(all_dep)   # include all dep files in the makefile
 
