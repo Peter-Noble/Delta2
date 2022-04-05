@@ -39,7 +39,7 @@ void ContactForceLocal::solve(collision::Cluster& cluster, std::vector<collision
         {
             mass_multiply += cluster.particles[a_id].getMass();
         }
-        if (cluster.particles[b_id].is_static)
+        if (!cluster.particles[b_id].is_static)
         {
             mass_multiply += cluster.particles[b_id].getMass();
         }

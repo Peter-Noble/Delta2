@@ -8,19 +8,6 @@
 using namespace Delta2;
 using namespace strategy;
 
-// PDEExplicit::PDEExplicit(ContactDetectionStrategy& contact_detection,
-//                          ContactForceStrategy& contact_force,
-//                          FrictionStrategy& friction,
-//                          TimeStepSelectionStrategy& time_step,
-//                          common::Options& opt) : 
-//                          PDEStrategy(opt),
-//                          _contact_detection(contact_detection),
-//                          _contact_force(contact_force),
-//                          _friction(friction),
-//                          _time_step(time_step) {
-    
-// }
-
 PDEExplicit::PDEExplicit(ContactDetectionStrategy& contact_detection,
                          ContactForceStrategy& contact_force,
                          FrictionStrategy& friction,
@@ -39,8 +26,7 @@ double PDEExplicit::selectTimeStep(collision::Cluster& cluster) {
     return time;
 }
 
-void PDEExplicit::
-step(collision::Cluster& cluster) {
+void PDEExplicit::step(collision::Cluster& cluster) {
     std::vector<Eigen::Vector3d> forces;
     std::vector<Eigen::Vector3d> torques;
     std::vector<int> counts;

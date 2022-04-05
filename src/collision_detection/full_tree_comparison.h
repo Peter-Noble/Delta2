@@ -212,8 +212,8 @@ namespace Delta2 {
 
                 dc_soup.swap(dc_soup_next);
                 dc_soup_next.clear();
-                dc_soup.swap(dc_soup_next);
-                dc_soup_next.clear();
+                dc_connected.swap(dc_connected_next);
+                dc_connected_next.clear();
             }
             return result;
         };

@@ -98,7 +98,7 @@ namespace Delta2 {
                 return {u, v, w};
             }
 
-            Eigen::Vector<real, 3> intersectSegment(const Edge<real>& E, real &t, bool t_inf, bool &isIntersecting) const {
+            Eigen::Vector<real, 3> intersectSegment(const Edge<real>& E, real& t, bool& t_inf, bool& isIntersecting) const {
                 const Eigen::Vector<real, 3>& start = E.A;
                 const Eigen::Vector<real, 3>& end = E.B;
                 Eigen::Vector<real, 3> AP = A - start;
@@ -107,7 +107,7 @@ namespace Delta2 {
                 real p1 = AP.dot(n);
                 real p2 = D.dot(n);
                 t_inf = false;
-                if (p2 <= std::numeric_limits<real>::epsilon()) {
+                if (std::fabs(p2) <= std::numeric_limits<real>::epsilon()) {
                     t = 0.0;
                     t_inf = true;
                     isIntersecting = false;

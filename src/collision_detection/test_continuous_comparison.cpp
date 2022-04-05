@@ -261,3 +261,15 @@ TEST_CASE("Continuous bucket", "[grp_collision_detection][continuous_comparison]
     REQUIRE( hits_filtered.size() == 1 );
     REQUIRE( hits_filtered[0].toc == Approx(0.9) );
 }
+
+TEST_CASE("pointTriCCDLinear error case", "[grp_collision_detection][continuous_comparison]") {
+    Delta2::common::Edge<double> e({2, -1, 0.29}, {2, -1, -0.81});
+    Delta2::common::Triangle<double> tri({50, 50,0}, {-50, 50, 0}, {50, -50, 0});
+
+    bool isIntersecting;
+    double t;
+    bool t_inf;
+    Eigen::Vector<double, 3> intersect = tri.intersectSegment(e, t, t_inf, isIntersecting);
+
+    REQUIRE(isIntersecting);
+}

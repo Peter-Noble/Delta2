@@ -464,7 +464,6 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
     #pragma omp parallel
     {
-        // for (collision::BroadPhaseCollision& b : broad_phase) {
         #pragma omp single
         {
             #pragma omp taskloop
