@@ -13,6 +13,8 @@
 #include <ittnotify.h>
 
 #include "../strategies/contact_force/contact_force_local.h"
+#include "../strategies/contact_force/contact_force_iterative.h"
+#include "../strategies/contact_force/sequential_impulses_s_time.h"
 #include "../strategies/friction/friction_iterative.h"
 #include "../strategies/time_step_size/time_step_selection_dynamic_continuous.h"
 #include "../strategies/contact_detection/contact_detection_comparison.h"
@@ -42,43 +44,58 @@ std::vector<Delta2::Particle> particles;
 
         std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
         {
-            auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-            p.current_state.setTranslation({0.0, 0.0, 1.5});
-            p.current_state.setAngular({-10, -5, 0});
+            auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
+            p.current_state.setTranslation({0.0, 0.0, 1.05});
+            p.current_state.setVelocity({0.0, 0.0, -0.3});
+            // p.current_state.setAngular({-10, -5, 0});
         }
-        {
-            auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-            p.current_state.setTranslation({3.0, 6.0, 1.1});
-            p.current_state.setVelocity({0.0, -3.0, 0.0});
-        }
+        // {
+        //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
+        //     p.current_state.setTranslation({3.0, 6.0, 1.1});
+        //     p.current_state.setVelocity({0.0, -3.0, 0.0});
+        // }
     }
 
-    {
-        Delta2::common::cube(V, F);
+    // {
+    //     Delta2::common::cube(V, F);
 
-        std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
-        {
-            auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-            p.current_state.setTranslation({3.0, 0.0, 1.5});
-        }
-        {
-            auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-            p.current_state.setTranslation({3.0, 0.0, 3.6});
-        }
-        {
-            auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-            p.current_state.setTranslation({3.0, 0.0, 5.7});
-        }
-        for (int i = 0; i < 20; i++) {
-            auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-            p.current_state.setTranslation({6.0 + i * 2.001, 0.0, 1.5});
-        }
-    }
+    //     std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
+    //     {
+    //         auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
+    //         p.current_state.setTranslation({0.0, 0.0, 1.55});
+    //         double angle = 45.0 / 180.0 * 3.14159;
+    //         Eigen::Quaterniond r;
+    //         r = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitX())
+    //             * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitY())
+    //             * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
+    //         p.current_state.setRotation(r);
+    //     }
+    //     {
+    //         auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
+    //         p.current_state.setTranslation({3.0, 0.0, 4.0});
+    //     }
+    //     {
+    //         auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
+    //         p.current_state.setTranslation({3.0, 0.0, 6.5});
+    //     }
+    //     // {
+    //     //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
+    //     //     p.current_state.setTranslation({3.0, 0.0, 3.6});
+    //     // }
+    //     // {
+    //     //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
+    //     //     p.current_state.setTranslation({3.0, 0.0, 5.7});
+    //     // }
+    //     // for (int i = 0; i < 20; i++) {
+    //     //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
+    //     //     p.current_state.setTranslation({6.0 + i * 2.001, 0.0, 1.5});
+    //     // }
+    // }
 
     {
         Delta2::common::plane(100.0, V, F);
         std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt, true));
-        auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
+        auto& p = particles.emplace_back(M, 1.0, 0.6, 0.05);
         p.is_static = true;
     }
 
@@ -97,7 +114,7 @@ std::vector<Delta2::Particle> particles;
     strategy::TimeStepSelectionDynamicContinuous time_step(contact_detection_continuous, opt);
     strategy::ContactDetectionComparison contact_detection;
     strategy::FrictionIterative friction(opt);
-    strategy::ContactForceLocal contact_force(friction, opt);
+    strategy::SequentialImpulsesSTime contact_force(friction, opt);
     strategy::PDEExplicit PDE(contact_detection, contact_force, friction, time_step, opt);
     strategy::BroadPhaseEmbreeCluster broad_phase(PDE, opt);
 
