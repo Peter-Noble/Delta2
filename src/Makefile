@@ -4,7 +4,7 @@ CC = dpcpp
 # Excluded: $(wildcard ./timestepping/*.cpp)
 strategy_src = $(wildcard ./strategies/broad_phase/*.cpp) $(wildcard ./strategies/contact_detection/*.cpp) $(wildcard ./strategies/contact_detection_continuous/*.cpp) $(wildcard ./strategies/contact_force/*.cpp) $(wildcard ./strategies/friction/*.cpp) $(wildcard ./strategies/PDE/*.cpp) $(wildcard ./strategies/time_step_size/*.cpp)
 all_src = $(wildcard *.cpp) $(wildcard ./model/*.cpp) $(wildcard ./common/*.cpp) $(wildcard ./collision_detection/*.cpp) $(shell ls ./embree_common/**/*.cpp | grep -v "cmake" | grep -v "taskschedulerppl" | grep -v "taskschedulertbb") $(wildcard ./quickhull/*.cpp) $(wildcard ./quickhull/Structs/*.cpp) $(strategy_src)
-test_src = $(wildcard test_*.cpp) $(wildcard ./model/test_*.cpp) $(wildcard ./common/test_*.cpp) $(wildcard ./timestepping/test_*.cpp) $(wildcard ./collision_detection/test_*.cpp)
+test_src = $(wildcard test_*.cpp) $(wildcard ./model/test_*.cpp) $(wildcard ./common/test_*.cpp) $(wildcard ./collision_detection/test_*.cpp)
 src = $(filter-out $(test_src), $(all_src))
 clean_src = $(all_src) runner/main.cpp runner/unit_test_runner.cpp
 obj = $(src:.cpp=.o)
@@ -17,7 +17,7 @@ test_dep = $(test_obj:.o=.d)
 all_dep = $(dep) $(test_dep)
 clean_dep = $(clean_obj:.o=.d)
 
-CFLAGS = -std=c++17 -qopenmp
+CFLAGS = -std=c++17 -qopenmp -DCGAL_DISABLE_ROUNDING_MATH_CHECK
 FLAGS = -march=native -g -qopenmp
 DEFINES = -DTASKING_INTERNAL
 
@@ -35,10 +35,10 @@ debug: maindebug
 alldebug: maindebug test
 
 mainrelease: $(release_obj) runner/main.o.release
-	$(CC) $(FLAGS) $(LIBS) -o ../build/Delta2 $^ $(LIBNAMES)
+	$(CC) $(FLAGS) $(LIBS) -o ../build/Delta2 $^ $(LIBNAMES) -O3
 
 maindebug: $(obj) runner/main.o
-	$(CC) $(FLAGS) $(LIBS) -o ../build/Delta2.debug $^ $(LIBNAMES)
+	$(CC) $(FLAGS) $(LIBS) -o ../build/Delta2.debug $^ $(LIBNAMES) -O0
 
 test: $(all_obj) runner/unit_test_runner.o 
 	$(CC) $(FLAGS) $(LIBS) -o ../build/test_Delta2 $^ $(LIBNAMES)
@@ -56,11 +56,6 @@ test: $(all_obj) runner/unit_test_runner.o
 %.o: %.cpp
 	$(CC) $(CFLAGS) -O0 $(FLAGS) $(DEFINES) $(INCLUDE) -o $@ -c $<
 
-.PHONY: clean
-clean:
-	cleandebug
-	cleanrelease
-	cleandep
 .PHONY: cleandebug
 cleandebug:
 	rm -f $(all_obj) Delta2
@@ -71,6 +66,12 @@ cleanrelease:
 .PHONY: cleandep
 cleandep:
 	rm -f $(all_dep)
+
+.PHONY: clean
+clean:
+	cleandebug
+	cleanrelease
+	cleandep
 
 .PHONY: printsrc
 printsrc:
