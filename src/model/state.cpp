@@ -1,9 +1,5 @@
 #include "state.h"
-<<<<<<< HEAD
-#include "../common/basic_utils.h"
-=======
 #include "../common/utils.h"
->>>>>>> 941061f9aba551ee111a9e394844644438a1cb9d
 
 using namespace Delta2;
 
@@ -80,15 +76,12 @@ Eigen::Vector3d State::pointVelocity(const Eigen::Vector3d& pt, const State& fut
     return (new_pt - pt.homogeneous()).head<3>() / (future.getTime() - getTime());
 }
 
-<<<<<<< HEAD
 // pt is in global space
 Eigen::Vector3d State::pointVelocity(const Eigen::Vector3d& pt, const Eigen::Matrix3d& inv_inertia) const {
     Eigen::Vector3d w = inv_inertia * getAngularMomentum();
     return getVelocity() + w.cross(pt - getTranslation());
 }
 
-=======
->>>>>>> 941061f9aba551ee111a9e394844644438a1cb9d
 Eigen::Matrix4d State::getTransformation() const {
     return common::transformationMatrix(_rotation, _translation);
 }
@@ -122,8 +115,6 @@ bool State::isValid() const {
     // }
     return true;
 }
-<<<<<<< HEAD
-=======
 
 void State::applyDelta(double t, Eigen::Vector3d force, Eigen::Vector3d torque, double mass, const Eigen::Matrix3d& inverse_inertia) {
     setTime(getTime() + t);
@@ -148,4 +139,3 @@ void State::applyDelta(double t, Eigen::Vector3d force, Eigen::Vector3d torque, 
 
     setRotation(rotation);
 }
->>>>>>> 941061f9aba551ee111a9e394844644438a1cb9d

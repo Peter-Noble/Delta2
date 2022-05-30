@@ -29,10 +29,7 @@ namespace Delta2 {
 
         Eigen::Vector3d futurePointVelocity(const Eigen::Vector3d& pt) const;
         Eigen::Vector3d pointVelocity(const Eigen::Vector3d& pt) const;
-<<<<<<< HEAD
-=======
         Eigen::Vector3d pointVelocity(const Eigen::Vector3d& pt, const State& S) const;
->>>>>>> 941061f9aba551ee111a9e394844644438a1cb9d
 
         std::shared_ptr<MeshData> mesh;
 
