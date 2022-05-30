@@ -68,9 +68,9 @@ namespace Delta2 {
 
         template<typename real, int branching, int bucket_size>
         std::vector<ContinuousContact<real>> compareTreesFullContinuous(Particle& a, Particle& b, real max_time, real& min_time_out) {
-	        __itt_domain* domain = __itt_domain_create("My Domain");
-            __itt_string_handle* bucket_contact_soup_task = __itt_string_handle_create("findContactsBucketContinuousComparison");
-            __itt_string_handle* bucket_contact_connected_task = __itt_string_handle_create("findContactsBucketConnectedContinuousComparison");
+	        // __itt_domain* domain = __itt_domain_create("My Domain");
+            // __itt_string_handle* bucket_contact_soup_task = __itt_string_handle_create("findContactsBucketContinuousComparison");
+            // __itt_string_handle* bucket_contact_connected_task = __itt_string_handle_create("findContactsBucketConnectedContinuousComparison");
             
             std::vector<ContinuousContact<real>> result;
             
@@ -92,9 +92,9 @@ namespace Delta2 {
                 hits.clear();
                 num_hits.clear();
 
-                __itt_task_begin(domain, __itt_null, __itt_null, bucket_contact_soup_task);
+                // __itt_task_begin(domain, __itt_null, __itt_null, bucket_contact_soup_task);
                 findContactsBucketContinuousComparison<branching, real>(dc_soup, a, b, hits, num_hits);
-                __itt_task_end(domain);
+                // __itt_task_end(domain);
 
                 int last_hit_num = 0;
                 for (int i = 0; i < dc_soup.size(); i++) {
@@ -153,9 +153,9 @@ namespace Delta2 {
                 hits.clear();
                 num_hits.clear();
                 
-                __itt_task_begin(domain, __itt_null, __itt_null, bucket_contact_connected_task);
+                // __itt_task_begin(domain, __itt_null, __itt_null, bucket_contact_connected_task);
                 findContactsBucketConnectedContinuousComparison<branching, real>(dc_connected, a, b, hits, num_hits);
-                __itt_task_end(domain);
+                // __itt_task_end(domain);
 
                 last_hit_num = 0;
                 for (int i = 0; i < dc_connected.size(); i++) {

@@ -80,6 +80,14 @@ Eigen::Vector3d Particle::pointVelocity(const Eigen::Vector3d& pt) const {
     return current_state.getVelocity() + omega.cross(pt - current_state.getTranslation());
 }
 
+Eigen::Vector3d Particle::pointVelocity(const Eigen::Vector3d& pt, const State& S) const {
+    Eigen::Matrix3d R = S.getRotation().toRotationMatrix();
+    Eigen::Matrix3d Iinv = R * _inertia_body_inverse * R.transpose();
+    Eigen::Vector3d omega = Iinv * S.getAngularMomentum();
+
+    return S.getVelocity() + omega.cross(pt - S.getTranslation());
+}
+
 void Particle::rollBackState(double time) {
     current_state = current_state.interpolate(last_state, time);
 }

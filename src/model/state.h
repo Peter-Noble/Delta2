@@ -23,6 +23,8 @@ namespace Delta2 {
             Eigen::Vector3d pointVelocity(const Eigen::Vector3d& pt, const Eigen::Matrix3d& inv_inertia) const;
             bool isValid() const;
             State interpolate(State last, double time) const;
+
+            void applyDelta(double t, Eigen::Vector3d F, Eigen::Vector3d T, double mass, const Eigen::Matrix3d& inverse_inertia);
         private:
             double _time;
 

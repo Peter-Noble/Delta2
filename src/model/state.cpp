@@ -1,5 +1,9 @@
 #include "state.h"
+<<<<<<< HEAD
 #include "../common/basic_utils.h"
+=======
+#include "../common/utils.h"
+>>>>>>> 941061f9aba551ee111a9e394844644438a1cb9d
 
 using namespace Delta2;
 
@@ -76,12 +80,15 @@ Eigen::Vector3d State::pointVelocity(const Eigen::Vector3d& pt, const State& fut
     return (new_pt - pt.homogeneous()).head<3>() / (future.getTime() - getTime());
 }
 
+<<<<<<< HEAD
 // pt is in global space
 Eigen::Vector3d State::pointVelocity(const Eigen::Vector3d& pt, const Eigen::Matrix3d& inv_inertia) const {
     Eigen::Vector3d w = inv_inertia * getAngularMomentum();
     return getVelocity() + w.cross(pt - getTranslation());
 }
 
+=======
+>>>>>>> 941061f9aba551ee111a9e394844644438a1cb9d
 Eigen::Matrix4d State::getTransformation() const {
     return common::transformationMatrix(_rotation, _translation);
 }
@@ -115,3 +122,30 @@ bool State::isValid() const {
     // }
     return true;
 }
+<<<<<<< HEAD
+=======
+
+void State::applyDelta(double t, Eigen::Vector3d force, Eigen::Vector3d torque, double mass, const Eigen::Matrix3d& inverse_inertia) {
+    setTime(getTime() + t);
+    setVelocity(getVelocity() + t * force / mass);
+    setTranslation(getTranslation() + t * getVelocity());
+
+    // https://link.springer.com/content/pdf/10.1007/s00707-013-0914-2.pdf
+
+    Eigen::Vector3d angular_momentum = getAngularMomentum() + t * torque;
+
+    Eigen::Quaterniond rotation = getRotation();
+
+    setAngular(angular_momentum);
+
+    Eigen::Matrix3d R = rotation.toRotationMatrix();
+    Eigen::Matrix3d Iinv = R * inverse_inertia * R.transpose();
+    Eigen::Vector3d omega = Iinv * angular_momentum;
+    
+    Eigen::Quaterniond rot_delta = Delta2::common::exp(0.5 * omega * t);
+
+    rotation = rot_delta * rotation;
+
+    setRotation(rotation);
+}
+>>>>>>> 941061f9aba551ee111a9e394844644438a1cb9d

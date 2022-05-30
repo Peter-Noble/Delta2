@@ -1,6 +1,7 @@
 #include "../testing/unit_test.h"
 #include "broad_phase_embree.h"
 #include "../common/primitive_geo.h"
+#include "../model/particle_handler.h"
 
 TEST_CASE("Broad phase Embree stationary", "[grp_collision_detection][broad_phase]") {
     std::vector<Delta2::Particle> particles;
@@ -18,7 +19,9 @@ TEST_CASE("Broad phase Embree stationary", "[grp_collision_detection][broad_phas
         particles.push_back(P);
     }
 
-    Delta2::collision::BroadPhaseCollisions C = Delta2::collision::broadPhaseEmbree(particles, 1.0);
+    Delta2::model::ParticleHandler ph(particles);
+
+    Delta2::collision::BroadPhaseCollisions C = Delta2::collision::broadPhaseEmbree(ph, 1.0);
 
     REQUIRE( C.size() == 9 );
 }
@@ -48,11 +51,13 @@ TEST_CASE("Broad phase Embree moving", "[grp_collision_detection][broad_phase]")
         particles.push_back(P);
     }
 
-    Delta2::collision::BroadPhaseCollisions C = Delta2::collision::broadPhaseEmbree(particles, 0.1);
+    Delta2::model::ParticleHandler ph(particles);
+
+    Delta2::collision::BroadPhaseCollisions C = Delta2::collision::broadPhaseEmbree(ph, 0.1);
 
     REQUIRE( C.size() == 0 );
     
-    C = Delta2::collision::broadPhaseEmbree(particles, 0.5);
+    C = Delta2::collision::broadPhaseEmbree(ph, 0.5);
 
     REQUIRE( C.size() == 1 );
 }
@@ -81,11 +86,13 @@ TEST_CASE("Broad phase Embree static", "[grp_collision_detection][broad_phase]")
         particles.push_back(P);
     }
 
-    Delta2::collision::BroadPhaseCollisions C = Delta2::collision::broadPhaseEmbree(particles, 0.1);
+    Delta2::model::ParticleHandler ph(particles);
+
+    Delta2::collision::BroadPhaseCollisions C = Delta2::collision::broadPhaseEmbree(ph, 0.1);
 
     REQUIRE( C.size() == 0 );
     
-    C = Delta2::collision::broadPhaseEmbree(particles, 1.0);
+    C = Delta2::collision::broadPhaseEmbree(ph, 1.0);
 
     REQUIRE( C.size() == 1 );
 
@@ -95,7 +102,9 @@ TEST_CASE("Broad phase Embree static", "[grp_collision_detection][broad_phase]")
         particles.push_back(P);
     }
 
-    C = Delta2::collision::broadPhaseEmbree(particles, 1.0);
+    ph = Delta2::model::ParticleHandler(particles);
+
+    C = Delta2::collision::broadPhaseEmbree(ph, 1.0);
 
     REQUIRE( C.size() == 2 );
 }
@@ -103,7 +112,9 @@ TEST_CASE("Broad phase Embree static", "[grp_collision_detection][broad_phase]")
 TEST_CASE("Broad phase embree empty", "[grp_collision_detection][broad_phase]") {
     std::vector<Delta2::Particle> particles;
 
-    Delta2::collision::BroadPhaseCollisions C = Delta2::collision::broadPhaseEmbree(particles, 1.0);
+    Delta2::model::ParticleHandler ph(particles);
+
+    Delta2::collision::BroadPhaseCollisions C = Delta2::collision::broadPhaseEmbree(ph, 1.0);
 
     REQUIRE( C.size() == 0 );
 }

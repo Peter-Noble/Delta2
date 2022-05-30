@@ -62,8 +62,9 @@ void Delta2::model::friction_solve(ParticleHandler& particles, std::vector<colli
 
             if (iterations == 0) {
                 double mu = sqrt(A.friction_coeff * A.friction_coeff + B.friction_coeff * B.friction_coeff);
-                Eigen::Vector<double, 3> f_n = Delta2::model::calcForce(c, 1.0, step_size);
-                max_force[h_i] = f_n.norm() * mu;
+                // Eigen::Vector<double, 3> f_n = Delta2::model::calcForce(c, 1.0, step_size);
+                // max_force[h_i] = f_n.norm() * mu;
+                max_force[h_i] = c.force_mag * mu;
             }
 
             Eigen::Vector3d a_hit_point = c.A.cast<double>();

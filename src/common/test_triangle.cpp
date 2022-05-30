@@ -77,7 +77,8 @@ TEMPLATE_TEST_CASE( "Triangle interaction methods", "[grp_common][triangle]", fl
     Delta2::common::Edge<TestType> E(start, end);
     TestType t;
     bool isIntersecting;
-    Eigen::Vector<TestType, 3> intersect_pt = tri2.intersectSegment(E, t, isIntersecting);
+    bool t_inf;
+    Eigen::Vector<TestType, 3> intersect_pt = tri2.intersectSegment(E, t, t_inf, isIntersecting);
 
     REQUIRE( isIntersecting );
     REQUIRE( t == Approx(t) );

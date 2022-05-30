@@ -8,7 +8,9 @@ namespace Delta2 {
     namespace collision{
         template<typename real>
         struct Contact {
-            Contact(const Eigen::Vector<real, 3>& A, const Eigen::Vector<real, 3>& B, real eps_a, real eps_b, real eps_inner_a, real eps_inner_b, Particle& particle_a, Particle& particle_b) : A(A), B(B), eps_a(eps_a), eps_b(eps_b), eps_inner_a(eps_inner_a), eps_inner_b(eps_inner_b), p_a(&particle_a), p_b(&particle_b) {};
+            Contact(const Eigen::Vector<real, 3>& A, const Eigen::Vector<real, 3>& B, real eps_a, real eps_b, real eps_inner_a, real eps_inner_b, Particle& particle_a, Particle& particle_b) : A(A), B(B), eps_a(eps_a), eps_b(eps_b), eps_inner_a(eps_inner_a), eps_inner_b(eps_inner_b), p_a(&particle_a), p_b(&particle_b) {
+                force_mag = 0.0;
+            };
             Eigen::Vector<real, 3> A;
             Eigen::Vector<real, 3> B;
             real eps_a;
@@ -17,6 +19,7 @@ namespace Delta2 {
             real eps_inner_b;
             Particle* p_a;
             Particle* p_b;
+            real force_mag;
         };
         template struct Contact<float>;
         template struct Contact<double>;
