@@ -680,6 +680,7 @@ namespace Delta2 {
         template<typename real>
         real triTriCCDLinear(const Delta2::common::Triangle<real> &a, const Eigen::Matrix<real, 4, 4>& a_T_start, const Eigen::Matrix<real, 4, 4> &a_T_end, const Delta2::common::Triangle<real> &b, const Eigen::Matrix<real, 4, 4> &b_T_start, const Eigen::Matrix<real, 4, 4> &b_T_end, Eigen::Vector<real, 3> &P_out, Eigen::Vector<real, 3> &Q_out, real &TOC_out) {
             real dist_min = std::numeric_limits<real>::infinity();
+            TOC_out = 1.0;
 
             Delta2::common::Triangle<real> a_start = a.transformed(a_T_start);
             Delta2::common::Triangle<real> a_end = a.transformed(a_T_end);
@@ -781,9 +782,9 @@ namespace Delta2 {
 
         template<int branching, class bucket_real>
 		void findContactsBucketContinuousComparison(std::vector<DeferredCompare>& bucket_pairs, Particle& a, Particle& b, std::vector<ContinuousContact<bucket_real>>& hits, std::vector<int>& pair_used_out) {
-			__itt_domain* domain = __itt_domain_create("My Domain");
-            __itt_string_handle* continuous_soup_bucket_task = __itt_string_handle_create("Continuous soup bucket");
-            __itt_string_handle* continuous_soup_triangle_task = __itt_string_handle_create("Continuous soup triangle");
+			// __itt_domain* domain = __itt_domain_create("My Domain");
+            // __itt_string_handle* continuous_soup_bucket_task = __itt_string_handle_create("Continuous soup bucket");
+            // __itt_string_handle* continuous_soup_triangle_task = __itt_string_handle_create("Continuous soup triangle");
             
             float search_dist = a.geo_eps + b.geo_eps;
             pair_used_out.reserve(bucket_pairs.size());
@@ -795,7 +796,7 @@ namespace Delta2 {
             Eigen::Matrix<bucket_real, 4, 4> b_t_end = b.future_state.getTransformation().cast<bucket_real>();
 
 			for (DeferredCompare& dc : bucket_pairs) {
-                __itt_task_begin(domain, __itt_null, __itt_null, continuous_soup_bucket_task);
+                // __itt_task_begin(domain, __itt_null, __itt_null, continuous_soup_bucket_task);
 				std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
 				std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
 
@@ -804,7 +805,7 @@ namespace Delta2 {
                     common::bbox<bucket_real> a_bbox = a_tri.transformed(a_t_start).bbox().expand(a_tri.transformed(a_t_end).bbox()).expand(a.geo_eps);
 
                     for (common::Triangle<bucket_real>& b_tri : b_bucket->getTriangles()) {
-                        __itt_task_begin(domain, __itt_null, __itt_null, continuous_soup_triangle_task);
+                        // __itt_task_begin(domain, __itt_null, __itt_null, continuous_soup_triangle_task);
                     
                         common::bbox<bucket_real> b_bbox = b_tri.transformed(b_t_start).bbox().expand(b_tri.transformed(b_t_end).bbox()).expand(b.geo_eps);
 
@@ -818,11 +819,11 @@ namespace Delta2 {
                                 hits.push_back(ci);
                             }
                         }
-                        __itt_task_end(domain);
+                        // __itt_task_end(domain);
                     }
 				}
                 pair_used_out.push_back(hits.size());
-                __itt_task_end(domain);
+                // __itt_task_end(domain);
 			}
 		};
 
