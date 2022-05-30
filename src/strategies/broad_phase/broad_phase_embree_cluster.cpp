@@ -17,6 +17,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
     {
         p->last_time_step_size *= 1.1;
         p->projectFutureState(p->last_time_step_size);
+        assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
 
     collision::BroadPhaseCollisions B;
@@ -59,6 +60,11 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         fine_min_final_time = std::min(fine_min_final_time, clusters[cluster_i].min_current_time + step);
 
         printf("Selected time: %f for cluster %i\n", step, cluster_i);
+    }
+
+    for (Particle* p : particles)
+    {
+        assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
 
     // Splitting into two loops makes this point act like a sync point.

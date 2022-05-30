@@ -32,6 +32,11 @@ void PDEExplicit::step(collision::Cluster& cluster) {
     std::vector<int> counts;
     std::vector<bool> can_advance;
 
+    for (Particle* p : cluster.particles)
+    {
+        assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
+    }
+
     for (Particle* p : cluster.particles) {
         forces.emplace_back(0.0, 0.0, 0.0);
         torques.emplace_back(0.0, 0.0, 0.0);
@@ -56,13 +61,18 @@ void PDEExplicit::step(collision::Cluster& cluster) {
         // }
     }
 
+    for (Particle* p : cluster.particles)
+    {
+        assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
+    }
+
     std::mutex lock;
 
-    #pragma omp parallel
+    // #pragma omp parallel
     {
-        #pragma omp single
+        // #pragma omp single
         {
-            #pragma omp taskloop
+            // #pragma omp taskloop
             for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
             {
                 collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
@@ -87,6 +97,11 @@ void PDEExplicit::step(collision::Cluster& cluster) {
     
     _contact_force.solve(cluster, hits);
     
+    for (Particle* p : cluster.particles)
+    {
+        assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
+    }
+
     for (Particle *p : cluster.particles)
     {
         if (!p->is_static)
@@ -97,5 +112,10 @@ void PDEExplicit::step(collision::Cluster& cluster) {
 
             printf("Post integration state of %i: last time %f, time %f, future time %f, sleep from %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), p->sleep_candidate_time);
         }
+    }
+
+    for (Particle* p : cluster.particles)
+    {
+        assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
 }
