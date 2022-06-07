@@ -11,6 +11,11 @@ namespace Delta2 {
             Contact(const Eigen::Vector<real, 3>& A, const Eigen::Vector<real, 3>& B, real eps_a, real eps_b, real eps_inner_a, real eps_inner_b, Particle& particle_a, Particle& particle_b) : A(A), B(B), eps_a(eps_a), eps_b(eps_b), eps_inner_a(eps_inner_a), eps_inner_b(eps_inner_b), p_a(&particle_a), p_b(&particle_b) {
                 force_mag = 0.0;
             };
+            bool operator < (const Contact& other) const {
+                double this_proportion = (A - B).norm() / (eps_a + eps_b);
+                double other_proportion = (other.A - other.B).norm() / (other.eps_a + other.eps_b);
+                return this_proportion < other_proportion;
+            }
             Eigen::Vector<real, 3> A;
             Eigen::Vector<real, 3> B;
             real eps_a;

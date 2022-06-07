@@ -59,6 +59,8 @@ SequentialImpulsesSTime::SequentialImpulsesSTime(FrictionStrategy& friction,
 void SequentialImpulsesSTime::solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits) {
     std::vector<LocalContactS> contacts;
 
+    std::sort(hits.begin(), hits.end());
+
     for (int c = 0; c < hits.size(); c++) {
         LocalContactS lc;
 
@@ -180,11 +182,11 @@ void SequentialImpulsesSTime::solve(collision::Cluster& cluster, std::vector<col
 
             Eigen::Vector3d p0_A = common::transform(contacts[c].local_A, hits[c].p_a->current_state.getTransformation());
             Eigen::Vector3d p0_B = common::transform(contacts[c].local_B, hits[c].p_b->current_state.getTransformation());
-            double d0 = (p0_A - p0_B).norm();
+            double d0 = p0_B.dot(n) - p0_A.dot(n);
 
             Eigen::Vector3d ps_A = common::transform(contacts[c].local_A, contacts[c].S_A.getTransformation());
             Eigen::Vector3d ps_B = common::transform(contacts[c].local_B, contacts[c].S_B.getTransformation());
-            double ds = (ps_A - ps_B).norm();
+            double ds = ps_B.dot(n) - ps_A.dot(n);
 
             printf("Start of iteration ds: %f\n", ds);
 
@@ -216,10 +218,18 @@ void SequentialImpulsesSTime::solve(collision::Cluster& cluster, std::vector<col
             auto eq = [=](double dist, double s) { return -F_last*dt*s/Meff - s*(-v0 + vs)/s_last - v0 + dt*s*(0.5*std::max(0.0, (-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer)) + 0.5*std::max(0.0, -1/(-inner + outer) + (-inner + outer)/std::pow(d0 - inner, 2)))/Meff; };
             auto grad = [=](double dist, double s) { return -F_last*dt/Meff - (-v0 + vs)/s_last - 1.0*dt*s*(-d0 + ds)*(-inner + outer)*Heaviside((-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer))/(Meff*s_last*std::pow(d0 - inner + s*(-d0 + ds)/s_last, 3)) + dt*(0.5*std::max(0.0, (-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer)) + 0.5*std::max(0.0, -1/(-inner + outer) + (-inner + outer)/std::pow(d0 - inner, 2)))/Meff; };
 
+            double no_force_intersection = s_last * (inner - d0) / (ds - d0);
+
+            if (no_force_intersection <= s) {
+                s = no_force_intersection * 0.9;
+                double d = d0 + s * (ds - d0) / s_last;
+                assert(grad(d, s) > 0.0);
+            }
+
             for (int i = 0; i < 10; i++) {
                 double d = d0 + s * (ds - d0) / s_last;
                 double e = eq(d, s);
-                double g = grad(g, s);
+                double g = grad(d, s);
                 s -= eq(d, s) / grad(d, s);
                 s = std::min(std::max(0.0, s), 1.0);
             }

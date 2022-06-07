@@ -3,6 +3,7 @@
 #include "../../model/particle.h"
 #include "../../collision_detection/broad_phase_embree.h"
 #include "../../collision_detection/separate_clusters.h"
+#include "../../common/viewer.h"
 
 using namespace Delta2;
 using namespace strategy;
@@ -95,6 +96,5 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
             printf("Cluster %i stepped forward %f\n", clusters[cluster_i].step_size, cluster_i);
         }
-
     }
 }
