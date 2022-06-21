@@ -462,11 +462,11 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
     std::mutex lock;
 
-    #pragma omp parallel
+    // #pragma omp parallel
     {
-        #pragma omp single
+        // #pragma omp single
         {
-            #pragma omp taskloop
+            // #pragma omp taskloop
             for (int b_i = 0; b_i < cluster.interations.size(); b_i++) {
                 int tid = omp_get_thread_num();
 
@@ -497,8 +497,8 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
                         Eigen::Vector<double, 3> rel_vel = a_vel - b_vel;
 
-                        if (hit_normal.normalized().dot(rel_vel.normalized()) <= 0.0) {
-                            if (hit_normal.norm() < 1e-8) {
+                        if (hit_normal.normalized().dot(rel_vel.normalized()) <= 0.0 || hit_normal.norm() < 1e-4) {
+                            if (hit_normal.norm() < 1e-4) {
                                 if (c.toc == 0.0) {
                                     throw std::runtime_error("Invalid configuration");
                                     continue;
