@@ -45,8 +45,8 @@ std::vector<Delta2::Particle> particles;
         std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
         {
             auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
-            p.current_state.setTranslation({0.0, 0.0, 1.05});
-            p.current_state.setVelocity({0.0, 0.0, -0.3});
+            p.current_state.setTranslation({0.0, 0.0, 1.03});
+            p.current_state.setVelocity({0.0, 0.0, -0.2});
             // p.current_state.setAngular({-10, -5, 0});
         }
         // {
