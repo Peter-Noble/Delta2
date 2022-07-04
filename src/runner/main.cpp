@@ -9,7 +9,7 @@
 #include "../model/particle_handler.h"
 
 #include <thread>
-#include <CL/sycl.hpp>
+// #include <CL/sycl.hpp>
 #include <ittnotify.h>
 
 #include "../strategies/contact_force/contact_force_local.h"

@@ -26,6 +26,7 @@ namespace Delta2 {
                 void addEigenMesh(const Eigen::Matrix4d& V, const Eigen::MatrixXi& F);
                 void addParticle(const Particle& P);
                 void addParticleInterval(const Particle& P);
+                void addEdge(common::Edge<double> edge);
             
                 void show();
                 igl::opengl::glfw::Viewer& getViewer();
@@ -33,6 +34,7 @@ namespace Delta2 {
                 Eigen::MatrixXd _V;
                 Eigen::MatrixXi _F;
                 igl::opengl::glfw::Viewer _viewer;
+                std::vector<common::Edge<double>> _edges;
         };
         class AnimationViewer {
             public:

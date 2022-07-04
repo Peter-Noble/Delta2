@@ -104,7 +104,9 @@ void SequentialImpulsesSTime::solve(collision::Cluster& cluster, std::vector<col
         lc.global_normal = (hits[c].B - hits[c].A) / 2.0;
         lc.global_tangent = {0, 0, 0}; // TODO
 
-        if (lc.global_normal.norm() == 0) {
+        printf("Normal: %f, %f, %f\n", lc.global_normal.x(), lc.global_normal.y(), lc.global_normal.z());
+
+        if (lc.global_normal.norm() < 1e-6) {
             assert(false);
         }
 
@@ -390,6 +392,7 @@ void SequentialImpulsesSTime::solve(collision::Cluster& cluster, std::vector<col
         }
     }
 
+    _friction.solve(ph, hits, forces, torques, counts, external_force, step_size);
     // TODO solve friction
 
     // Solve post S
