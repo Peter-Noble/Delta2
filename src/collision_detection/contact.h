@@ -33,6 +33,9 @@ namespace Delta2 {
         bool compareContacts(const Contact<real>& a, const Contact<real>& b) {
             double a_eps = a.eps_a + a.eps_b;
             double b_eps = b.eps_a + b.eps_b;
+            if (a_eps == b_eps) {
+                return (a.A - a.B).norm() < (b.A - b.B).norm();
+            }
             return a_eps < b_eps;
         }
         template bool compareContacts<float>(const Contact<float>& a, const Contact<float>& b);
