@@ -14,6 +14,19 @@ void Viewer::show() {
 
     _viewer.data().set_mesh(V, _F);
 
+    int num_edges = _edges.size();
+    Eigen::MatrixXd a_pts;
+    a_pts.resize(num_edges, 3);
+    Eigen::MatrixXd b_pts;
+    b_pts.resize(num_edges, 3);
+    for (int e_i = 0; e_i < num_edges; e_i++) {
+        a_pts.row(e_i) = transform(_edges[e_i].A, T);
+        b_pts.row(e_i) = transform(_edges[e_i].B, T);
+    }
+    _viewer.data().add_points(a_pts, Eigen::RowVector3d(1.0, 0.0, 0.0));
+    _viewer.data().add_points(b_pts, Eigen::RowVector3d(0.0, 0.0, 1.0));
+    _viewer.data().add_edges(a_pts, b_pts, Eigen::RowVector3d(1.0, 1.0, 1.0));
+
     _viewer.launch(true, false, "Delta2", 0, 0);
 }
 
@@ -25,9 +38,17 @@ void Viewer::addParticle(const Particle& P) {
     concatMesh(_V, _F, P.getTransformedVertices(), P.getFaces(), _V, _F);
 }
 
+void Viewer::addParticleFuture(const Particle& P) {
+    concatMesh(_V, _F, P.getTransformedVerticesFuture(), P.getFaces(), _V, _F);
+}
+
 void Viewer::addParticleInterval(const Particle& P) {
     concatMesh(_V, _F, P.getTransformedVertices(), P.getFaces(), _V, _F);
     concatMesh(_V, _F, P.getTransformedVerticesFuture(), P.getFaces(), _V, _F);
+}
+
+void Viewer::addEdge(common::Edge<double> edge) {
+    _edges.push_back(edge);
 }
 
 igl::opengl::glfw::Viewer& Viewer::getViewer() {
@@ -104,7 +125,6 @@ void AnimationViewer::show() {
             V = transform(V, T);
             _viewer.data().set_mesh(V, F);
             _viewer.data().set_colors(C);
-
             int num_edges = _edges[_frame].size();
             Eigen::MatrixXd a_pts;
             a_pts.resize(num_edges, 3);
