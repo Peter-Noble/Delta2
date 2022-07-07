@@ -34,6 +34,7 @@ namespace Delta2 {
         std::shared_ptr<MeshData> mesh;
 
         void rollBackState(double time);
+        State updateState(double t, const Eigen::Vector3d& force, const Eigen::Vector3d& torque);
 
         State last_state;
         State current_state;

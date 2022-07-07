@@ -2,6 +2,7 @@
 #include "../common/basic_utils.h"
 
 using namespace Delta2;
+using namespace Eigen;
 
 Particle::Particle(std::shared_ptr<MeshData> m, double density, double friction_co, double eps) {
     mesh = m;
@@ -104,4 +105,35 @@ double Particle::maxDifferenceToCurrent(const State& S) {
     double ang = S.getRotation().angularDistance(current_state.getRotation());
     double rot_dist = mesh->getBoundingRadius() * std::tan(ang);
     return (rot_dist + (current_state.getTranslation() - S.getTranslation()).norm()) / (S.getTime() - current_state.getTime());
+}
+
+State Particle::updateState(double t, const Vector3d& force, const Vector3d& torque) {
+    State updated = current_state;
+
+    updated.setTime(current_state.getTime() + t);
+    Vector3d vel_change = t * force / getMass();
+    updated.setVelocity(current_state.getVelocity() + t * force / getMass());
+    // updated.setTranslation(getTranslation() + t * updated.getVelocity() + force_offset);
+    Vector3d pos_change_from_velocity = t * current_state.getVelocity();
+    Vector3d pos_change_from_accel = 0.5 * force / getMass() * t * t;
+    updated.setTranslation(current_state.getTranslation() + t * current_state.getVelocity() + 0.5 * force / getMass() * t * t);
+
+    // https://link.springer.com/content/pdf/10.1007/s00707-013-0914-2.pdf
+
+    Eigen::Vector3d angular_momentum = current_state.getAngularMomentum() + t * torque;
+
+    Eigen::Quaterniond rotation = current_state.getRotation();
+
+    updated.setAngular(angular_momentum);
+
+    Eigen::Matrix3d R = rotation.toRotationMatrix();
+    Eigen::Matrix3d Iinv = R * getInverseInertiaMatrix() * R.transpose();
+    Eigen::Vector3d omega = Iinv * angular_momentum;
+
+    Eigen::Quaterniond rot_delta = Delta2::common::exp(0.5 * omega * t);
+
+    rotation = rot_delta * rotation;
+    updated.setRotation(rotation);
+
+    return updated;
 }

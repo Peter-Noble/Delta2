@@ -2,6 +2,7 @@
 #include "../common/utils.h"
 
 using namespace Delta2;
+using namespace Eigen;
 
 State::State() {
     _time = 0;
