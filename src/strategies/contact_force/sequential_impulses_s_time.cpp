@@ -193,98 +193,85 @@ void SequentialImpulsesSTime::solve(collision::Cluster& cluster, std::vector<col
 
     double damp_start = 0.75;
 
+    std::vector<State> SStates;
+    std::vector<State> FStates;
+    for (int p = 0; p < cluster.particles.size(); p++) {
+        SStates.push_back(cluster.particles[p].current_state);
+        FStates.push_back(cluster.particles[p].future_state);
+    }
+
     int iterations = 100;
+    int primary = 0;
+    double s = 1.0;
     for (int it = 0; it < iterations; it++) {
-        for (int p = 0; p < cluster.particles.size(); p++) {
-            min_s[p] = 1.0;
-        }
-        for (int c = 0; c < hits.size(); c++) {
-            uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
-            uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
+        printf("Iteration: %i\n", it);
+        double s_last = s;
 
-            // Integrate without the contribution of this contact.  Then solve for s, work out the contribution of this contact and add it.
+        int primary_a_id, primary_b_id;
+        {
+            uint32_t a_id = cluster.particles.getLocalID(hits[primary].p_a->id);
+            uint32_t b_id = cluster.particles.getLocalID(hits[primary].p_b->id);
+            primary_a_id = a_id;
+            primary_b_id = b_id;
 
-            double outer = hits[c].eps_a + hits[c].eps_b;
-            double inner = hits[c].eps_inner_a + hits[c].eps_inner_b;
-            Eigen::Vector3d n = contacts[c].global_normal.normalized();
+            if (!hits[primary].p_a->is_static)
+            {
+                Eigen::Vector3d force = forces[a_id];
+                Eigen::Vector3d torque = torques[a_id];
+                Eigen::Vector3d force_offset = force_offsets[a_id];
+                Eigen::Vector3d torque_offset = torque_offsets[a_id];
+                double t = contacts[primary].s * cluster.step_size;
+                SStates[a_id] = updateState(hits[primary].p_a->current_state, t, force, force_offset, torque, torque_offset, hits[primary].p_a);
+            }
+
+            if (!hits[primary].p_b->is_static)
+            {
+                Eigen::Vector3d force = forces[b_id];
+                Eigen::Vector3d torque = torques[b_id];
+                Eigen::Vector3d force_offset = force_offsets[b_id];
+                Eigen::Vector3d torque_offset = torque_offsets[b_id];
+                double t = contacts[primary].s * cluster.step_size;
+                SStates[b_id] = updateState(hits[primary].p_b->current_state, t, force, force_offset, torque, torque_offset, hits[primary].p_b);
+            }
+
+            double outer = hits[primary].eps_a + hits[primary].eps_b;
+            double inner = hits[primary].eps_inner_a + hits[primary].eps_inner_b;
+            Eigen::Vector3d n = contacts[primary].global_normal.normalized();
             auto F = [=](double dist) { return std::max(0.0, (outer - inner) / ((dist - inner)*(dist - inner)) - (outer - inner) / ((outer - inner)*(outer - inner))); };
             auto integral = [=](double dist) { return (inner - outer) / (dist - inner) - dist / (inner - outer); };
 
-            Eigen::Vector3d force_last = -n * contacts[c].force_last;
-            Eigen::Vector3d pre_A = common::transform(contacts[c].local_A, contacts[c].S_A.getTransformation());
+            Eigen::Vector3d force_last = -n * contacts[primary].force_last;
+            Eigen::Vector3d pre_A = common::transform(contacts[primary].local_A, contacts[primary].S_A.getTransformation());
             Eigen::Vector3d t_a_last = model::calcTorque(force_last, pre_A, cluster.particles[a_id].current_state.getTranslation());
-            Eigen::Vector3d pre_B = common::transform(contacts[c].local_B, contacts[c].S_B.getTransformation());
+            Eigen::Vector3d pre_B = common::transform(contacts[primary].local_B, contacts[primary].S_B.getTransformation());
             Eigen::Vector3d t_b_last = model::calcTorque(Eigen::Vector3d(-force_last), pre_B, cluster.particles[b_id].current_state.getTranslation());
 
-            if (!hits[c].p_a->is_static)
-            {
-                // Eigen::Vector3d force = forces[a_id] - force_last;
-                // Eigen::Vector3d torque = torques[a_id] - t_a_last;
-                Eigen::Vector3d force = forces[a_id]; // - force_last;
-                Eigen::Vector3d torque = torques[a_id]; // - t_a_last;
-                Eigen::Vector3d force_offset = force_offsets[a_id];
-                Eigen::Vector3d torque_offset = torque_offsets[a_id];
-                double t = contacts[c].s * cluster.step_size;
-                contacts[c].S_A = updateState(hits[c].p_a->current_state, t, force, force_offset, torque, torque_offset, hits[c].p_a);
-                // contacts[c].S_A = updateState(hits[c].p_a->current_state, cluster.step_size, force, force_offset, torque, torque_offset, hits[c].p_a);
-            }
-
-            if (!hits[c].p_b->is_static)
-            {
-                // Eigen::Vector3d force = forces[b_id] + force_last;
-                // Eigen::Vector3d torque = torques[b_id] - t_b_last;
-                Eigen::Vector3d force = forces[b_id]; // + force_last;
-                Eigen::Vector3d torque = torques[b_id]; // - t_b_last;
-                Eigen::Vector3d force_offset = force_offsets[b_id];
-                Eigen::Vector3d torque_offset = torque_offsets[b_id];
-                double t = contacts[c].s * cluster.step_size;
-                contacts[c].S_B = updateState(hits[c].p_b->current_state, t, force, force_offset, torque, torque_offset, hits[c].p_b);
-                // contacts[c].S_B = updateState(hits[c].p_b->current_state, cluster.step_size, force, force_offset, torque, torque_offset, hits[c].p_b);
-            }
-
-            Eigen::Vector3d p0_A = common::transform(contacts[c].local_A, hits[c].p_a->current_state.getTransformation());
-            Eigen::Vector3d p0_B = common::transform(contacts[c].local_B, hits[c].p_b->current_state.getTransformation());
+            Eigen::Vector3d p0_A = common::transform(contacts[primary].local_A, hits[primary].p_a->current_state.getTransformation());
+            Eigen::Vector3d p0_B = common::transform(contacts[primary].local_B, hits[primary].p_b->current_state.getTransformation());
             double d0 = p0_B.dot(n) - p0_A.dot(n);
 
-            Eigen::Vector3d ps_A = common::transform(contacts[c].local_A, contacts[c].S_A.getTransformation());
-            Eigen::Vector3d ps_B = common::transform(contacts[c].local_B, contacts[c].S_B.getTransformation());
+            Eigen::Vector3d ps_A = common::transform(contacts[primary].local_A, contacts[primary].S_A.getTransformation());
+            Eigen::Vector3d ps_B = common::transform(contacts[primary].local_B, contacts[primary].S_B.getTransformation());
             double ds = ps_B.dot(n) - ps_A.dot(n);
             double ds_orig = ds;
 
             // printf("Start of iteration ds: %f\n", ds);
 
-            Eigen::Vector3d v0_A = hits[c].p_a->current_state.pointVelocity(p0_A, hits[c].p_a->getInverseInertiaMatrix());
-            Eigen::Vector3d v0_B = hits[c].p_b->current_state.pointVelocity(p0_B, hits[c].p_b->getInverseInertiaMatrix());
+            Eigen::Vector3d v0_A = hits[primary].p_a->current_state.pointVelocity(p0_A, hits[primary].p_a->getInverseInertiaMatrix());
+            Eigen::Vector3d v0_B = hits[primary].p_b->current_state.pointVelocity(p0_B, hits[primary].p_b->getInverseInertiaMatrix());
             double v0 = v0_A.dot(n) - v0_B.dot(n);
 
-            Eigen::Vector3d vs_A = contacts[c].S_A.pointVelocity(ps_A, hits[c].p_a->getInverseInertiaMatrix());
-            Eigen::Vector3d vs_B = contacts[c].S_B.pointVelocity(ps_B, hits[c].p_b->getInverseInertiaMatrix());
+            Eigen::Vector3d vs_A = contacts[primary].S_A.pointVelocity(ps_A, hits[primary].p_a->getInverseInertiaMatrix());
+            Eigen::Vector3d vs_B = contacts[primary].S_B.pointVelocity(ps_B, hits[primary].p_b->getInverseInertiaMatrix());
             double vs = vs_A.dot(n) - vs_B.dot(n);
 
             double dt = cluster.step_size;
             double F_ext = forces[b_id].dot(n) - forces[a_id].dot(n);
-            double Meff = contacts[c].mass_eff_normal;
-            double F_last = contacts[c].force_last;
+            double Meff = contacts[primary].mass_eff_normal;
+            double F_last = contacts[primary].force_last;
             // double F_last = 0.0;
 
-            double s_last = contacts[c].s;
-            // s_last = 1.0;
-            double s = s_last;
-
             auto Heaviside = [](double f) { return f >= 0.0 ? 1.0 : 0.0; };
-            // These ones solve for final velocity of vs but the velocity changes over the time interval so the velocity we solve for needs to depend on s
-            // auto eq = [=](double dist, double s) { return -vs + s*dt*(0.5*std::max(0.0, (-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer)) + 0.5*std::max(0.0, -1/(-inner + outer) + (-inner + outer)/std::pow(d0 - inner, 2)))/Meff; };
-            // auto grad = [=](double dist, double s) { return -1.0*s*dt*(-d0 + ds)*(-inner + outer)*Heaviside((-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer))/(Meff*s_last*std::pow(d0 - inner + s*(-d0 + ds)/s_last, 3)) + dt*(0.5*std::max(0.0, (-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer)) + 0.5*std::max(0.0, -1/(-inner + outer) + (-inner + outer)/std::pow(d0 - inner, 2)))/Meff; };
-
-            // Works for the first iteration but then the velocity is zero so contact moves earlier and earlier
-            // auto eq = [=](double dist, double s) { return -s*(-v0 + vs)/s_last - v0 + s*dt*(0.5*std::max(0.0, (-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer)) + 0.5*std::max(0.0, -1/(-inner + outer) + (-inner + outer)/std::pow(d0 - inner, 2)))/Meff; };
-            // auto grad = [=](double dist, double s) { return -(-v0 + vs)/s_last - 1.0*s*dt*(-d0 + ds)*(-inner + outer)*Heaviside((-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer))/(Meff*s_last*std::pow(d0 - inner + s*(-d0 + ds)/s_last, 3)) + dt*(0.5*std::max(0.0, (-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer)) + 0.5*std::max(0.0, -1/(-inner + outer) + (-inner + outer)/std::pow(d0 - inner, 2)))/Meff; };
- 
-            // auto eq = [=](double dist, double s) { return (-F_last*s_last*dt/Meff) - s*(-v0 + vs)/s_last - v0 + dt*s*(0.5*std::max(0.0, (-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer)) + 0.5*std::max(0.0, -1/(-inner + outer) + (-inner + outer)/std::pow(d0 - inner, 2)))/Meff; };
-            // auto grad = [=](double dist, double s) { return (-F_last*dt/Meff) - (-v0 + vs)/s_last - 1.0*dt*s*(-d0 + ds)*(-inner + outer)*Heaviside((-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer))/(Meff*s_last*std::pow(d0 - inner + s*(-d0 + ds)/s_last, 3)) + dt*(0.5*std::max(0.0, (-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer)) + 0.5*std::max(0.0, -1/(-inner + outer) + (-inner + outer)/std::pow(d0 - inner, 2)))/Meff; };
-
-            // auto eq = [=](double dist, double s) { return -(s*(-F_last*dt*s/Meff - v0 + vs) + v0)/s_last + dt*s*(0.5*std::max(0.0, (-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer)) + 0.5*std::max(0.0, -1/(-inner + outer) + (-inner + outer)/std::pow(d0 - inner, 2)))/Meff; };
-            // auto grad = [=](double dist, double s) { return -(-2*F_last*dt*s/Meff - v0 + vs)/s_last - 1.0*dt*s*(-d0 + ds)*(-inner + outer)*Heaviside((-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer))/(Meff*s_last*std::pow(d0 - inner + s*(-d0 + ds)/s_last, 3)) + dt*(0.5*std::max(0.0, (-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer)) + 0.5*std::max(0.0, -1/(-inner + outer) + (-inner + outer)/std::pow(d0 - inner, 2)))/Meff; };
 
             auto eq = [=](double dist, double s) { return -s*(-v0 + vs)/s_last - v0 + dt*s*(-F_last + 0.5*std::max(0.0, (-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2.0) - 1.0/(-inner + outer)) + 0.5*std::max(0.0, -1.0/(-inner + outer) + (-inner + outer)/std::pow(d0 - inner, 2.0)))/Meff; };
             auto grad = [=](double dist, double s) { return -(-v0 + vs)/s_last - 1.0*dt*s*(-d0 + ds)*(-inner + outer)*Heaviside((-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer))/(Meff*s_last*std::pow(d0 - inner + s*(-d0 + ds)/s_last, 3)) + dt*(-F_last + 0.5*std::max(0.0, (-inner + outer)/std::pow(d0 - inner + s*(-d0 + ds)/s_last, 2) - 1/(-inner + outer)) + 0.5*std::max(0.0, -1/(-inner + outer) + (-inner + outer)/std::pow(d0 - inner, 2)))/Meff; };
@@ -298,109 +285,128 @@ void SequentialImpulsesSTime::solve(collision::Cluster& cluster, std::vector<col
             }
 
             for (int i = 0; i < 10; i++) {
-                double velocity_change = ((F(d0+s*(ds-d0)/s_last) + F(d0))/2.0 - F_last) * (s * dt) / Meff;
-                double eq_rhs = (v0+s*(vs-v0)/s_last);
-
                 double d = d0 + s * (ds - d0) / s_last;
-                // printf("d: %f\n", d);
                 double e = eq(d, s);
-                // double e = velocity_change_sympy - eq_rhs_sympy;
                 double g = grad(d, s);
-                // printf("s: %f, e: %f, g %f\n", s, e, g);
                 s -= e / g;
                 s = std::min(std::max(0.0, s), 1.0);
-                double force_z = (F(d0) + F(d)) / 2.0;
-                // printf("Force z: %f\n", force_z);
-                // printf("Eq: %f, %f\n", velocity_change, eq_rhs);
             }
 
-            double last = contacts[c].force_last;
+            contacts[primary].s = s > 1e-6 ? s : 1.0;
 
-            if (s > 0.0) {
-                contacts[c].s = s;
-                min_s[a_id] = std::min(min_s[a_id], s);
-                min_s[b_id] = std::min(min_s[b_id], s);
-
-                ds = d0+s*(ds-d0)/s_last;
-                // printf("New ds: %f\n", ds);
-                double F0 = F(d0);
-                double F1 = F(ds);
-                contacts[c].force_last = std::max(0.0, (F(d0) + F(ds)) / 2.0);
-            }
-            else {
-                contacts[c].s = 1.0;
-                ds = d0+1.0*(ds-d0)/s_last;
-                contacts[c].force_last = std::max(0.0, (F(d0) + F(ds)) / 2.0);
-            }
-
-            double force_diff = (contacts[c].force_last - last) * 0.8;
-            contacts[c].force_last -= (contacts[c].force_last - last) * 0.2;
-
-            double damp = damp_start + double(it) * (1.0 - damp_start) / double(iterations);
-            double pre_damp = contacts[c].force_last;
-            contacts[c].force_last = pre_damp * damp;
-            force_diff -= pre_damp * (1-damp);
-
-            Eigen::Vector3d f = -n * force_diff;
-
-            Eigen::Vector3d t_a = model::calcTorque(f, ps_A, contacts[c].S_A.getTranslation());
-            Eigen::Vector3d t_b = model::calcTorque(Eigen::Vector3d(-f), ps_B, contacts[c].S_B.getTranslation());
-
-            forces[a_id] += f;
-            // printf("Force A: %f\n", forces[a_id].z());
-            torques[a_id] += t_a;
-            forces[b_id] += -f;
-            torques[b_id] += t_b;
-
-            Vector3d f_offset = -n * contacts[c].force_move_offset;
-            Vector3d t_offset_a = model::calcTorque(f_offset, ps_A, contacts[c].S_A.getTranslation());  // TODO last two args here could probably be updated
-            Vector3d t_offset_b = model::calcTorque(Vector3d(-f_offset), ps_B, contacts[c].S_B.getTranslation());  // TODO last two args here could probably be updated
-            
-            force_offsets[a_id] -= f_offset;
-            force_offsets[b_id] += f_offset;
-            torque_offsets[a_id] -= t_offset_a;
-            torque_offsets[b_id] -= t_offset_b;
-
-            if (s > 0) {
-                contacts[c].force_move_offset = 0;
-            }
-            else {
-                contacts[c].force_move_offset = 0;
-            }
-
-            f_offset = -n * contacts[c].force_move_offset;
-            t_offset_a = model::calcTorque(f_offset, ps_A, contacts[c].S_A.getTranslation());  // TODO last two args here could probably be updated
-            t_offset_b = model::calcTorque(Vector3d(-f_offset), ps_B, contacts[c].S_B.getTranslation());  // TODO last two args here could probably be updated
-            
-            // TODO Has this correction factor been correctly removed?  The two step approach will take care of this instead?  Or is this to take into account the changing velocity?
-            // force_offsets[a_id] += f_offset;
-            // force_offsets[b_id] -= f_offset;
-            // torque_offsets[a_id] += t_offset_a;
-            // torque_offsets[b_id] += t_offset_b;
-
-            last_ds = ds;
-
+            if (!hits[primary].p_a->is_static)
             {
                 Eigen::Vector3d force = forces[a_id];
                 Eigen::Vector3d torque = torques[a_id];
-                double t = min_s[a_id] * cluster.step_size;
                 Eigen::Vector3d force_offset = force_offsets[a_id];
                 Eigen::Vector3d torque_offset = torque_offsets[a_id];
-                State SState = updateState(cluster.particles[a_id].current_state, t, force, force_offset, torque, torque_offset, &cluster.particles[a_id]);
-                if (s < 0.9 && s > 0.1 && SState.getVelocity().norm() > 1e-2 && it == iterations - 1 ) {
-                    printf("Strange\n");
-                }
+                double t = contacts[primary].s * cluster.step_size;
+                SStates[a_id] = updateState(hits[primary].p_a->current_state, t, force, force_offset, torque, torque_offset, hits[primary].p_a);
+            }
+
+            if (!hits[primary].p_b->is_static)
+            {
+                Eigen::Vector3d force = forces[b_id];
+                Eigen::Vector3d torque = torques[b_id];
+                Eigen::Vector3d force_offset = force_offsets[b_id];
+                Eigen::Vector3d torque_offset = torque_offsets[b_id];
+                double t = contacts[primary].s * cluster.step_size;
+                SStates[b_id] = updateState(hits[primary].p_b->current_state, t, force, force_offset, torque, torque_offset, hits[primary].p_b);
+            }
+        }
+
+        forces[primary_a_id] = external_force(cluster.particles[primary_a_id]);
+        forces[primary_b_id] = external_force(cluster.particles[primary_b_id]);
+        torques[primary_a_id] = { 0.0, 0.0, 0.0 };
+        torques[primary_b_id] = { 0.0, 0.0, 0.0 };
+
+        printf("Primary: %i, S: %f\n", primary, s);
+
+        // Update SStates for anything related to the contact we've just updated
+        for (int c = 0; c < hits.size(); c++) {
+            uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
+            uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
+
+            // If it's not just been updated then no point recomputing the SState
+            if (!(a_id == primary_a_id || b_id == primary_a_id || a_id == primary_b_id || b_id == primary_b_id)) {
+                continue;
+            }
+
+            double outer = hits[c].eps_a + hits[c].eps_b;
+            double inner = hits[c].eps_inner_a + hits[c].eps_inner_b;
+            Eigen::Vector3d n = contacts[c].global_normal.normalized();
+            auto F = [=](double dist) { return std::max(0.0, (outer - inner) / ((dist - inner)*(dist - inner)) - (outer - inner) / ((outer - inner)*(outer - inner))); };
+            auto integral = [=](double dist) { return (inner - outer) / (dist - inner) - dist / (inner - outer); };
+
+            Eigen::Vector3d p0_A = common::transform(contacts[c].local_A, hits[c].p_a->current_state.getTransformation());
+            Eigen::Vector3d p0_B = common::transform(contacts[c].local_B, hits[c].p_b->current_state.getTransformation());
+            double d0 = p0_B.dot(n) - p0_A.dot(n);
+
+            Eigen::Vector3d ps_A = common::transform(contacts[c].local_A, SStates[a_id].getTransformation());
+            Eigen::Vector3d ps_B = common::transform(contacts[c].local_B, SStates[b_id].getTransformation());
+            double ds = ps_B.dot(n) - ps_A.dot(n);
+
+            double F0 = F(d0);
+            double F1 = F(ds);
+            contacts[c].force_last = std::max(0.0, (F(d0) + F(ds)) / 2.0);
+
+            Eigen::Vector3d force = -n * contacts[c].force_last;
+
+            Eigen::Vector3d T_A = model::calcTorque(force, ps_A, SStates[a_id].getTranslation());
+            Eigen::Vector3d T_B = model::calcTorque(Eigen::Vector3d(-force), ps_B, SStates[b_id].getTranslation());
+
+            forces[a_id] += force;
+            forces[b_id] -= force;
+            torques[a_id] += T_A;
+            torques[b_id] += T_B;
+
+            printf("Contact: %i, Normal: %f, %f, %f, Force: %f\n", c, contacts[c].global_normal.x(), contacts[c].global_normal.y(), contacts[c].global_normal.z(), contacts[c].force_last);
+            printf("    Outer: %f, Inner: %f, d0: %f, ds: %f\n", outer, inner, d0, ds);
+        }
+
+        if (!hits[primary].p_a->is_static)
+        {
+            Eigen::Vector3d force = forces[primary_a_id];
+            Eigen::Vector3d torque = torques[primary_a_id];
+            Eigen::Vector3d force_offset = force_offsets[primary_a_id];
+            Eigen::Vector3d torque_offset = torque_offsets[primary_a_id];
+            double t = contacts[primary].s * cluster.step_size;
+            SStates[primary_a_id] = updateState(hits[primary].p_a->current_state, t, force, force_offset, torque, torque_offset, hits[primary].p_a);
+        }
+
+        if (!hits[primary].p_b->is_static)
+        {
+            Eigen::Vector3d force = forces[primary_b_id];
+            Eigen::Vector3d torque = torques[primary_b_id];
+            Eigen::Vector3d force_offset = force_offsets[primary_b_id];
+            Eigen::Vector3d torque_offset = torque_offsets[primary_b_id];
+            double t = contacts[primary].s * cluster.step_size;
+            SStates[primary_b_id] = updateState(hits[primary].p_b->current_state, t, force, force_offset, torque, torque_offset, hits[primary].p_b);
+        }
+
+        // select the next primary
+        primary = 0;
+        for (int c = 0; c < hits.size(); c++) {
+            uint32_t a_id = cluster.particles.getLocalID(hits[primary].p_a->id);
+            uint32_t b_id = cluster.particles.getLocalID(hits[primary].p_b->id);
+
+            if (!(a_id == primary_a_id || b_id == primary_a_id || a_id == primary_b_id || b_id == primary_b_id)) {
+                continue;
+            }
+
+            // TODO is this too simple?  Hard to reason about this.
+            if (contacts[c].s < contacts[primary].s) {
+                primary = c;
             }
         }
     }
+
     for (int c = 0; c < hits.size(); c++) {
         hits[c].force_mag = contacts[c].force_last;
         printf("Normal: %f, %f, %f, Contact: %f, i\n", contacts[c].global_normal.x(), contacts[c].global_normal.y(), contacts[c].global_normal.z(), contacts[c].force_last, c);
     }
 
     std::vector<double> particleSStepSize;
-    std::vector<State> SStates;
-    std::vector<State> FStates;
     for (int p = 0; p < cluster.particles.size(); p++) {
         uint32_t id = cluster.particles.getLocalID(cluster.particles[p].id);
         particleSStepSize.push_back(min_s[id] * cluster.step_size);
@@ -412,9 +418,9 @@ void SequentialImpulsesSTime::solve(collision::Cluster& cluster, std::vector<col
             Eigen::Vector3d torque_offset = torque_offsets[id];
             printf("Particle: %i, SForce: %f, %f, %f, STorque: %f, %f, %f\n", p, force.x(), force.y(), force.z(), torque.x(), torque.y(), torque.z());
             State SState = updateState(cluster.particles[id].current_state, t, force, force_offset, torque, torque_offset, &cluster.particles[id]);
-            SStates.push_back(SState);
+            SStates[p] = SState;
             State FState = updateState(SState, (1 - min_s[id])*cluster.step_size, force, force_offset, torque, torque_offset, &cluster.particles[id]);
-            FStates.push_back(FState);
+            FStates[p] = FState;
             printf("0 vel: (%f, %f, %f), Z loc: %f\n", cluster.particles[id].current_state.getVelocity().x(), cluster.particles[id].current_state.getVelocity().y(), cluster.particles[id].current_state.getVelocity().z(), cluster.particles[id].current_state.getTranslation().z());
             printf("S vel: (%f, %f, %f), Z loc: %f, s: %f\n", SState.getVelocity().x(), SState.getVelocity().y(), SState.getVelocity().z(), SState.getTranslation().z(), min_s[id]);
             printf("1 vel: (%f, %f, %f), Z loc: %f\n", FState.getVelocity().x(), FState.getVelocity().y(), FState.getVelocity().z(), FState.getTranslation().z());
