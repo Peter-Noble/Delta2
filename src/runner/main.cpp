@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
         return opt_result;
     }
     
-std::vector<Delta2::Particle> particles;
+    std::vector<Delta2::Particle> particles;
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
 
@@ -72,8 +72,15 @@ std::vector<Delta2::Particle> particles;
         // }
         {
             auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
-            p.current_state.setTranslation({0.0, 0.0, 1.03});
-            p.current_state.setVelocity({0.0, 0.0, -0.4});
+            p.current_state.setTranslation({0.0, 0.0, 1.53});
+            p.current_state.setVelocity({0.0, 0.0, -0.2});
+            double angle = 10.0 / 180.0 * 3.14159;
+            Eigen::Quaterniond r;
+            r = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitX())
+                * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitY())
+                * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
+            p.current_state.setRotation(r);
+
         }
         // {
         //     auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
