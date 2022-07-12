@@ -39,58 +39,59 @@ std::vector<Delta2::Particle> particles;
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
 
-    {
-        Delta2::common::sphere(1.0, 9, V, F);
-
-        std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
-        {
-            auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
-            p.current_state.setTranslation({0.0, 0.0, 1.03});
-            p.current_state.setVelocity({0.0, 0.0, -0.2});
-            // p.current_state.setAngular({-10, -5, 0});
-        }
-        // {
-        //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-        //     p.current_state.setTranslation({3.0, 6.0, 1.1});
-        //     p.current_state.setVelocity({0.0, -3.0, 0.0});
-        // }
-    }
-
     // {
-    //     Delta2::common::cube(V, F);
+    //     Delta2::common::sphere(1.0, 9, V, F);
 
     //     std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
     //     {
     //         auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
-    //         p.current_state.setTranslation({0.0, 0.0, 1.55});
-    //         double angle = 45.0 / 180.0 * 3.14159;
-    //         Eigen::Quaterniond r;
-    //         r = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitX())
-    //             * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitY())
-    //             * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
-    //         p.current_state.setRotation(r);
-    //     }
-    //     {
-    //         auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
-    //         p.current_state.setTranslation({3.0, 0.0, 4.0});
-    //     }
-    //     {
-    //         auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
-    //         p.current_state.setTranslation({3.0, 0.0, 6.5});
+    //         p.current_state.setTranslation({0.0, 0.0, 1.03});
+    //         p.current_state.setVelocity({0.0, 0.0, -0.2});
+    //         // p.current_state.setAngular({-10, -5, 0});
     //     }
     //     // {
     //     //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-    //     //     p.current_state.setTranslation({3.0, 0.0, 3.6});
-    //     // }
-    //     // {
-    //     //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-    //     //     p.current_state.setTranslation({3.0, 0.0, 5.7});
-    //     // }
-    //     // for (int i = 0; i < 20; i++) {
-    //     //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-    //     //     p.current_state.setTranslation({6.0 + i * 2.001, 0.0, 1.5});
+    //     //     p.current_state.setTranslation({3.0, 6.0, 1.1});
+    //     //     p.current_state.setVelocity({0.0, -3.0, 0.0});
     //     // }
     // }
+
+    {
+        Delta2::common::cube(V, F);
+
+        std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
+        // {
+        //     auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
+        //     p.current_state.setTranslation({0.0, 0.0, 1.55});
+        //     double angle = 45.0 / 180.0 * 3.14159;
+        //     Eigen::Quaterniond r;
+        //     r = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitX())
+        //         * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitY())
+        //         * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
+        //     p.current_state.setRotation(r);
+        // }
+        {
+            auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
+            p.current_state.setTranslation({0.0, 0.0, 1.03});
+            p.current_state.setVelocity({0.0, 0.0, -0.4});
+        }
+        // {
+        //     auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
+        //     p.current_state.setTranslation({3.0, 0.0, 6.5});
+        // }
+        // {
+        //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
+        //     p.current_state.setTranslation({3.0, 0.0, 3.6});
+        // }
+        // {
+        //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
+        //     p.current_state.setTranslation({3.0, 0.0, 5.7});
+        // }
+        // for (int i = 0; i < 20; i++) {
+        //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
+        //     p.current_state.setTranslation({6.0 + i * 2.001, 0.0, 1.5});
+        // }
+    }
 
     {
         Delta2::common::plane(100.0, V, F);

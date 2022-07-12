@@ -2,16 +2,16 @@ import sympy
 from sympy.physics.vector import *
 from sympy import sqrt, log, Max, ccode
  
-# d0, v0, v1, Meff, dt = sympy.symbols("d_0 v_0 v_1 M t")  # Distance along normal at t=0, v at t=0, current estimate of v at t=0, effective mass along contact normal, timestep size
-# inner, outer = sympy.symbols("i o")
-# s, vs, ds, delta_s, F_ext= sympy.symbols("s v_s d_s delta_s F_ext")  # The thing we're trying to solve for
-# s_last, x, F_last = sympy.symbols("s_l x F_l")
+d0, v0, v1, Meff, dt = sympy.symbols("d_0 v_0 v_1 M t")  # Distance along normal at t=0, v at t=0, current estimate of v at t=0, effective mass along contact normal, timestep size
+inner, outer = sympy.symbols("i o")
+s, vs, ds, delta_s, F_ext= sympy.symbols("s v_s d_s delta_s F_ext")  # The thing we're trying to solve for
+s_last, x, F_last = sympy.symbols("s_l x F_l")
 
-d0, v0, v1, Meff, dt = sympy.symbols("d0 v0 v1 Meff dt")  # Distance along normal at t=0, v at t=0, current estimate of v at t=0, effective mass along contact normal, timestep size
-inner, outer = sympy.symbols("inner outer")
-s, vs, ds, delta_s, F_ext= sympy.symbols("s vs ds delta_s F_ext")  # The thing we're trying to solve for
-d_start = sympy.symbols("d_start")
-s_last, x, F_last = sympy.symbols("s_last, x F_last")
+# d0, v0, v1, Meff, dt = sympy.symbols("d0 v0 v1 Meff dt")  # Distance along normal at t=0, v at t=0, current estimate of v at t=0, effective mass along contact normal, timestep size
+# inner, outer = sympy.symbols("inner outer")
+# s, vs, ds, delta_s, F_ext= sympy.symbols("s vs ds delta_s F_ext")  # The thing we're trying to solve for
+# d_start = sympy.symbols("d_start")
+# s_last, x, F_last = sympy.symbols("s_last, x F_last")
 
 # vs = v0 * (1.0 - s) + v1 * s  # The velocity that needs cancelling
  
