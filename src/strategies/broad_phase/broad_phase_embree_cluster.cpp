@@ -16,7 +16,8 @@ BroadPhaseEmbreeCluster::BroadPhaseEmbreeCluster(PDEStrategy& local_pde, common:
 void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
     for (Particle* p : particles)
     {
-        p->last_time_step_size *= 1.1;
+        p->last_time_step_size *= 2;
+        p->last_time_step_size = std::min(p->last_time_step_size, (double) _opt.time_step_size);
         p->projectFutureState(p->last_time_step_size);
         assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
