@@ -7,7 +7,7 @@ namespace Delta2 {
         class SequentialImpulsesSTime : public ContactForceStrategy {
         public:
             SequentialImpulsesSTime(FrictionStrategy& friction, common::Options& opt);
-            void solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits) override;
+            bool solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits) override;
         };
     }
 }

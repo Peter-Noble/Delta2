@@ -117,7 +117,7 @@ SequentialImpulsesSTime::SequentialImpulsesSTime(FrictionStrategy& friction,
 
 }
 
-void SequentialImpulsesSTime::solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits) {
+bool SequentialImpulsesSTime::solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits) {
     std::vector<LocalContactS> contacts;
 
     std::sort(hits.begin(), hits.end());
@@ -158,6 +158,7 @@ void SequentialImpulsesSTime::solve(collision::Cluster& cluster, std::vector<col
             view.addEdge(common::Edge(hits[c].A, hits[c].B));
             view.show();
 
+            return false;
             assert(false);
         }
 
@@ -830,12 +831,37 @@ void SequentialImpulsesSTime::solve(collision::Cluster& cluster, std::vector<col
         //         // FStates[id].setAngular(FStates[id].getAngularMomentum() * separation_damp);
         //     }
         // }
+
+
+        _friction.solve(cluster.particles, hits, forces, torques, FStates, particleSStepSize);
+
+        // Update states (including Fstate) ready for Fstate computation
+        for (int p = 0; p < cluster.particles.size(); p++) {
+            uint32_t id = cluster.particles.getLocalID(cluster.particles[p].id);
+            particleSStepSize.push_back(s * cluster.step_size);
+            if (!cluster.particles[id].is_static) {
+                Eigen::Vector3d force = forces[id];
+                Eigen::Vector3d torque = torques[id];
+                Eigen::Vector3d force_offset = force_offsets[id];
+                Eigen::Vector3d torque_offset = torque_offsets[id];
+                State FState = updateState(SStates[id], (1.0 - s)*cluster.step_size, force, force_offset, torque, torque_offset, &cluster.particles[id]);
+                FStates[p] = FState;
+            }
+            else {
+                FStates[p] = cluster.particles[id].future_state;
+            }
+        }
     }
+
+    double drag = std::pow(0.5, cluster.step_size);
+    drag = 1;
 
     for (Particle *p : cluster.particles)
     {
         if (!p->is_static) {
             uint32_t id = cluster.particles.getLocalID(p->id);
+            FStates[id].setAngular(FStates[id].getAngularMomentum() * drag);
+            FStates[id].setVelocity(FStates[id].getVelocity() * drag);
             p->future_state = FStates[id];
             printf("End of step z vel: %f, z loc: %f\n", p->future_state.getVelocity().z(), p->future_state.getTranslation().z());
         }

@@ -26,7 +26,7 @@ double PDEExplicit::selectTimeStep(collision::Cluster& cluster) {
     return time;
 }
 
-void PDEExplicit::step(collision::Cluster& cluster) {
+bool PDEExplicit::step(collision::Cluster& cluster) {
     std::vector<Eigen::Vector3d> forces;
     std::vector<Eigen::Vector3d> torques;
     std::vector<int> counts;
@@ -95,7 +95,10 @@ void PDEExplicit::step(collision::Cluster& cluster) {
         }
     }
     
-    _contact_force.solve(cluster, hits);
+    bool success = _contact_force.solve(cluster, hits);
+    if (!success) {
+        return false;
+    }
     
     for (Particle* p : cluster.particles)
     {
@@ -118,4 +121,6 @@ void PDEExplicit::step(collision::Cluster& cluster) {
     {
         assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
+
+    return true;
 }

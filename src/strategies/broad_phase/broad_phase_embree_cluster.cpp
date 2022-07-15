@@ -93,7 +93,10 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
             printf("Sleeping cluster %i stepped forward %f\n", clusters[cluster_i].step_size, cluster_i);
         }
         else {
-            _local_pde.step(clusters[cluster_i]);
+            bool success = _local_pde.step(clusters[cluster_i]);
+            if (!success) {
+                // TODO go back and redo this step with a smaller timestep
+            }
 
             printf("Cluster %i stepped forward %f\n", clusters[cluster_i].step_size, cluster_i);
         }
