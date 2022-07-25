@@ -462,11 +462,11 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
     std::mutex lock;
 
-    // #pragma omp parallel
+    #pragma omp parallel
     {
-        // #pragma omp single
+        #pragma omp single
         {
-            // #pragma omp taskloop
+            #pragma omp taskloop
             for (int b_i = 0; b_i < cluster.interations.size(); b_i++) {
                 int tid = omp_get_thread_num();
 
@@ -500,7 +500,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                         if (hit_normal.normalized().dot(rel_vel.normalized()) <= 0.0 || hit_normal.norm() < 1e-4) {
                             if (hit_normal.norm() < 1e-4) {
                                 if (c.toc == 0.0) {
-                                    throw std::runtime_error("Invalid configuration");
+                                    // throw std::runtime_error("Invalid configuration");
                                     continue;
                                 }
                                 double rel_vel_norm = rel_vel.norm();
@@ -524,7 +524,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                                             // This is the first frame penetrating this eps boundry
                                             assert((2.0 - depth / proj_dist) / 2.0 <= 1.0);
 
-                                            double new_step = common::lerp(c.toc * (1.0 - depth / proj_dist), c.toc, 0.75);
+                                            double new_step = common::lerp(c.toc * (1.0 - depth / proj_dist), c.toc, 0.5);
                                             min_scaling_seen = std::min(min_scaling_seen, new_step);
                                             if (max_time_step_for_pair * new_step < 1e-6) {
                                                 printf("Small time step 0\n");
@@ -534,7 +534,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                                             // The contact point was already inside the eps boundry at the start of the timestep
                                             double future_point = c.toc + (1.0 - c.toc) * interaction_dist / (proj_vel * max_time_step_for_pair);
 
-                                            double new_step = common::lerp(c.toc, std::min(future_point, 1.0), 0.9);
+                                            double new_step = common::lerp(c.toc, std::min(future_point, 1.0), 0.8);
 
                                             min_scaling_seen = std::min(min_scaling_seen, new_step);
                                         }

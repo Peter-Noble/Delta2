@@ -34,7 +34,7 @@ bool PDEExplicit::step(collision::Cluster& cluster) {
 
     for (Particle* p : cluster.particles)
     {
-        assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
+        assert(p->last_state.getTime() <= p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
 
     for (Particle* p : cluster.particles) {
@@ -63,16 +63,16 @@ bool PDEExplicit::step(collision::Cluster& cluster) {
 
     for (Particle* p : cluster.particles)
     {
-        assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
+        assert(p->last_state.getTime() <= p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
 
     std::mutex lock;
 
-    // #pragma omp parallel
+    #pragma omp parallel
     {
-        // #pragma omp single
+        #pragma omp single
         {
-            // #pragma omp taskloop
+            #pragma omp taskloop
             for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
             {
                 collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
@@ -102,7 +102,7 @@ bool PDEExplicit::step(collision::Cluster& cluster) {
     
     for (Particle* p : cluster.particles)
     {
-        assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
+        assert(p->last_state.getTime() <= p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
 
     for (Particle *p : cluster.particles)

@@ -13,13 +13,46 @@ BroadPhaseEmbreeCluster::BroadPhaseEmbreeCluster(PDEStrategy& local_pde, common:
 
 }
 
+void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster, bool first_call) {
+    double start_step = cluster.step_size;
+    bool success = false;
+    success = _local_pde.step(cluster);
+    if (!success) {
+        double extra_time = 0.0;
+        if (first_call) {
+            for (Particle* p : cluster.particles) {
+                if (!p->is_static) {
+                    extra_time = p->current_state.getTime() - p->last_state.getTime();
+                    p->current_state = p->current_state.interpolate(p->last_state, (p->last_state.getTime() + p->current_state.getTime()) / 2.0);
+                    cluster.min_current_time = std::min(cluster.min_current_time, p->current_state.getTime());
+                    assert(p->last_state.getTime() <= cluster.min_current_time);
+                }
+            }
+        }
+        cluster.step_size = (cluster.step_size + extra_time) / (first_call ? 3.0 : 2.0);
+
+        if (cluster.step_size < 1e-6) {
+            throw std::runtime_error("Step size is too small");
+        }
+
+        // cluster.step_size *= 0.5;
+        if (first_call) {
+            stepRecursive(cluster, first_call);
+        }
+        stepRecursive(cluster, false);
+        stepRecursive(cluster, false);
+        printf("Cluster step failed.  Reducing time step size to %f and trying again.\n", cluster.step_size);
+    }
+    cluster.step_size = start_step;
+}
+
 void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
     for (Particle* p : particles)
     {
         p->last_time_step_size *= 2;
         p->last_time_step_size = std::min(p->last_time_step_size, (double) _opt.time_step_size);
         p->projectFutureState(p->last_time_step_size);
-        assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
+        assert(p->last_state.getTime() <= p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
 
     collision::BroadPhaseCollisions B;
@@ -66,7 +99,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
     for (Particle* p : particles)
     {
-        assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
+        assert(p->last_state.getTime() <= p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
 
     // Splitting into two loops makes this point act like a sync point.
@@ -93,12 +126,9 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
             printf("Sleeping cluster %i stepped forward %f\n", clusters[cluster_i].step_size, cluster_i);
         }
         else {
-            bool success = _local_pde.step(clusters[cluster_i]);
-            if (!success) {
-                // TODO go back and redo this step with a smaller timestep
-            }
+            stepRecursive(clusters[cluster_i], true);
 
-            printf("Cluster %i stepped forward %f\n", clusters[cluster_i].step_size, cluster_i);
+            printf("Cluster %i stepped forward %f\n", cluster_i, clusters[cluster_i].step_size);
         }
     }
 }
