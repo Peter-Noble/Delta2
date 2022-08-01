@@ -1,5 +1,10 @@
 #include "convex_hull.h"
 #include "../quickhull/QuickHull.hpp"
+#include "stdlib.h"
+
+static Eigen::Vector3d cast(const quickhull::Vector3<double>& v) {
+    return Eigen::Vector3d(v.x, v.y, v.z);
+};
 
 namespace Delta2 {
     namespace common {
@@ -13,13 +18,15 @@ namespace Delta2 {
             }
 
             auto hull = qh.getConvexHull(pointCloud, true, true);
-            const std::vector<size_t>& indexBuffer = hull.getIndexBuffer();
+
+            const auto& vertices = hull.getVertexBuffer();
+            const auto& indexBuffer = hull.getIndexBuffer();
             //const auto& vertexBuffer = hull.getVertexBuffer();
             // Do what you want with the convex triangle mesh
 
             std::vector<Triangle<double>> result;
             for (int t_i = 0; t_i < indexBuffer.size(); t_i+=3) {
-                Triangle<double> t(pts[t_i], pts[t_i+1], pts[t_i+2]);
+                Triangle<double> t(cast(vertices[indexBuffer[t_i]]), cast(vertices[indexBuffer[t_i+1]]), cast(vertices[indexBuffer[t_i+2]]));
                 result.push_back(t);
             }
 

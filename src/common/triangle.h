@@ -13,7 +13,11 @@ namespace Delta2 {
         class Triangle {
             public:
             Eigen::Vector<real, 3> A, B, C;
-            Triangle(const Eigen::Vector<real, 3>& A, const Eigen::Vector<real, 3>& B, const Eigen::Vector<real, 3>& C) : A(A), B(B), C(C) {}
+            Triangle(const Eigen::Vector<real, 3>& Ap, const Eigen::Vector<real, 3>& Bp, const Eigen::Vector<real, 3>& Cp) {
+                A = Ap;
+                B = Bp;
+                C = Cp;
+            }
             real area() const {
                 return 0.5 * ((A - C).cross(B - C)).norm();
             };

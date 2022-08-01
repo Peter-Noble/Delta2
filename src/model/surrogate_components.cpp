@@ -136,9 +136,11 @@ namespace Delta2 {
         };
         std::vector<Eigen::Vector<double, 3>> BucketSoup::getVertices() {
             std::vector<Eigen::Vector<double, 3>> result;
+            result.resize(_num_tris * 3);
+            // assert(_num_tris == _triangles.size());
             for (int i = 0; i < _num_tris; i++) {
                 for (int v = 0; v < 3; v++) {
-                    result.push_back(_triangles[i][v]);
+                    result[i*3 + v] = _triangles[i][v];
                 }
             }
             return result;

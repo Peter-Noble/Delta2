@@ -49,6 +49,7 @@ namespace Delta2 {
         int id;
         double sleep_candidate_time;
         double restitution;
+        int cluster_id;
     private:
         void assignID();
 

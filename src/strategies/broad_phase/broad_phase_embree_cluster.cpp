@@ -95,6 +95,10 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         fine_min_final_time = std::min(fine_min_final_time, clusters[cluster_i].min_current_time + step);
 
         printf("Selected time: %f for cluster %i\n", step, cluster_i);
+
+        for (Particle* p : clusters[cluster_i].particles) {
+            p->cluster_id = cluster_i;
+        }
     }
 
     for (Particle* p : particles)

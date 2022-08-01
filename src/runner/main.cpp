@@ -26,6 +26,7 @@
 using namespace Delta2;
 
 void guiThread(common::AnimationViewer* view) {
+    printf("Show GUI\n");
     view->show();
 }
 
@@ -131,7 +132,7 @@ int main(int argc, char *argv[]) {
 
     time_step.init(ph);
 
-    bool cont = true;
+    bool cont = opt.final_time > 0.0 || (opt.final_time < 0.0 && opt.num_time_steps > 0);
     int step = 0;
     while (cont) {
         printf("Step: %i\n", step);
@@ -147,7 +148,10 @@ int main(int argc, char *argv[]) {
         if (opt.final_time > 0.0) {
             cont = false;
             for (const Delta2::Particle& p : particles) {
-                if (p.current_state.getTime() < opt.final_time && !p.is_static) {
+                double time = p.current_state.getTime();
+                double final_time = opt.final_time;
+                bool is_static = p.is_static;
+                if (time < final_time && is_static) {
                     cont = true;
                 }
             }
