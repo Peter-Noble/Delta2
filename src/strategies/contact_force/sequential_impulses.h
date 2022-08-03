@@ -1,6 +1,7 @@
 #pragma once
 
 #include "contact_force_strategy.h"
+#include "sequential_impulses_warm_start.h"
 
 namespace Delta2 {
     namespace strategy {
@@ -8,6 +9,8 @@ namespace Delta2 {
         public:
             SequentialImpulses(FrictionStrategy& friction, common::Options& opt);
             bool solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits) override;
+        private:
+            SequentialImpulseWarmStart _warm_start;
         };
     }
 }
