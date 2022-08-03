@@ -398,53 +398,62 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
         }
     }
 
+    // Add each broad phase interaction to required clusters
+    // TODO this isn't very efficient as each interaction searches through all the particles in all the clusters.
+    for (collision::BroadPhaseCollision& b : broad_phase) {
+        int a_id = particles.getLocalID(b.first.first); // local geo id
+        int b_id = particles.getLocalID(b.second.first);
+
+        for (int c_i = 0; c_i < clusters.size(); c_i++) {
+            Particle* address_a = &(particles[a_id]);
+            Particle* address_b = &(particles[b_id]);
+            
+            if (particles[a_id].is_static && particles[b_id].is_static) {
+                continue;
+            }
+
+            bool a_in = std::find(cluster_particles[c_i].begin(), cluster_particles[c_i].end(), address_a) != cluster_particles[c_i].end();
+            bool b_in = std::find(cluster_particles[c_i].begin(), cluster_particles[c_i].end(), address_b) != cluster_particles[c_i].end();
+
+            if (a_in) {
+                if (b_in) {
+                    clusters[c_i].interations.push_back(b);
+                }
+                else if (particles[b_id].is_static) {
+                    cluster_particles[c_i].push_back(address_b);
+                    clusters[c_i].interations.push_back(b);
+                }
+            }
+            else {
+                if (b_in) {
+                    if (particles[a_id].is_static) {
+                        cluster_particles[c_i].push_back(address_a);
+                        clusters[c_i].interations.push_back(b);
+                    }
+                }
+            }
+        }
+    }
+
     for (int c_i = 0; c_i < sizes.rows(); c_i++) {
         for (Particle* p : cluster_particles[c_i]) {
-            p->rollBackState(clusters[c_i].min_current_time);
             if (!p->is_static) {
+                p->rollBackState(clusters[c_i].min_current_time);
                 clusters[c_i].is_static = false;
             }
         }
     }
 
-    for (collision::BroadPhaseCollision& b : broad_phase) {
-        int a_id = particles.getLocalID(b.first.first); // local geo id
-        int b_id = particles.getLocalID(b.second.first);
-        int id;
-        int static_id = -1;
-        int cluster_id;
-
-        if (!particles[a_id].is_static && !particles[b_id].is_static) {
-            assert(components(a_id, 0) == components(b_id, 0));
-            id = a_id;
-        }
-        else if (particles[a_id].is_static && particles[b_id].is_static) {
-            continue;
-        }
-        else if (particles[a_id].is_static) {
-            id = b_id;
-            static_id = a_id;
-            cluster_id = components(b_id, 0);
-        }
-        else {
-            id = a_id;
-            static_id = b_id;
-            cluster_id = components(a_id, 0);
-        }
-
-        if (static_id >= 0) {
-            Particle* address = &(particles[static_id]);
-            if (std::find(cluster_particles[cluster_id].begin(), cluster_particles[cluster_id].end(), address) == cluster_particles[cluster_id].end()) {
-                cluster_particles[cluster_id].push_back(address);
-            }
-        }
-
-        clusters[components(a_id, 0)].interations.push_back(b);
-    }
-
+    // Filter out the clusters that have no non-sleeping particles
+    int cluster_target = 0;
     for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++) {
-        clusters[cluster_i].particles = model::ParticleHandler(cluster_particles[cluster_i]);
+        if (!clusters[cluster_i].is_static) {
+            clusters[cluster_target] = clusters[cluster_i];
+            clusters[cluster_target].particles = model::ParticleHandler(cluster_particles[cluster_i]);
+            cluster_target++;
+        }
     }
+    clusters.resize(cluster_target); // Removed (and calls destructor) for the end clusters that are no longer needed
 
     return clusters;
 }
