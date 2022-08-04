@@ -26,7 +26,6 @@
 using namespace Delta2;
 
 void guiThread(common::AnimationViewer* view) {
-    printf("Show GUI\n");
     view->show();
 }
 
@@ -58,49 +57,49 @@ int main(int argc, char *argv[]) {
     //     // }
     // }
 
-    {
-        Delta2::common::cube(V, F);
+    Delta2::common::cube(V, F);
 
-        std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
-        // {
-        //     auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
-        //     p.current_state.setTranslation({0.0, 0.0, 1.55});
-        //     double angle = 45.0 / 180.0 * 3.14159;
-        //     Eigen::Quaterniond r;
-        //     r = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitX())
-        //         * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitY())
-        //         * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
-        //     p.current_state.setRotation(r);
-        // }
-        // {
-        //     auto& p = particles.emplace_back(M, 1.0, 0.4, 0.5);
-        //     p.current_state.setTranslation({0.0, 0.0, 1.53});
-        //     p.current_state.setVelocity({0.0, 0.0, -0.2});
-        //     // double angle = 1.0 / 180.0 * 3.14159;
-        //     // Eigen::Quaterniond r;
-        //     // r = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitX())
-        //     //     * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitY())
-        //     //     * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
-        //     // p.current_state.setRotation(r);
+    std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
+    // {
+    //     auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
+    //     p.current_state.setTranslation({0.0, 0.0, 1.55});
+    //     double angle = 45.0 / 180.0 * 3.14159;
+    //     Eigen::Quaterniond r;
+    //     r = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitX())
+    //         * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitY())
+    //         * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
+    //     p.current_state.setRotation(r);
+    // }
+    // {
+    //     auto& p = particles.emplace_back(M, 1.0, 0.4, 0.5);
+    //     p.current_state.setTranslation({0.0, 0.0, 1.53});
+    //     p.current_state.setVelocity({0.0, 0.0, -0.2});
+    //     // double angle = 1.0 / 180.0 * 3.14159;
+    //     // Eigen::Quaterniond r;
+    //     // r = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitX())
+    //     //     * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitY())
+    //     //     * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
+    //     // p.current_state.setRotation(r);
 
-        // }
-        // {
-        //     auto& p = particles.emplace_back(M, 1.0, 0.4, 0.5);
-        //     p.current_state.setTranslation({0.0, 0.0, 1.53});
-        //     p.current_state.setVelocity({0.0, 1.0, 0.0});
-        //     p.current_state.setAngular({0.0, 0.0, 1.0});
-        // }
-        // {
-        //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-        //     p.current_state.setTranslation({3.0, 0.0, 3.6});
-        // }
-        // {
-        //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-        //     p.current_state.setTranslation({3.0, 0.0, 5.7});
-        // }
+    // }
+    // {
+    //     auto& p = particles.emplace_back(M, 1.0, 0.4, 0.5);
+    //     p.current_state.setTranslation({0.0, 0.0, 1.53});
+    //     p.current_state.setVelocity({0.0, 1.0, 0.0});
+    //     p.current_state.setAngular({0.0, 0.0, 1.0});
+    // }
+    // {
+    //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
+    //     p.current_state.setTranslation({3.0, 0.0, 3.6});
+    // }
+    // {
+    //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
+    //     p.current_state.setTranslation({3.0, 0.0, 5.7});
+    // }
+    for (int x = 0; x < 5; x++) {
         for (int i = 0; i < 5; i++) {
-            auto& p = particles.emplace_back(M, 1.0, 1.0, 0.5);
-            p.current_state.setTranslation({0, 0.0, 1.1 + i * 2.06});
+            auto& p = particles.emplace_back(M, 1.0, 1.0, 0.25);
+            p.current_state.setTranslation({x * 4.0, i * x * 0.2, 1.1 + i * 2.06});
         }
     }
 

@@ -9,6 +9,7 @@ Viewer::Viewer() {
 }
 
 void Viewer::show() {
+    printf("Viewer show\n");
     Eigen::Matrix4d T = Delta2::common::transformationMatrix(Eigen::Vector3d({-igl::PI/2.0, 0.0, 0.0}), Eigen::Vector3d({0.0, 0.0, 0.0}));
     Eigen::MatrixXd V = transform(_V, T);
 
@@ -62,27 +63,58 @@ void AnimationViewer::recordFrame(std::vector<std::pair<Eigen::Vector3d, Eigen::
     std::lock_guard<std::mutex> guard(_lock);
     std::vector<Eigen::Matrix4d> frame_transforms;
     std::vector<Eigen::Vector3d> colours;
+    std::vector<int> groups;
+    std::vector<ParticleState> states;
     // _Ts.emplace_back();
     for (Delta2::Particle& p : *_Ps) {
         // _Ts[_Ts.size() - 1].push_back(p.current_state.getTransformation());
         frame_transforms.push_back(p.current_state.getTransformation());
         if (p.is_static) {
             colours.push_back({0.3, 0.3, 0.4});
+            states.push_back(ParticleState::Static);
         }
         else if (p.getSleeping()) {
             colours.push_back({0.5, 0.4, 0.1});
+            states.push_back(ParticleState::Sleeping);
         }
         else {
             colours.push_back({1.0, 0.7, 0.3});
+            states.push_back(ParticleState::Active);
         }
+        groups.push_back(p.cluster_id);
     }
-    _Ts.push_back(frame_transforms);
     _edges.push_back(edges);
     _times.push_back(time);
     _colours.push_back(colours);
-}
+    _states.push_back(states);
+    _groups.push_back(groups);
+    _Ts.push_back(frame_transforms);
+}   
 
 void AnimationViewer::show() {
+    printf("Animation show\n");
+    std::vector<Eigen::Vector3d> group_colours {
+        {230.0 / 255.0, 25.0 / 255.0,   75.0 / 255.0},
+        {60.0 / 255.0,  180.0 / 255.0,  75.0 / 255.0},
+        {255.0 / 255.0, 255.0 / 255.0,  25.0 / 255.0},
+        {0.0 / 255.0,   130.0 / 255.0,  200.0 / 255.0},
+        {245.0 / 255.0, 130.0 / 255.0,  48.0 / 255.0},
+        {145.0 / 255.0, 30.0 / 255.0,   180.0 / 255.0},
+        {70.0 / 255.0,  240.0 / 255.0,  240.0 / 255.0},
+        {240.0 / 255.0, 50.0 / 255.0,   230.0 / 255.0},
+        {210.0 / 255.0, 245.0 / 255.0,  60.0 / 255.0},
+        {250.0 / 255.0, 190.0 / 255.0,  212.0 / 255.0},
+        {0.0 / 255.0,   128.0 / 255.0,  128.0 / 255.0},
+        {220.0 / 255.0, 190.0 / 255.0,  255.0 / 255.0},
+        {170.0 / 255.0, 110.0 / 255.0,  40.0 / 255.0},
+        {255.0 / 255.0, 250.0 / 255.0,  200.0 / 255.0},
+        {128.0 / 255.0, 0.0 / 255.0,    0.0 / 255.0},
+        {170.0 / 255.0, 255.0 / 255.0,  195.0 / 255.0},
+        {128.0 / 255.0, 128.0 / 255.0,  0.0 / 255.0},
+        {255.0 / 255.0, 215.0 / 255.0,  180.0 / 255.0},
+        {0.0 / 255.0,   0.0 / 255.0,    128.0 / 255.0}
+    };
+
     _viewer.callback_pre_draw = [&](igl::opengl::glfw::Viewer &) -> bool {
         std::lock_guard<std::mutex> guard(_lock);
         if (_viewer.core().is_animating && _Ts.size() > 0) {
@@ -113,9 +145,23 @@ void AnimationViewer::show() {
                 concatMesh(V, F, Vp, Fp, V, F);
                 Eigen::MatrixXd Cp;
                 Cp.resize(Fp.rows(), 3);
+                Eigen::Vector3d use_colour;
+                assert(_frame < _states.size());
+                assert(p_i < _states[_frame].size());
+                switch (_states[_frame][p_i]) {
+                    case ParticleState::Active:
+                        use_colour = group_colours[_groups[_frame][p_i] % group_colours.size()];
+                        break;
+                    case ParticleState::Sleeping:
+                        use_colour = {0.5, 0.4, 0.1};
+                        break;
+                    case ParticleState::Static:
+                        use_colour = {0.3, 0.3, 0.4};
+                        break;
+                }
                 for (int i = 0; i < Fp.rows(); i++) {
                     for (int j = 0; j < 3; j++) {
-                        Cp(i,j) = _colours[_frame][p_i][j];
+                        Cp(i,j) = use_colour[j];
                     }
                 }
                 concatColors(C, Cp, C);

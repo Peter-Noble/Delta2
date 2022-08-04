@@ -1,6 +1,6 @@
 #pragma once
 
-#include "igl/opengl/glfw/Viewer.h"
+// #include "igl/opengl/glfw/Viewer.h"
 
 #include "triangle.h"
 #include "../model/particle.h"
@@ -37,6 +37,7 @@ namespace Delta2 {
                 igl::opengl::glfw::Viewer _viewer;
                 std::vector<common::Edge<double>> _edges;
         };
+        enum class ParticleState { Active, Sleeping, Static };
         class AnimationViewer {
             public:
                 AnimationViewer(std::vector<Delta2::Particle>* particles);
@@ -56,6 +57,8 @@ namespace Delta2 {
                 int _frame;
                 std::chrono::time_point<std::chrono::system_clock> _start_time;
                 std::mutex _lock;
+                std::vector<std::vector<int>> _groups;
+                std::vector<std::vector<ParticleState>> _states;
         };
     }
 }
