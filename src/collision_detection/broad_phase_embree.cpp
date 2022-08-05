@@ -100,11 +100,13 @@ void boundsFuncIndividualTime(const struct RTCBoundsFunctionArguments *args)
     } else {
         mesh_aabb = p.mesh->getSphereBounds();
         // Eigen::Vector3f start_loc = p.current_state.getTranslation().cast<float>();
-        Eigen::Vector3f start_loc = p.last_state.getTranslation().cast<float>();
-        bounds.extend(translate(mesh_aabb, start_loc));
+        Eigen::Vector3f last_loc = p.last_state.getTranslation().cast<float>();
+        bounds.extend(translate(mesh_aabb, last_loc));
+        Eigen::Vector3f current_loc = p.current_state.getTranslation().cast<float>();
+        bounds.extend(translate(mesh_aabb, current_loc));
         // Eigen::Vector3f end_loc = p.current_state.getTranslation().cast<float>() + p.current_state.getVelocity().cast<float>() * p.last_time_step_size;
-        Eigen::Vector3f end_loc = p.future_state.getTranslation().cast<float>();
-        bounds.extend(translate(mesh_aabb, end_loc));
+        Eigen::Vector3f future_loc = p.future_state.getTranslation().cast<float>();
+        bounds.extend(translate(mesh_aabb, future_loc));
     }
     bounds = bounds.enlarge_by(p.geo_eps);
 
