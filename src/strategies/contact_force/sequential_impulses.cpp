@@ -342,7 +342,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             converged = true;
             for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
                 Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
-                if (impulse_diff.norm() > 1e-2) {
+                if (impulse_diff.norm() > 1e-3) {
                     converged = false;
                     break;
                 }
