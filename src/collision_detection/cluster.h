@@ -13,6 +13,34 @@ namespace Delta2 {
             bool sleeping;
             double min_current_time;
             bool is_static;
+
+            // Check to see if this other cluster is a match for this one and hasn't advanced in time.
+            bool hasAdvanced(Cluster& other) {
+                if (min_current_time != other.min_current_time) {
+                    return true;
+                }
+                if (step_size != other.step_size) {
+                    return true;
+                }
+                if (sleeping != other.sleeping) {
+                    return true;
+                }
+                if (particles.size() != other.particles.size()) {
+                    return true;
+                }
+                for (Particle* p : particles) {
+                    bool found = false;
+                    for (Particle* o : other.particles) {
+                        if (p->id == o->id) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        return true;
+                    }
+                }
+            };
         };
     }
 }
