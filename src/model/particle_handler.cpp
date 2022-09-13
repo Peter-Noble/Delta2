@@ -53,3 +53,11 @@ std::vector<Particle*>::iterator ParticleHandler::begin() {
 std::vector<Particle*>::iterator ParticleHandler::end() {
     return _ps.end();
 }
+
+std::vector<Particle*>::const_iterator ParticleHandler::begin() const {
+    return _ps.cbegin();
+}
+
+std::vector<Particle*>::const_iterator ParticleHandler::end() const {
+    return _ps.cend();
+}

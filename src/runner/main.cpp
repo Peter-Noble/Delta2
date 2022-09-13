@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
     //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
     //     p.current_state.setTranslation({3.0, 0.0, 5.7});
     // }
-    for (int x = 0; x < 5; x++) {
+    for (int x = 0; x < 1; x++) {
         for (int i = 0; i < 5; i++) {
             auto& p = particles.emplace_back(M, 1.0, 1.0, 0.25);
             p.current_state.setTranslation({x * 4.0, i * x * 0.2, 1.1 + i * 2.06});
@@ -128,6 +128,8 @@ int main(int argc, char *argv[]) {
     strategy::SequentialImpulses contact_force(friction, opt);
     strategy::PDEExplicit PDE(contact_detection, contact_force, friction, time_step, opt);
     strategy::BroadPhaseEmbreeCluster broad_phase(PDE, opt);
+
+    // PDE.printType();
 
     time_step.init(ph);
 

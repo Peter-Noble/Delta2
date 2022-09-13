@@ -9,6 +9,8 @@ namespace Delta2 {
             BroadPhaseEmbreeCluster(PDEStrategy& local_pde, common::Options& opt);
             void step(model::ParticleHandler& particles) override;
             void stepRecursive(Delta2::collision::Cluster& cluster, bool first_call);
+        private:
+            std::vector<collision::Cluster> last_step_clusters;
         };
     }
 }

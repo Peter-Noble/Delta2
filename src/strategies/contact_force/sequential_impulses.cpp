@@ -83,6 +83,10 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
         lc.start_dist = (hits[c].A - hits[c].B).norm();
 
+        if (lc.start_dist < 1.e-4) {
+            return false;
+        }
+
         Eigen::Matrix4d A_T_i = hits[c].p_a->future_state.getTransformation().inverse();
         lc.local_A = common::transform(hits[c].A, A_T_i);
         Eigen::Matrix4d B_T_i = hits[c].p_b->future_state.getTransformation().inverse();
@@ -222,7 +226,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
                 // ======== CANCEL RELATIVE VELOCITY ALONG NORMAL ========
 
-                const double delta_damp = 0.5;
+                const double delta_damp = 0.1;
                 // v1 = im / m to cancel velocity
                 const double delta_impulse_mag = d1 < outer ? v1 * m * delta_damp : -contacts[c].impulse;
 
@@ -342,22 +346,26 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             converged = true;
             for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
                 Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
-                if (impulse_diff.norm() > 1e-3) {
+                if (impulse_diff.norm() > 1e-4) {
                     converged = false;
                     break;
                 }
+            }
+            for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
+                Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
                 // printf("impulse: %f, %f, %f\n", impulses[p_i].x(), impulses[p_i].y(), impulses[p_i].z());
                 // printf("impulse diff: %f, %f, %f\n", impulse_diff.x(), impulse_diff.y(), impulse_diff.z());
             }
+
             it++;
         }
 
         for (int c = 0; c < hits.size(); c++) {
             uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
             uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
-            printf("Contact with ids: %i(%i), %i(%i), %f, (%f, %f, %f)\n", a_id, hits[c].p_a->id, b_id, hits[c].p_b->id, contacts[c].impulse, contacts[c].global_normal.x(), contacts[c].global_normal.y(), contacts[c].global_normal.z());
+            // printf("Contact with ids: %i(%i), %i(%i), %f, (%f, %f, %f)\n", a_id, hits[c].p_a->id, b_id, hits[c].p_b->id, contacts[c].impulse, contacts[c].global_normal.x(), contacts[c].global_normal.y(), contacts[c].global_normal.z());
         }
-        printf("Finish contact in %i iterations\n", it);
+        // printf("Finish contact in %i iterations\n", it);
     }
 
     for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {

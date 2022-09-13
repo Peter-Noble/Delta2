@@ -10,7 +10,7 @@ using namespace strategy;
 
 BroadPhaseEmbreeCluster::BroadPhaseEmbreeCluster(PDEStrategy& local_pde, common::Options& opt) :
                                                  BroadPhaseStrategy(local_pde, opt) {
-
+    
 }
 
 void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster, bool first_call) {
@@ -69,34 +69,51 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         }
     }
 
-    printf("Clusters: %i\n", clusters.size());
+    // printf("Clusters: %i\n", clusters.size());
 
     double fine_min_final_time = std::numeric_limits<double>::infinity();
 
+    // printf("Select time step sizes\n");
     for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++)
     {
-        if (clusters[cluster_i].min_current_time > min_final_time)
+        collision::Cluster& cl = clusters[cluster_i];
+
+        if (cl.min_current_time > min_final_time)
         {
+            printf("%i skipping time step selection because min current time ahead of min final time\n", cluster_i);
             // This cluster can't advance because there is another cluster that is too far behind
             continue;
         }
 
-        if (clusters[cluster_i].is_static)
+        if (cl.is_static)
         {
+            // printf("%i skipping time step selection because static cluster\n", cluster_i);
             // This cluster shouldn't be advanced as it's asleep or static
             continue;
         }
 
-        if (clusters[cluster_i].sleeping) {
-            fine_min_final_time = std::min(fine_min_final_time, clusters[cluster_i].min_current_time + _opt.time_step_size);
+        if (cl.sleeping) {
+            printf("%i skipping time step selection because sleeping cluster\n", cluster_i);
+            fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + _opt.time_step_size);
+            continue;
         }
 
-        double step = _local_pde.selectTimeStep(clusters[cluster_i]); 
-        fine_min_final_time = std::min(fine_min_final_time, clusters[cluster_i].min_current_time + step);
+        // TODO can this test ever pass?  Does the first check for min_current_time > min_final_time catch this?
+        auto it = std::find_if(last_step_clusters.begin(), last_step_clusters.end(), [&cl](const collision::Cluster& last) {return !last.hasAdvanced(cl);});        
+        if (it != last_step_clusters.end()) {
+            // This cluster was the same as it was last iteration (and it didn't advance) so just keep the same step size recommendation.
+            cl.step_size = it->step_size;
+            fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + it->step_size);
+            printf("%i skipping time step selection because time step has already been picked for this cluster since last modification\n", cluster_i);
+            continue;
+        }
+
+        double step = _local_pde.selectTimeStep(cl);
+        fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + step);
 
         printf("Selected time: %f for cluster %i\n", step, cluster_i);
 
-        for (Particle* p : clusters[cluster_i].particles) {
+        for (Particle* p : cl.particles) {
             p->cluster_id = cluster_i;
         }
     }
@@ -110,16 +127,19 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
     //    Advantage - Only clusters that can advance are advanced.
     //    Disadvantage - We have to wait for all time step selections to be done.
 
+    // printf("Advance\n");
     for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++)
     {
         if (clusters[cluster_i].min_current_time > fine_min_final_time)
         {
+            // printf("%i not advancing because another cluster too far behind\n", cluster_i);
             // This cluster can't advance because there is another cluster that is too far behind
             continue;
         }
 
         if (clusters[cluster_i].is_static)
         {
+            // printf("%i not advancing because it's static\n", cluster_i);
             // This cluster shouldn't be advanced as it's asleep or static
             continue;
         }
@@ -127,12 +147,14 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         if (clusters[cluster_i].sleeping) {
             _local_pde.stepSleeping(clusters[cluster_i]);
 
-            printf("Sleeping cluster %i stepped forward %f\n", clusters[cluster_i].step_size, cluster_i);
+            // printf("%i (sleeping) stepped forward %f\n", clusters[cluster_i].step_size, cluster_i);
         }
         else {
             stepRecursive(clusters[cluster_i], true);
 
-            printf("Cluster %i stepped forward %f\n", cluster_i, clusters[cluster_i].step_size);
+            // printf("%i stepped forward %f\n", cluster_i, clusters[cluster_i].step_size);
         }
     }
+
+    last_step_clusters.swap(clusters);
 }

@@ -13,6 +13,9 @@ namespace Delta2 {
             virtual double selectTimeStep(collision::Cluster& cluster) = 0;
             virtual bool step(collision::Cluster& cluster) = 0;
             void stepSleeping(collision::Cluster& cluster);
+            virtual void printType() {
+                printf("PDEStrategy");
+            }
         protected:
             common::Options _opt;
         };

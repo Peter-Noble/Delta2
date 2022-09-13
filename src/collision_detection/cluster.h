@@ -15,11 +15,8 @@ namespace Delta2 {
             bool is_static;
 
             // Check to see if this other cluster is a match for this one and hasn't advanced in time.
-            bool hasAdvanced(Cluster& other) {
+            bool hasAdvanced(const Cluster& other) const {
                 if (min_current_time != other.min_current_time) {
-                    return true;
-                }
-                if (step_size != other.step_size) {
                     return true;
                 }
                 if (sleeping != other.sleeping) {
@@ -30,7 +27,7 @@ namespace Delta2 {
                 }
                 for (Particle* p : particles) {
                     bool found = false;
-                    for (Particle* o : other.particles) {
+                    for (const Particle* o : other.particles) {
                         if (p->id == o->id) {
                             found = true;
                             break;

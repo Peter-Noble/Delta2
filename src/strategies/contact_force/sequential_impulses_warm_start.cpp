@@ -48,7 +48,7 @@ void SequentialImpulseWarmStart::update(std::vector<LocalContact>& contacts, std
     std::unique_lock<std::shared_mutex> guard;
 
     for (auto& tmp : acc) {
-        printf("Updating: (%i, %i) from %f to %f\n", tmp.first.first, tmp.first.second, _store[tmp.first], tmp.second.first / tmp.second.second);
+        // printf("Updating: (%i, %i) from %f to %f\n", tmp.first.first, tmp.first.second, _store[tmp.first], tmp.second.first / tmp.second.second);
         _store[tmp.first] = tmp.second.first / tmp.second.second;
     }
 }

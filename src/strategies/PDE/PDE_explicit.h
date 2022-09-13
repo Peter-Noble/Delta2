@@ -14,6 +14,9 @@ namespace Delta2 {
             PDEExplicit(ContactDetectionStrategy& contact_detection, ContactForceStrategy& contact_force, FrictionStrategy& friction, TimeStepSelectionStrategy& time_step, common::Options& opt);
             double selectTimeStep(collision::Cluster& cluster) override;
             bool step(collision::Cluster& cluster) override;
+            void printType() override {
+                printf("Explicit\n");
+            };
         protected:
             ContactDetectionStrategy& _contact_detection;
             ContactForceStrategy& _contact_force;

@@ -21,6 +21,7 @@ PDEExplicit::PDEExplicit(ContactDetectionStrategy& contact_detection,
 }
 
 double PDEExplicit::selectTimeStep(collision::Cluster& cluster) {
+    // printf("Selecting explicit time step\n");
     double time = _time_step.selectTimeStep(cluster);
     cluster.step_size = time;
     return time;
@@ -109,11 +110,16 @@ bool PDEExplicit::step(collision::Cluster& cluster) {
     {
         if (!p->is_static)
         {
+            bool willSleep = p->last_state.isStationary() && p->current_state.isStationary() && p->future_state.isStationary();
+            willSleep &= p->last_state.getTime() < p->current_state.getTime() && p->current_state.getTime() < p->future_state.getTime();
+
             p->last_state = p->current_state;
             p->current_state = p->future_state;
             p->projectFutureState(cluster.step_size);
 
-            printf("Post integration state of %i: last time %f, time %f, future time %f, sleep from %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), p->sleep_candidate_time);
+            p->setSleeping(willSleep);
+
+            // printf("Post integration state of %i: last time %f, time %f, future time %f, sleep from %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), p->sleep_candidate_time);
         }
     }
 
