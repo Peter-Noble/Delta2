@@ -106,18 +106,18 @@ bool PDEExplicit::step(collision::Cluster& cluster) {
         assert(p->last_state.getTime() <= p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
 
+    bool willSleep = true;
     for (Particle *p : cluster.particles)
     {
         if (!p->is_static)
         {
-            bool willSleep = p->last_state.isStationary() && p->current_state.isStationary() && p->future_state.isStationary();
+            willSleep &= p->last_state.isStationary() && p->current_state.isStationary() && p->future_state.isStationary();
             willSleep &= p->last_state.getTime() < p->current_state.getTime() && p->current_state.getTime() < p->future_state.getTime();
 
+            // printf("Updating %i last: %f, current: %f, future: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
             p->last_state = p->current_state;
             p->current_state = p->future_state;
             p->projectFutureState(cluster.step_size);
-
-            p->setSleeping(willSleep);
 
             // printf("Post integration state of %i: last time %f, time %f, future time %f, sleep from %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), p->sleep_candidate_time);
         }
@@ -125,6 +125,7 @@ bool PDEExplicit::step(collision::Cluster& cluster) {
 
     for (Particle* p : cluster.particles)
     {
+        p->setSleeping(willSleep);
         assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
 
