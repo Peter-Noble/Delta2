@@ -1,6 +1,7 @@
 #include "viewer.h"
 #include "basic_utils.h"
 #include <chrono>
+#include <tuple>
 
 using namespace Delta2::common;
 
@@ -59,16 +60,32 @@ igl::opengl::glfw::Viewer& Viewer::getViewer() {
 AnimationViewer::AnimationViewer(std::vector<Delta2::Particle>* particles) : _Ps(particles) {
 }
 
-void AnimationViewer::recordFrame(std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>& edges, double time) {
+void AnimationViewer::recordFrame(std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>& edges) {
     std::lock_guard<std::mutex> guard(_lock);
     std::vector<Eigen::Matrix4d> frame_transforms;
     std::vector<Eigen::Vector3d> colours;
     std::vector<int> groups;
     std::vector<ParticleState> states;
     // _Ts.emplace_back();
+
+    double time = std::numeric_limits<double>::infinity();
+    for (Delta2::Particle& p : *_Ps) {
+        if (!p.is_static) {
+            time = std::min(time, p.current_state.getTime());
+        }
+    }
+    if (std::isinf(time)) {
+        time = 0.0;
+    }
+
     for (Delta2::Particle& p : *_Ps) {
         // _Ts[_Ts.size() - 1].push_back(p.current_state.getTransformation());
-        frame_transforms.push_back(p.current_state.getTransformation());
+        if (p.is_static) {
+            frame_transforms.push_back(p.current_state.getTransformation());
+        }
+        else {
+            frame_transforms.push_back(p.current_state.interpolate(p.last_state, time).getTransformation());
+        }
         if (p.is_static) {
             colours.push_back({0.3, 0.3, 0.4});
             states.push_back(ParticleState::Static);
@@ -89,7 +106,14 @@ void AnimationViewer::recordFrame(std::vector<std::pair<Eigen::Vector3d, Eigen::
     _states.push_back(states);
     _groups.push_back(groups);
     _Ts.push_back(frame_transforms);
-}   
+    _contacts.push_back({});
+}
+
+void AnimationViewer::recordFrame(std::vector<std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d>>& contacts) {
+    std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> edges;
+    recordFrame(edges);
+    _contacts[_contacts.size() - 1] = contacts;
+}
 
 void AnimationViewer::show() {
     printf("Animation show\n");
@@ -180,11 +204,29 @@ void AnimationViewer::show() {
                 a_pts.row(e_i) = transform(_edges[_frame][e_i].first, T);
                 b_pts.row(e_i) = transform(_edges[_frame][e_i].second, T);
             }
+
+            Eigen::MatrixXd hit_normal_edges;
+            hit_normal_edges.resize(_contacts[_frame].size(), 3);
+            Eigen::MatrixXd hit_friction_edges;
+            hit_friction_edges.resize(_contacts[_frame].size(), 3);
+            Eigen::MatrixXd hit_pts;
+            hit_pts.resize(_contacts[_frame].size(), 3);
+            for (int c_i = 0; c_i < _contacts[_frame].size(); c_i++) {
+                hit_pts.row(c_i) = transform(std::get<0>(_contacts[_frame][c_i]), T);
+                hit_normal_edges.row(c_i) = transform(Eigen::Vector3d(std::get<0>(_contacts[_frame][c_i]) + std::get<1>(_contacts[_frame][c_i])), T);
+                hit_friction_edges.row(c_i) = transform(Eigen::Vector3d(std::get<0>(_contacts[_frame][c_i]) + std::get<2>(_contacts[_frame][c_i])), T);
+            }
+
             _viewer.data().clear_points();
             _viewer.data().clear_edges();
             _viewer.data().add_points(a_pts, Eigen::RowVector3d(1.0, 0.0, 0.0));
             _viewer.data().add_points(b_pts, Eigen::RowVector3d(0.0, 0.0, 1.0));
             _viewer.data().add_edges(a_pts, b_pts, Eigen::RowVector3d(1.0, 1.0, 1.0));
+
+            _viewer.data().add_points(hit_pts, Eigen::RowVector3d(1.0, 1.0, 0.0));
+            _viewer.data().add_edges(hit_pts, hit_friction_edges, Eigen::RowVector3d(0.0, 1.0, 0.0));
+            _viewer.data().add_edges(hit_pts, hit_normal_edges, Eigen::RowVector3d(0.0, 1.0, 1.0));
+
         }
         return false;
     };

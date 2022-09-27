@@ -23,7 +23,12 @@
 #include "../strategies/PDE/PDE_explicit.h"
 #include "../strategies/broad_phase/broad_phase_embree_cluster.h"
 
+#include "../globals.h"
+
 using namespace Delta2;
+
+std::mutex globals::contact_draws_lock;
+std::vector<std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d>> globals::contact_draws;
 
 void guiThread(common::AnimationViewer* view) {
     view->show();
@@ -56,6 +61,13 @@ int main(int argc, char *argv[]) {
     //     //     p.current_state.setVelocity({0.0, -3.0, 0.0});
     //     // }
     // }
+
+    {
+        Delta2::common::plane(100.0, V, F);
+        std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt, true));
+        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+        p.is_static = true;
+    }
 
     Delta2::common::cube(V, F);
 
@@ -92,23 +104,18 @@ int main(int argc, char *argv[]) {
     //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
     //     p.current_state.setTranslation({3.0, 0.0, 3.6});
     // }
-    // {
-    //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-    //     p.current_state.setTranslation({3.0, 0.0, 5.7});
-    // }
-    for (int x = 0; x < 1; x++) {
-        for (int i = 0; i < 5; i++) {
-            auto& p = particles.emplace_back(M, 1.0, 1.0, 0.25);
-            p.current_state.setTranslation({x * 4.0, i * x * 0.2, 1.1 + i * 2.06});
-        }
-    }
-
     {
-        Delta2::common::plane(100.0, V, F);
-        std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt, true));
-        auto& p = particles.emplace_back(M, 1.0, 1.0, 0.5);
-        p.is_static = true;
+        auto& p = particles.emplace_back(M, 1.0, 0.95, 0.25);
+        p.current_state.setTranslation({0.0, 0.0, 1.08});
+        p.current_state.setVelocity({1.0, 0.0, 0.0});
+        p.current_state.setAngular({0.0, 0.0, 1.0});
     }
+    // for (int x = 4; x < 5; x++) {
+    //     for (int i = 0; i < 5; i++) {
+    //         auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+    //         p.current_state.setTranslation({x * 4.0, i * x * 0.2, 1.1 + i * 2.06});
+    //     }
+    // }
 
     model::ParticleHandler ph(particles);
 
@@ -117,7 +124,7 @@ int main(int argc, char *argv[]) {
 
     if (opt.gui) {
         std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> empty;
-        view.recordFrame(empty, 0.0);
+        view.recordFrame(empty);
         gui = std::thread(guiThread, &view);
     }
 
@@ -137,12 +144,16 @@ int main(int argc, char *argv[]) {
     int step = 0;
     while (cont) {
         printf("Step: %i\n", step);
-        std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> view_draws;
+        // std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> view_draws;
+        {
+            std::lock_guard draws_lock(globals::contact_draws_lock);
+            globals::contact_draws.clear();
+        }
 
         broad_phase.step(ph);
 
         if (opt.gui) {
-            view.recordFrame(view_draws, particles[0].current_state.getTime());
+            view.recordFrame(globals::contact_draws);
         }
 
         step++;
@@ -152,7 +163,7 @@ int main(int argc, char *argv[]) {
                 double time = p.current_state.getTime();
                 double final_time = opt.final_time;
                 bool is_static = p.is_static;
-                if (time < final_time && is_static) {
+                if (time < final_time && !is_static) {
                     cont = true;
                 }
             }

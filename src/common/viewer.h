@@ -41,7 +41,8 @@ namespace Delta2 {
         class AnimationViewer {
             public:
                 AnimationViewer(std::vector<Delta2::Particle>* particles);
-                void recordFrame(std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>& edges, double time);
+                void recordFrame(std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>>& edges);
+                void recordFrame(std::vector<std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d>>& contacts);
 
                 AnimationViewer(const AnimationViewer&) = delete;
                 void operator=(const AnimationViewer&) = delete;
@@ -59,6 +60,7 @@ namespace Delta2 {
                 std::mutex _lock;
                 std::vector<std::vector<int>> _groups;
                 std::vector<std::vector<ParticleState>> _states;
+                std::vector<std::vector<std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d>>> _contacts;
         };
     }
 }
