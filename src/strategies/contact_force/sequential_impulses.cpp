@@ -367,8 +367,12 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             updated_friction_total.push_back({0, 0, 0});
         }
 
-        for (int it = 0; it < 30; it++) {
+        for (int it = 0; it < 100; it++) {
             std::map<std::pair<int, int>, int> contacts_per_pair;
+            printf("===============================\n");
+
+            std::vector<common::Edge<double>> view_hits;
+            bool show = false;
 
             for (int c = 0; c < hits.size(); c++) {
                 uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
@@ -392,8 +396,9 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
                 Eigen::Vector3d v_tangent = v1_AB - v1_AB.dot(n) * n;
                 double mu = std::min(cluster.particles[a_id].friction_coeff, cluster.particles[b_id].friction_coeff);
-                double max_force = contacts[c].impulse * mu;
+                double max_force = contacts[c].impulse * mu * 1000;
 
+                // printf("it: %i, c: %i, max_force: %.4f, v_tangent: %.4f\n", it, c, max_force, v_tangent.norm());
                 Eigen::Vector3d r_A = hits[c].A - hits[c].p_a->future_state.getTranslation();
                 Eigen::Vector3d r_B = hits[c].B - hits[c].p_b->future_state.getTranslation();
 
@@ -421,7 +426,10 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
                 double m_inv_effective_tangent = k_tangent < 1e-6 ? 0.0 : 1.0 / k_tangent;
 
-                Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * 0.5;
+                Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * 0.25;
+                if (max_force > 1e-6) {
+                    printf("delta_friction_impulse: %.4f, %.4f, %.4f\n", delta_friction_impulse.x(), delta_friction_impulse.y(), delta_friction_impulse.z());
+                }
                 Eigen::Vector3d friction_impulse_total = contacts[c].last_friction_impulse + delta_friction_impulse;
                 friction_impulse_total = friction_impulse_total.normalized() * std::clamp(friction_impulse_total.norm(), 0.0, max_force);
 
@@ -434,8 +442,23 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 else {
                     contacts_per_pair[key] = 1;
                 }
+
+                if (it == 99 && max_force > 1e-6) {
+                    printf("v_tangent: %.4f, fric impulse: %.4f, max_force: %.4f\n", v_tangent.norm(), friction_impulse_total.norm(), max_force);
+                    show |= v_tangent.norm() > 1e-3;
+                    view_hits.push_back(common::Edge(hits[c].A, hits[c].B));                    
+                }
             }
 
+            if (show) {
+                common::Viewer view;
+                view.addParticleFuture(cluster.particles[0]);
+                view.addParticleFuture(cluster.particles[1]);
+                for (auto e : view_hits) {
+                    view.addEdge(e);
+                }    
+                view.show();
+            }
 
             for (int c = 0; c < hits.size(); c++) {
                 uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
