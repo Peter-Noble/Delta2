@@ -198,11 +198,11 @@ void timestepping::ExplicitAdaptiveClustersWithWitnessesScheme::step(double time
             std::mutex lock;
 
             //for (collision::BroadPhaseCollision &b : cluster_interactions[cluster_i])
-            #pragma omp parallel
+            // #pragma omp parallel
             {
-                #pragma omp single
+                // #pragma omp single
                 {
-                    #pragma omp taskloop
+                    // #pragma omp taskloop
                     for (int b_i = 0; b_i < cluster_interactions[cluster_i].size(); b_i++)
                     {
                         __itt_string_handle* tree_comparison_task = __itt_string_handle_create("Tree comparison");

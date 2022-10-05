@@ -16,6 +16,6 @@ TimeStepSelectionDynamicContinuous::TimeStepSelectionDynamicContinuous(ContactDe
 
 double TimeStepSelectionDynamicContinuous::selectTimeStep(collision::Cluster& cluster) {
     collision::fineCollisionClustersWithTimeStepSelection(cluster);
-    cluster.step_size = std::max(1e-5, std::min(cluster.step_size, (double)_opt.time_step_size));
+    cluster.step_size = std::max(1e-3, std::min(cluster.step_size, (double)_opt.time_step_size));
     return cluster.step_size;
 }

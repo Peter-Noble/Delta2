@@ -54,12 +54,12 @@ std::vector<collision::ContinuousContact<double>> collision::separateContinuousC
         }
     }
 
-    #pragma omp parallel
+    // #pragma omp parallel
     {
         // for (collision::BroadPhaseCollision& b : broad_phase) {
-        #pragma omp single
+        // #pragma omp single
         {
-            #pragma omp taskloop
+            // #pragma omp taskloop
             for (int b_i = 0; b_i < broad_phase.size(); b_i++) {
                 __itt_string_handle* continuous_pair_task = __itt_string_handle_create("Continuous pair");
                 __itt_task_begin(domain, __itt_null, __itt_null, continuous_pair_task);
@@ -204,12 +204,12 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
     // TODO Compute a min future state per cluster given the slow increase of timestep size.  Then use this to avoid computing step sizes for clusters
     //      where the current time is greater than the max possible future time of another cluster.
 
-    #pragma omp parallel
+    // #pragma omp parallel
     {
         // for (collision::BroadPhaseCollision& b : broad_phase) {
-        #pragma omp single
+        // #pragma omp single
         {
-            #pragma omp taskloop
+            // #pragma omp taskloop
             for (int b_i = 0; b_i < broad_phase.size(); b_i++) {
                 __itt_string_handle* continuous_pair_task = __itt_string_handle_create("Continuous pair");
                 __itt_task_begin(domain, __itt_null, __itt_null, continuous_pair_task);
@@ -471,11 +471,11 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
     std::mutex lock;
 
-    #pragma omp parallel
+    // #pragma omp parallel
     {
-        #pragma omp single
+        // #pragma omp single
         {
-            #pragma omp taskloop
+            // #pragma omp taskloop
             for (int b_i = 0; b_i < cluster.interations.size(); b_i++) {
                 int tid = omp_get_thread_num();
 
@@ -635,17 +635,17 @@ void collision::fineWitnessCollisionClustersWithTimeStepSelection(std::vector<De
 
     std::mutex lock;
 
-    #pragma omp parallel
+    // #pragma omp parallel
     {
         // for (collision::BroadPhaseCollision& b : broad_phase) {
-        #pragma omp single
+        // #pragma omp single
         {
-            #pragma omp taskloop
+            // #pragma omp taskloop
             for (int c_i = 0; c_i < cluster_interactions_out.size(); c_i++) {
                 if (min_current_time[c_i] > max_reachable_time) {
                     continue;
                 }
-                #pragma omp taskloop
+                // #pragma omp taskloop
                 for (int b_i = 0; b_i < cluster_interactions_out[c_i].size(); b_i++) {
                     __itt_string_handle* continuous_pair_task = __itt_string_handle_create("Continuous pair");
                     __itt_task_begin(domain, __itt_null, __itt_null, continuous_pair_task);

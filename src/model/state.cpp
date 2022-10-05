@@ -118,7 +118,7 @@ bool State::isValid() const {
 }
 
 bool State::isStationary() const {
-    return getVelocity().norm() < 1e-3 && getAngularMomentum().norm() < 1e-3;
+    return getVelocity().norm() < 1e-4 && getAngularMomentum().norm() < 1e-4;
 }
 
 void State::applyDelta(double t, Eigen::Vector3d force, Eigen::Vector3d torque, double mass, const Eigen::Matrix3d& inverse_inertia) {

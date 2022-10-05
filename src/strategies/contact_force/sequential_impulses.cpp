@@ -69,6 +69,32 @@ State updateState(State& future, double t, const Vector3d& impulse, const Vector
     return updated;
 }
 
+State updateStateImmediate(State& future, double t, const Vector3d& impulse, const Vector3d& impulse_offset, const Vector3d& rotational_impulse, const Vector3d& rotational_impulse_offset, Particle* p) {
+    State updated = future;
+
+    updated.setVelocity(future.getVelocity() + impulse / p->getMass());
+    updated.setTranslation(future.getTranslation() + impulse_offset / p->getMass() * t + impulse / p->getMass() * t);
+
+    // https://link.springer.com/content/pdf/10.1007/s00707-013-0914-2.pdf
+
+    Eigen::Vector3d angular_momentum = future.getAngularMomentum() + rotational_impulse;
+
+    Eigen::Quaterniond rotation = future.getRotation();
+
+    updated.setAngular(angular_momentum);
+
+    Eigen::Matrix3d R = rotation.toRotationMatrix();
+    Eigen::Matrix3d Iinv = R * p->getInverseInertiaMatrix() * R.transpose();
+    Eigen::Vector3d omega = Iinv * (future.getAngularMomentum() + t * rotational_impulse_offset + t * rotational_impulse);
+
+    Eigen::Quaterniond rot_delta = Delta2::common::exp(0.5 * omega * t);
+
+    rotation = rot_delta * rotation;
+    updated.setRotation(rotation);
+
+    return updated;
+}
+
 SequentialImpulses::SequentialImpulses(FrictionStrategy& friction,
                                      common::Options& opt) :
                                      ContactForceStrategy(friction, opt) {
@@ -85,7 +111,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
         lc.start_dist = (hits[c].A - hits[c].B).norm();
 
-        if (lc.start_dist < 1.e-4) {
+        if (lc.start_dist < 1e-6 && cluster.step_size > 1e-4) {
             return false;
         }
 
@@ -147,6 +173,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
     std::vector<Eigen::Vector3d> rotational_impulse_offsets;
 
     std::vector<State> FStates;
+    std::vector<State> FStates_friction;
 
     const double t = cluster.step_size;
 
@@ -157,6 +184,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
         impulse_offsets.push_back({0, 0, 0});
         rotational_impulse_offsets.push_back({0, 0, 0});
         FStates.push_back(cluster.particles[p_i].future_state);
+        FStates_friction.push_back(cluster.particles[p_i].future_state);
     }
 
     _warm_start.apply(contacts, hits);
@@ -168,7 +196,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
         Eigen::Vector3d n = contacts[c].global_normal.normalized();
         const double outer_search = hits[c].eps_a + hits[c].eps_b;
-        const double outer = outer_search * 0.1;
+        const double outer = outer_search * 0.25;
 
         Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
         Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
@@ -195,6 +223,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             Eigen::Vector3d impulse_offset = impulse_offsets[p_i];
             Eigen::Vector3d rotational_impulse_offset = rotational_impulse_offsets[p_i];
             FStates[p_i] = updateState(cluster.particles[p_i].future_state, t, impulse, impulse_offset, rotational_impulse, rotational_impulse_offset, &cluster.particles[p_i]);
+            FStates_friction[p_i] = updateStateImmediate(cluster.particles[p_i].future_state, t, impulse, impulse_offset, rotational_impulse, rotational_impulse_offset, &cluster.particles[p_i]);
         }
     }
 
@@ -214,7 +243,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 Eigen::Vector3d n = contacts[c].global_normal.normalized();
 
                 const double outer_search = hits[c].eps_a + hits[c].eps_b;
-                const double outer = outer_search * 0.1 ;
+                const double outer = outer_search * 0.25;
 
                 Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
                 Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
@@ -249,8 +278,9 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
                 // ========  OFFSET ALONG NORMAL ========
 
-                const double lower_slop = std::max(outer * 0.1, outer - contacts[c].start_dist);
-                const double slop = common::lerp(lower_slop, outer * 0.1, 0.3);
+                const double min_slop_factor = 0.2;
+                const double lower_slop = std::max(outer * min_slop_factor, outer - contacts[c].start_dist);
+                const double slop = common::lerp(lower_slop, outer * min_slop_factor, 0.3);
                 const double penetration_depth = outer - d1;
 
                 // d1 = i/m * t offset distance with impulse.  m * d1 / t = i
@@ -268,8 +298,8 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 Eigen::Vector3d update_rotational_impulse_offset_A = model::calcTorque(update_impulse_offset, p1_A, FStates[a_id].getTranslation());
                 Eigen::Vector3d update_rotational_impulse_offset_B = model::calcTorque(Eigen::Vector3d(-update_impulse_offset), p1_B, FStates[b_id].getTranslation());
 
-                rotational_impulse_offsets[a_id] += update_rotational_impulse_offset_A;
-                rotational_impulse_offsets[b_id] += update_rotational_impulse_offset_B;
+                // rotational_impulse_offsets[a_id] += update_rotational_impulse_offset_A;
+                // rotational_impulse_offsets[b_id] += update_rotational_impulse_offset_B;
 
                 // ======== FRICTION ========
 
@@ -335,6 +365,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                     Eigen::Vector3d impulse_offset = impulse_offsets[a_id];
                     Eigen::Vector3d rotational_impulse_offset = rotational_impulse_offsets[a_id];
                     FStates[a_id] = updateState(cluster.particles[a_id].future_state, t, impulse, impulse_offset, rotational_impulse, rotational_impulse_offset, &cluster.particles[a_id]);
+                    FStates_friction[a_id] = updateStateImmediate(cluster.particles[a_id].future_state, t, impulse, impulse_offset, rotational_impulse, rotational_impulse_offset, &cluster.particles[a_id]);
                 }
                 if (!cluster.particles[b_id].is_static)
                 {
@@ -343,12 +374,13 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                     Eigen::Vector3d impulse_offset = impulse_offsets[b_id];
                     Eigen::Vector3d rotational_impulse_offset = rotational_impulse_offsets[b_id];
                     FStates[b_id] = updateState(cluster.particles[b_id].future_state, t, impulse, impulse_offset, rotational_impulse, rotational_impulse_offset, &cluster.particles[b_id]);
+                    FStates_friction[b_id] = updateStateImmediate(cluster.particles[b_id].future_state, t, impulse, impulse_offset, rotational_impulse, rotational_impulse_offset, &cluster.particles[b_id]);
                 }
             }
             converged = true;
             for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
                 Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
-                if (impulse_diff.norm() > 1e-5) {
+                if (impulse_diff.norm() > 1e-6) {
                     converged = false;
                     break;
                 }
@@ -362,14 +394,22 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             it++;
         }
 
+        std::vector<Eigen::Vector3d> v_tangents;
         std::vector<Eigen::Vector3d> updated_friction_total;
+        std::vector<Eigen::Vector3d> updated_friction_total_last_offset;
+        std::vector<Eigen::Vector3d> updated_friction_total_offset;
         for (int c = 0; c < hits.size(); c++) {
             updated_friction_total.push_back({0, 0, 0});
+            updated_friction_total_last_offset.push_back({0, 0, 0});
+            updated_friction_total_offset.push_back({0, 0, 0});
+            v_tangents.push_back({0, 0, 0});
         }
 
-        for (int it = 0; it < 100; it++) {
+        it = 0;
+        converged = false;
+        while (!converged && it < 100) {
             std::map<std::pair<int, int>, int> contacts_per_pair;
-            printf("===============================\n");
+            // printf("===============================\n");
 
             std::vector<common::Edge<double>> view_hits;
             bool show = false;
@@ -381,24 +421,43 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 Eigen::Vector3d n = contacts[c].global_normal.normalized();
 
                 const double outer_search = hits[c].eps_a + hits[c].eps_b;
-                const double outer = outer_search * 0.1;
+                const double outer = outer_search * 0.25;
 
                 Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
                 Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
                 const double d1 = p1_B.dot(n) - p1_A.dot(n);
 
-                Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
-                Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
+                Eigen::Vector3d v1_A = hits[c].p_a->is_static ? Eigen::Vector3d({0, 0, 0}) : FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
+                Eigen::Vector3d v1_B = hits[c].p_b->is_static ? Eigen::Vector3d({0, 0, 0}) : FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
+
+                Eigen::Vector3d last_point_A = common::transform(contacts[c].local_A, hits[c].p_a->current_state.getTransformation());
+                Eigen::Vector3d future_point_A = common::transform(contacts[c].local_A, FStates_friction[a_id].getTransformation());
+                Eigen::Vector3d v1_A_drift = (future_point_A - last_point_A) / cluster.step_size;
+
+                Eigen::Vector3d last_point_B = common::transform(contacts[c].local_B, hits[c].p_b->current_state.getTransformation());
+                Eigen::Vector3d future_point_B = common::transform(contacts[c].local_B, FStates_friction[b_id].getTransformation());
+                Eigen::Vector3d v1_B_drift = (future_point_B - last_point_B) / cluster.step_size;
+
+                // Eigen::Vector4d new_pt_A = FStates[a_id].getTransformation() * (hits[c].p_a->current_state.getTransformation().inverse() * p1_A.homogeneous()) + FStates[a_id].getVelocity() * cluster.step_size;
+                // Eigen::Vector3d v1_A = (new_pt_A - p1_A.homogeneous()).head<3>() / cluster.step_size;
+
+                // Eigen::Vector4d new_pt_B = FStates[b_id].getTransformation() * (hits[c].p_b->current_state.getTransformation().inverse() * p1_B.homogeneous()) + FStates[b_id].getVelocity() * cluster.step_size;
+                // Eigen::Vector3d v1_B = (new_pt_B - p1_B.homogeneous()).head<3>() / cluster.step_size;
+
+                // Eigen::Vector3d v1_A = FStates_friction[a_id].pointVelocity(p1_A, hits[c].p_a->current_state);
+                // Eigen::Vector3d v1_B = FStates_friction[b_id].pointVelocity(p1_B, hits[c].p_b->current_state);
 
                 const double m = contacts[c].mass_eff_normal;
 
                 Eigen::Vector3d v1_AB = v1_A - v1_B;
+                Eigen::Vector3d v1_AB_drift = v1_A_drift - v1_B_drift;
 
                 Eigen::Vector3d v_tangent = v1_AB - v1_AB.dot(n) * n;
+                Eigen::Vector3d v_tangent_drift = v1_AB_drift - v1_AB_drift.dot(n) * n;
+                v_tangents[c] = v_tangent;
                 double mu = std::min(cluster.particles[a_id].friction_coeff, cluster.particles[b_id].friction_coeff);
-                double max_force = contacts[c].impulse * mu * 1000;
+                double max_force = contacts[c].impulse * mu * 10;
 
-                // printf("it: %i, c: %i, max_force: %.4f, v_tangent: %.4f\n", it, c, max_force, v_tangent.norm());
                 Eigen::Vector3d r_A = hits[c].A - hits[c].p_a->future_state.getTranslation();
                 Eigen::Vector3d r_B = hits[c].B - hits[c].p_b->future_state.getTranslation();
 
@@ -410,28 +469,59 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 Eigen::Vector3d rt_A = r_A.cross(tangent);
                 Eigen::Vector3d rt_B = r_B.cross(tangent);
 
+                Eigen::Vector3d tangent_drift = v_tangent_drift.normalized();
+
+                Eigen::Vector3d rt_A_drift = r_A.cross(tangent_drift);
+                Eigen::Vector3d rt_B_drift = r_B.cross(tangent_drift);
+
                 double im_A = 1.0 / hits[c].p_a->getMass();
                 double im_B = 1.0 / hits[c].p_b->getMass();
                 Eigen::Matrix3d ii_A = hits[c].p_a->getInverseInertiaMatrix();
                 Eigen::Matrix3d ii_B = hits[c].p_b->getInverseInertiaMatrix();
 
                 double k_tangent = 0.0;
+                double k_tangent_drift = 0.0;
                 if (!hits[c].p_a->is_static) {
                     k_tangent += im_A + rt_A.transpose() * ii_A * rt_A;
+                    k_tangent_drift += im_A + rt_A_drift.transpose() * ii_A * rt_A_drift;
 
                 }
                 if (!hits[c].p_b->is_static) {
                     k_tangent += im_B + rt_B.transpose() * ii_B * rt_B;
+                    k_tangent_drift += im_B + rt_B_drift.transpose() * ii_B * rt_B_drift;
                 }
 
                 double m_inv_effective_tangent = k_tangent < 1e-6 ? 0.0 : 1.0 / k_tangent;
+                double m_inv_effective_tangent_drift = k_tangent_drift < 1e-6 ? 0.0 : 1.0 / k_tangent_drift;
 
-                Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * 0.25;
-                if (max_force > 1e-6) {
-                    printf("delta_friction_impulse: %.4f, %.4f, %.4f\n", delta_friction_impulse.x(), delta_friction_impulse.y(), delta_friction_impulse.z());
-                }
+                Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * 0.9;
+                Eigen::Vector3d delta_friction_impulse_offset = -v_tangent_drift * m_inv_effective_tangent_drift * 0.5;
+                // if (max_force > 1e-6) {
+                //     Eigen::Vector3d w_a = hits[c].p_a->getInverseInertiaMatrix() * FStates[a_id].getAngularMomentum();
+                //     Eigen::Vector3d ang_a = w_a.cross(p1_A - FStates[a_id].getTranslation());
+                //     Eigen::Vector3d vel_a = FStates[a_id].getVelocity();
+
+                //     Eigen::Vector3d w_b = hits[c].p_b->getInverseInertiaMatrix() * FStates[b_id].getAngularMomentum();
+                //     Eigen::Vector3d ang_b = w_b.cross(p1_B - FStates[b_id].getTranslation());
+                //     Eigen::Vector3d vel_b = FStates[b_id].getVelocity();
+
+                //     printf("it: %i, c: %i, max_force: %.4f, v_tangent: %.4f\n", it, c, max_force, v_tangent.norm());
+                //     printf("v_tangent: %.4f, %.4f, %.4f\n", v_tangent.x(), v_tangent.y(), v_tangent.z());
+                //     printf("v1_A_drift: %.4f, %.4f, %.4f\n", v1_A_drift.x(), v1_A_drift.y(), v1_A_drift.z());
+                //     printf("v1_B_drift: %.4f, %.4f, %.4f\n", v1_B_drift.x(), v1_B_drift.y(), v1_B_drift.z());
+                //     printf("v1_AB: %.4f, %.4f, %.4f\n", v1_AB.x(), v1_AB.y(), v1_AB.z());
+                //     // printf("vel_a: %.4f, %.4f, %.4f, ang_a: %.4f, %.4f, %.4f\n", vel_a.x(), vel_a.y(), vel_a.z(), ang_a.x(), ang_a.y(), ang_a.z());
+                //     // printf("vel_b: %.4f, %.4f, %.4f, ang_b: %.4f, %.4f, %.4f\n", vel_b.x(), vel_b.y(), vel_b.z(), ang_b.x(), ang_b.y(), ang_b.z());hits[c].B - last_point_B)
+                //     printf("last: %.4f, %.4f, %.4f, hit: %.4f, %.4f, %.4f\n", last_point_B.x(), last_point_B.y(), last_point_B.z(), hits[c].B.x(), hits[c].B.y(), hits[c].B.z());
+                //     printf("delta_friction_impulse       : %.4f, %.4f, %.4f, m_eff: %.4f\n", delta_friction_impulse.x(), delta_friction_impulse.y(), delta_friction_impulse.z(), m_inv_effective_tangent);
+                //     printf("delta_friction_impulse offset: %.4f, %.4f, %.4f, m_eff: %.4f\n", delta_friction_impulse_offset.x(), delta_friction_impulse_offset.y(), delta_friction_impulse_offset.z(), m_inv_effective_tangent_drift);
+                // }
                 Eigen::Vector3d friction_impulse_total = contacts[c].last_friction_impulse + delta_friction_impulse;
                 friction_impulse_total = friction_impulse_total.normalized() * std::clamp(friction_impulse_total.norm(), 0.0, max_force);
+
+                // Eigen::Vector3d friction_impulse_total_offset = updated_friction_total_offset[c] + delta_friction_impulse_offset;
+                // friction_impulse_total_offset = friction_impulse_total_offset.normalized() * std::clamp(friction_impulse_total_offset.norm(), 0.0, max_force);
+                // updated_friction_total_offset[c] = friction_impulse_total_offset;
 
                 updated_friction_total[c] = friction_impulse_total;
 
@@ -442,23 +532,19 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 else {
                     contacts_per_pair[key] = 1;
                 }
-
-                if (it == 99 && max_force > 1e-6) {
-                    printf("v_tangent: %.4f, fric impulse: %.4f, max_force: %.4f\n", v_tangent.norm(), friction_impulse_total.norm(), max_force);
-                    show |= v_tangent.norm() > 1e-3;
-                    view_hits.push_back(common::Edge(hits[c].A, hits[c].B));                    
-                }
             }
 
-            if (show) {
-                common::Viewer view;
-                view.addParticleFuture(cluster.particles[0]);
-                view.addParticleFuture(cluster.particles[1]);
-                for (auto e : view_hits) {
-                    view.addEdge(e);
-                }    
-                view.show();
-            }
+            // if (show) {
+            //     common::Viewer view;
+            //     view.addParticleFuture(cluster.particles[0]);
+            //     view.addParticleFuture(cluster.particles[1]);
+            //     for (auto e : view_hits) {
+            //         view.addEdge(e);
+            //     }
+            //     view.show();
+            // }
+
+            converged = true;
 
             for (int c = 0; c < hits.size(); c++) {
                 uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
@@ -473,6 +559,10 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 impulses[a_id] += update_friction_impulse;
                 impulses[b_id] -= update_friction_impulse;
 
+                if (update_friction_impulse.norm() > 1e-4) {
+                    converged = false;
+                }
+
                 Eigen::Vector3d rotational_impulse_friction_A = model::calcTorque(contacts[c].last_friction_impulse, p1_A, FStates[a_id].getTranslation());
                 Eigen::Vector3d rotational_impulse_friction_B = model::calcTorque(Eigen::Vector3d(-contacts[c].last_friction_impulse), p1_B, FStates[b_id].getTranslation());
 
@@ -482,6 +572,21 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 contacts[c].last_friction_rotational_impulse_B = rotational_impulse_friction_B;
                 rotational_impulses[a_id] += contacts[c].last_friction_rotational_impulse_A;
                 rotational_impulses[b_id] += contacts[c].last_friction_rotational_impulse_B;
+
+                Eigen::Vector3d update_friction_impulse_offset = (updated_friction_total_offset[c] - updated_friction_total_last_offset[c]) / contacts_per_pair[key];
+                updated_friction_total_last_offset[c] = updated_friction_total_offset[c];
+                impulse_offsets[a_id] += update_friction_impulse_offset;
+                impulse_offsets[b_id] -= update_friction_impulse_offset;
+
+                if (update_friction_impulse_offset.norm() > 1e-4) {
+                    converged = false;
+                }
+
+                Eigen::Vector3d rotational_impulse_friction_offset_A = model::calcTorque(update_friction_impulse_offset, p1_A, FStates[a_id].getTranslation());
+                Eigen::Vector3d rotational_impulse_friction_offset_B = model::calcTorque(Eigen::Vector3d(-update_friction_impulse_offset), p1_B, FStates[b_id].getTranslation());
+
+                rotational_impulse_offsets[a_id] += rotational_impulse_friction_offset_A;
+                rotational_impulse_offsets[b_id] += rotational_impulse_friction_offset_B;
             }
 
             // ======== INTEGRATE ========
@@ -492,9 +597,13 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                     Eigen::Vector3d rotational_impulse = rotational_impulses[p];
                     Eigen::Vector3d impulse_offset = impulse_offsets[p];
                     Eigen::Vector3d rotational_impulse_offset = rotational_impulse_offsets[p];
+                    // printf("Particle: %i, impulse: %.4f, %.4f, %.4f, rotational_impulse: %.4f, %.4f, %.4f\n", p, impulse.x(), impulse.y(), impulse.z(), rotational_impulse.x(), rotational_impulse.y(), rotational_impulse.z());
                     FStates[p] = updateState(cluster.particles[p].future_state, t, impulse, impulse_offset, rotational_impulse, rotational_impulse_offset, &cluster.particles[p]);
+                    FStates_friction[p] = updateStateImmediate(cluster.particles[p].future_state, t, impulse, impulse_offset, rotational_impulse, rotational_impulse_offset, &cluster.particles[p]);
                 }
             }
+
+            it++;
         }
 
         {
@@ -503,7 +612,8 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
                 uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
                 // printf("Contact with ids: %i(%i), %i(%i), %f, (%f, %f, %f)\n", a_id, hits[c].p_a->id, b_id, hits[c].p_b->id, contacts[c].impulse, contacts[c].global_normal.x(), contacts[c].global_normal.y(), contacts[c].global_normal.z());
-                globals::contact_draws.push_back(std::make_tuple(contacts[c].global_centre, contacts[c].global_normal.normalized() * contacts[c].impulse, contacts[c].last_friction_impulse));
+                // globals::contact_draws.push_back(std::make_tuple(contacts[c].global_centre, contacts[c].global_normal.normalized() * contacts[c].impulse, contacts[c].last_friction_impulse));
+                globals::contact_draws.push_back(std::make_tuple(contacts[c].global_centre, contacts[c].global_normal.normalized() * contacts[c].impulse, v_tangents[c] * 10.0));
             }
         }
         // printf("Finish contact in %i iterations\n", it);

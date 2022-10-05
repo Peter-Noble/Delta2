@@ -1,4 +1,5 @@
-CC = dpcpp
+CC = icx
+CCLINK = dpcpp
 
 
 # Excluded: $(wildcard ./timestepping/*.cpp)
@@ -35,10 +36,10 @@ debug: maindebug
 alldebug: maindebug test
 
 mainrelease: $(release_obj) runner/main.o.release
-	$(CC) $(FLAGS) $(LIBS) -o ../build/Delta2 $^ $(LIBNAMES) -O3
+	$(CCLINK) $(FLAGS) $(LIBS) -o ../build/Delta2 $^ $(LIBNAMES) -O3
 
 maindebug: $(obj) runner/main.o
-	$(CC) $(FLAGS) $(LIBS) -o ../build/Delta2.debug $^ $(LIBNAMES) -O0
+	$(CCLINK) $(FLAGS) $(LIBS) -o ../build/Delta2.debug $^ $(LIBNAMES) -O0
 
 test: $(all_obj) runner/unit_test_runner.o 
 	$(CC) $(FLAGS) $(LIBS) -o ../build/test_Delta2 $^ $(LIBNAMES)
@@ -51,7 +52,7 @@ test: $(all_obj) runner/unit_test_runner.o
 	$(CC) $(CFLAGS) $(FLAGS) $(DEFINES) $(INCLUDE) $< -MM -MT $(@:.d=.o) >$@
 
 %.o.release: %.cpp
-	$(CC) $(CFLAGS) -O3 $(FLAGS) $(DEFINES) $(INCLUDE) -o $@ -c $<
+	$(CC) $(CFLAGS) -O3 $(FLAGS) $(DEFINES) -DNDEBUG $(INCLUDE) -o $@ -c $<
 
 %.o: %.cpp
 	$(CC) $(CFLAGS) -O0 $(FLAGS) $(DEFINES) $(INCLUDE) -o $@ -c $<

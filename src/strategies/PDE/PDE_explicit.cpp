@@ -69,11 +69,11 @@ bool PDEExplicit::step(collision::Cluster& cluster) {
 
     std::mutex lock;
 
-    #pragma omp parallel
+    // #pragma omp parallel
     {
-        #pragma omp single
+        // #pragma omp single
         {
-            #pragma omp taskloop
+            // #pragma omp taskloop
             for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
             {
                 collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
@@ -111,8 +111,17 @@ bool PDEExplicit::step(collision::Cluster& cluster) {
     {
         if (!p->is_static)
         {
-            willSleep &= p->last_state.isStationary() && p->current_state.isStationary() && p->future_state.isStationary();
-            willSleep &= p->last_state.getTime() < p->current_state.getTime() && p->current_state.getTime() < p->future_state.getTime();
+            // assert(p->id < _not_moved_for.size());
+            bool canSleep = p->last_state.isStationary() && p->current_state.isStationary() && p->future_state.isStationary();
+            canSleep &= p->last_state.getTime() < p->current_state.getTime() && p->current_state.getTime() < p->future_state.getTime();
+            if (!canSleep) {
+                p->sleep_not_moved_steps = 0;
+            } else {
+                p->sleep_not_moved_steps++;
+            }
+            if (p->sleep_not_moved_steps < 20) {
+                willSleep = false;
+            }
 
             // printf("Updating %i last: %f, current: %f, future: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
             p->last_state = p->current_state;

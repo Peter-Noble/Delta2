@@ -16,6 +16,7 @@ Particle::Particle(std::shared_ptr<MeshData> m, double density, double friction_
     last_time_step_size = 1.0;
     _is_sleeping = false;
     sleep_candidate_time = 0.0;
+    sleep_not_moved_steps = 0;
     restitution = 0.5;
     cluster_id = -1;
     assignID();
@@ -33,6 +34,7 @@ Particle::Particle(std::shared_ptr<MeshData> m, double density, double friction_
     is_static = false;
     geo_eps = eps;
     last_time_step_size = 1.0;
+    sleep_not_moved_steps = 0;
     _is_sleeping = false;
     cluster_id = -1;
     assignID();

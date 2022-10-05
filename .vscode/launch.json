@@ -9,7 +9,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/Delta2.debug",
-            "args": ["-f 10.0", "--gui", "-t 0.1"],
+            "args": ["-f 15.0", "-t 0.1", "--gui"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [

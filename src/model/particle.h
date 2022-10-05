@@ -48,6 +48,7 @@ namespace Delta2 {
         double last_time_step_size;
         int id;
         double sleep_candidate_time;
+        int sleep_not_moved_steps;
         double restitution;
         int cluster_id;
     private:
