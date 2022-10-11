@@ -67,6 +67,62 @@ namespace Delta2 {
         };
 
         template<typename real, int branching, int bucket_size>
+        std::vector<Contact<real>> compareTreesFullCurrent(Particle& a, Particle& b, strategy::ContactDetectionStrategy& bucket_comparison) {
+            std::vector<Contact<real>> result;
+            
+            std::vector<DeferredCompare> dc;
+            std::vector<DeferredCompare> dc_next;
+            dc.emplace_back(a.mesh->getSurrogateTree().getNode(0), b.mesh->getSurrogateTree().getNode(0));
+            std::vector<int> num_hits;
+            std::vector<Contact<real>> hits;
+            while (!dc.empty()) {
+                hits.clear();
+                // findContactsBucketComparison<branching, real>(dc, a, b, hits, num_hits);
+                bucket_comparison.findContactsBucketComparisonCurrent(dc, a, b, hits, num_hits);
+                int last_hit_num = 0;
+                for (int i = 0; i < dc.size(); i++) {
+                    if (num_hits[i] > last_hit_num) {
+                        bool advance_a = false;
+                        bool advance_b = false;
+                        if (!dc[i].a.is_inner && !dc[i].b.is_inner) {
+                            result.insert(result.end(), hits.begin() + last_hit_num, hits.begin() + num_hits[i]);
+                        }
+                        else if (!dc[i].a.is_inner) {
+                            advance_b = true;
+                        }
+                        else if (!dc[i].b.is_inner) {
+                            advance_a = true;
+                        }
+                        else {
+                            // TODO this decision of which to advance first is a little arbitrary.
+                            //    Would probably be better to advance the one with the largest area.
+                            if (dc[i].a.depth < dc[i].b.depth) {
+                                advance_a = true;
+                            }
+                            else {
+                                advance_b = true;
+                            }
+                        }
+                        if (advance_a) {
+                            for (int c = 0; c < dc[i].a.num_children; c++) {
+                                dc_next.emplace_back(a.mesh->getSurrogateTree().getNode(c + dc[i].a.child_id_first), dc[i].b);
+                            }
+                        }
+                        else if (advance_b) {
+                            for (int c = 0; c < dc[i].b.num_children; c++) {
+                                dc_next.emplace_back(dc[i].a, b.mesh->getSurrogateTree().getNode(c + dc[i].b.child_id_first));
+                            }
+                        }
+                    }
+                    last_hit_num = num_hits[i];
+                }
+                dc.swap(dc_next);
+                dc_next.clear();
+            }
+            return result;
+        };
+
+        template<typename real, int branching, int bucket_size>
         std::vector<ContinuousContact<real>> compareTreesFullContinuous(Particle& a, Particle& b, real max_time, real& min_time_out) {
 	        // __itt_domain* domain = __itt_domain_create("My Domain");
             // __itt_string_handle* bucket_contact_soup_task = __itt_string_handle_create("findContactsBucketContinuousComparison");

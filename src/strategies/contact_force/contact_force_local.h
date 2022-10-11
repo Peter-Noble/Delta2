@@ -7,7 +7,7 @@ namespace Delta2 {
         class ContactForceLocal : public ContactForceStrategy {
         public:
             ContactForceLocal(FrictionStrategy& friction, common::Options& opt);
-            bool solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits) override;
+            bool solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits, bool allow_fail=true) override;
         };
     }
 }

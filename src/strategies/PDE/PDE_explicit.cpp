@@ -3,6 +3,8 @@
 #include "../../collision_detection/full_tree_comparison.h"
 #include "../../model/forces.h"
 
+#include "tbb/task_group.h"
+
 #include <mutex>
 
 using namespace Delta2;
@@ -27,7 +29,10 @@ double PDEExplicit::selectTimeStep(collision::Cluster& cluster) {
     return time;
 }
 
-bool PDEExplicit::step(collision::Cluster& cluster) {
+bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
+    __itt_domain* domain = __itt_domain_create("My Domain");
+    __itt_string_handle* compare_individual_pair_task = __itt_string_handle_create("Compare individual pair");
+    
     std::vector<Eigen::Vector3d> forces;
     std::vector<Eigen::Vector3d> torques;
     std::vector<int> counts;
@@ -69,34 +74,42 @@ bool PDEExplicit::step(collision::Cluster& cluster) {
 
     std::mutex lock;
 
-    #pragma omp parallel
+    tbb::task_group task_group;
+
+    // #pragma omp parallel
+    // {
+    //     #pragma omp single
+    //     {
+    //         #pragma omp taskloop
+    for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
     {
-        #pragma omp single
-        {
-            #pragma omp taskloop
-            for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
+        task_group.run([&, b_i] {
+            __itt_task_begin(domain, __itt_null, __itt_null, compare_individual_pair_task);
+            collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
+
+            int a_id = cluster.particles.getLocalID(b.first.first); // geo id
+            int b_id = cluster.particles.getLocalID(b.second.first);
+
+            Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
+            Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
+
+            std::vector<collision::Contact<double>> Cs = collision::compareTreesFull<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], _contact_detection);
+            std::vector<collision::Contact<double>> filtered = collision::filterContacts<double>(Cs, 0.0);
+
+            std::lock_guard<std::mutex> guard(lock);
+            for (collision::Contact<double> &c : filtered)
             {
-                collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
-
-                int a_id = cluster.particles.getLocalID(b.first.first); // geo id
-                int b_id = cluster.particles.getLocalID(b.second.first);
-
-                Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
-                Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
-
-                std::vector<collision::Contact<double>> Cs = collision::compareTreesFull<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], _contact_detection);
-                std::vector<collision::Contact<double>> filtered = collision::filterContacts<double>(Cs, 0.0);
-
-                std::lock_guard<std::mutex> guard(lock);
-                for (collision::Contact<double> &c : filtered)
-                {
-                    hits.push_back(c);
-                }
+                hits.push_back(c);
             }
-        }
+            __itt_task_end(domain);
+        });
     }
+    //     }
+    // }
+
+    task_group.wait();
     
-    bool success = _contact_force.solve(cluster, hits);
+    bool success = _contact_force.solve(cluster, hits, allow_fail);
     if (!success) {
         return false;
     }
@@ -119,6 +132,7 @@ bool PDEExplicit::step(collision::Cluster& cluster) {
             p->current_state = p->future_state;
             p->projectFutureState(cluster.step_size);
 
+            assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
             // printf("Post integration state of %i: last time %f, time %f, future time %f, sleep from %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), p->sleep_candidate_time);
         }
     }
@@ -126,7 +140,6 @@ bool PDEExplicit::step(collision::Cluster& cluster) {
     for (Particle* p : cluster.particles)
     {
         p->setSleeping(willSleep);
-        assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
 
     return true;

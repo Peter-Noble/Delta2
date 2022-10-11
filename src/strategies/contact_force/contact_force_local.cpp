@@ -12,7 +12,7 @@ ContactForceLocal::ContactForceLocal(FrictionStrategy& friction,
 
 }
 
-bool ContactForceLocal::solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits) {
+bool ContactForceLocal::solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits, bool allow_fail) {
     std::vector<Eigen::Vector3d> forces;
     std::vector<Eigen::Vector3d> torques;
     std::vector<int> counts;

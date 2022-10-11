@@ -8,6 +8,7 @@
 #include <chrono>
 #include <omp.h>
 #include <ittnotify.h>
+#include "tbb/task_group.h"
 
 using namespace Delta2;
 
@@ -196,47 +197,52 @@ void timestepping::ExplicitAdaptiveClustersWithWitnessesScheme::step(double time
             }
 
             std::mutex lock;
+            tbb::task_group task_group;
 
             //for (collision::BroadPhaseCollision &b : cluster_interactions[cluster_i])
-            #pragma omp parallel
+            // #pragma omp parallel
+            // {
+            //     #pragma omp single
+            //     {
+            //         #pragma omp taskloop
+            for (int b_i = 0; b_i < cluster_interactions[cluster_i].size(); b_i++)
             {
-                #pragma omp single
-                {
-                    #pragma omp taskloop
-                    for (int b_i = 0; b_i < cluster_interactions[cluster_i].size(); b_i++)
+                __itt_string_handle* tree_comparison_task = __itt_string_handle_create("Tree comparison");
+                task_group.run([&, b_i] {
+                    __itt_task_begin(domain, __itt_null, __itt_null, tree_comparison_task);
+                    int tid = omp_get_thread_num();
+
+                    collision::BroadPhaseCollision &b = cluster_interactions[cluster_i][b_i]; 
+
+                    int a_id = b.first.first; // geo id
+                    int b_id = b.second.first;
+
+                    Eigen::Vector3d a_centre = (*_particles)[a_id].current_state.getTranslation();
+                    Eigen::Vector3d b_centre = (*_particles)[b_id].current_state.getTranslation();
+
+                    std::vector<collision::Contact<double>> Cs = collision::compareTreesFull<double, 8, 8>((*_particles)[a_id], (*_particles)[b_id]);
+                    std::vector<collision::Contact<double>> filtered = collision::filterContacts<double>(Cs, 0.0);
+
+                    std::lock_guard<std::mutex> guard(lock);
+                    for (collision::Contact<double> &c : filtered)
                     {
-                        __itt_string_handle* tree_comparison_task = __itt_string_handle_create("Tree comparison");
-                        __itt_task_begin(domain, __itt_null, __itt_null, tree_comparison_task);
-                        int tid = omp_get_thread_num();
-
-                        collision::BroadPhaseCollision &b = cluster_interactions[cluster_i][b_i]; 
-
-                        int a_id = b.first.first; // geo id
-                        int b_id = b.second.first;
-
-                        Eigen::Vector3d a_centre = (*_particles)[a_id].current_state.getTranslation();
-                        Eigen::Vector3d b_centre = (*_particles)[b_id].current_state.getTranslation();
-
-                        std::vector<collision::Contact<double>> Cs = collision::compareTreesFull<double, 8, 8>((*_particles)[a_id], (*_particles)[b_id]);
-                        std::vector<collision::Contact<double>> filtered = collision::filterContacts<double>(Cs, 0.0);
-
-                        std::lock_guard<std::mutex> guard(lock);
-                        for (collision::Contact<double> &c : filtered)
+                        if ((c.A - c.B).norm() < 1e-8)
                         {
-                            if ((c.A - c.B).norm() < 1e-8)
-                            {
-                                if (cluster_step_size[cluster_i] * 0.9 > double(_opt.time_step_size * _opt.adaptive_time_step_factor)) {
-                                    valid_timestep_found = false;
-                                    cluster_step_size[cluster_i] *= 0.9;
-                                    break;
-                                }
+                            if (cluster_step_size[cluster_i] * 0.9 > double(_opt.time_step_size * _opt.adaptive_time_step_factor)) {
+                                valid_timestep_found = false;
+                                cluster_step_size[cluster_i] *= 0.9;
+                                break;
                             }
-                            hits.push_back(std::make_tuple(a_id, b_id, c));
                         }
-                        __itt_task_end(domain);
+                        hits.push_back(std::make_tuple(a_id, b_id, c));
                     }
-                }
+                    __itt_task_end(domain);
+                });
             }
+            //     }
+            // }
+
+            task_group.wait();
         }
         __itt_task_end(domain);
 

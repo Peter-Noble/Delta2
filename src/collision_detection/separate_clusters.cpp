@@ -4,13 +4,14 @@
 #include <chrono>
 #include <omp.h>
 #include <ittnotify.h>
+#include "tbb/task_group.h"
 
 using namespace Delta2;
 
 /*
  *  toc on the resulting collisions is 
  */
-std::vector<collision::ContinuousContact<double>> collision::separateContinuousCollisionClusters(collision::BroadPhaseCollisions& broad_phase, std::vector<Delta2::Particle>& particles, double max_time, std::vector<std::vector<Particle*>>& cluster_particles_out, std::vector<collision::BroadPhaseCollisions>& cluster_interactions_out, std::vector<bool>& sleeping) {
+void collision::separateContinuousCollisionClusters(collision::BroadPhaseCollisions& broad_phase, std::vector<Delta2::Particle>& particles, double max_time, std::vector<std::vector<Particle*>>& cluster_particles_out, std::vector<collision::BroadPhaseCollisions>& cluster_interactions_out, std::vector<bool>& sleeping) {
     __itt_domain* domain = __itt_domain_create("My Domain");
 
     int num_particles = particles.size();
@@ -54,47 +55,53 @@ std::vector<collision::ContinuousContact<double>> collision::separateContinuousC
         }
     }
 
-    #pragma omp parallel
-    {
-        // for (collision::BroadPhaseCollision& b : broad_phase) {
-        #pragma omp single
-        {
-            #pragma omp taskloop
-            for (int b_i = 0; b_i < broad_phase.size(); b_i++) {
-                __itt_string_handle* continuous_pair_task = __itt_string_handle_create("Continuous pair");
-                __itt_task_begin(domain, __itt_null, __itt_null, continuous_pair_task);
+    tbb::task_group task_group;
+    __itt_string_handle* continuous_trees_continuous_task = __itt_string_handle_create("Compare trees full continuous");
+    __itt_string_handle* continuous_pair_task = __itt_string_handle_create("Continuous pair");
 
-                int tid = omp_get_thread_num();
+    // #pragma omp parallel
+    // {
+    //     // for (collision::BroadPhaseCollision& b : broad_phase) {
+    //     #pragma omp single
+    //     {
+    //         #pragma omp taskloop
+    for (int b_i = 0; b_i < broad_phase.size(); b_i++) {
+        task_group.run([&, b_i] {
+            __itt_task_begin(domain, __itt_null, __itt_null, continuous_pair_task);
 
-                collision::BroadPhaseCollision& b = broad_phase[b_i];
+            int tid = omp_get_thread_num();
 
-                int a_id = b.first.first; // geo id
-                int b_id = b.second.first;
+            collision::BroadPhaseCollision& b = broad_phase[b_i];
 
-                Eigen::Vector3d a_centre = particles[a_id].current_state.getTranslation();
-                Eigen::Vector3d b_centre = particles[b_id].current_state.getTranslation();
+            int a_id = b.first.first; // geo id
+            int b_id = b.second.first;
 
-                double max_time_step_for_pair = std::min(particles[a_id].last_time_step_size, particles[b_id].last_time_step_size); // Use the minimum of the maximum allowed timesteps
+            Eigen::Vector3d a_centre = particles[a_id].current_state.getTranslation();
+            Eigen::Vector3d b_centre = particles[b_id].current_state.getTranslation();
 
-                double min_time;
+            double max_time_step_for_pair = std::min(particles[a_id].last_time_step_size, particles[b_id].last_time_step_size); // Use the minimum of the maximum allowed timesteps
 
-                __itt_string_handle* continuous_trees_continuous_task = __itt_string_handle_create("Compare trees full continuous");
-                __itt_task_begin(domain, __itt_null, __itt_null, continuous_trees_continuous_task);
-                std::vector<collision::ContinuousContact<double>> Ccs = collision::compareTreesFullContinuous<double, 8, 8>(particles[a_id], particles[b_id], max_time_step_for_pair, min_time);
-                __itt_task_end(domain);
+            double min_time;
 
-                if (Ccs.size() > 0) {
-                    double min_scaling_seen = 1.0;
-                    double min_toc = 1.0;
-                    for (collision::ContinuousContact<double>& c : Ccs) {
-                        
-                    }
-                    printf("Min toc: %f\n", min_toc);
+            __itt_task_begin(domain, __itt_null, __itt_null, continuous_trees_continuous_task);
+            std::vector<collision::ContinuousContact<double>> Ccs = collision::compareTreesFullContinuous<double, 8, 8>(particles[a_id], particles[b_id], max_time_step_for_pair, min_time);
+            __itt_task_end(domain);
+
+            if (Ccs.size() > 0) {
+                double min_scaling_seen = 1.0;
+                double min_toc = 1.0;
+                for (collision::ContinuousContact<double>& c : Ccs) {
+                    
                 }
-                __itt_task_end(domain);
+                printf("Min toc: %f\n", min_toc);
             }
-        }
+            __itt_task_end(domain);
+        });
     }
+    //     }
+    // }
+
+    task_group.wait();
 
     for (collision::BroadPhaseCollision& b : broad_phase) {
         int a_id = b.first.first; // geo id
@@ -204,12 +211,12 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
     // TODO Compute a min future state per cluster given the slow increase of timestep size.  Then use this to avoid computing step sizes for clusters
     //      where the current time is greater than the max possible future time of another cluster.
 
-    #pragma omp parallel
-    {
-        // for (collision::BroadPhaseCollision& b : broad_phase) {
-        #pragma omp single
-        {
-            #pragma omp taskloop
+    // #pragma omp parallel
+    // {
+    //     // for (collision::BroadPhaseCollision& b : broad_phase) {
+    //     #pragma omp single
+    //     {
+    //         #pragma omp taskloop
             for (int b_i = 0; b_i < broad_phase.size(); b_i++) {
                 __itt_string_handle* continuous_pair_task = __itt_string_handle_create("Continuous pair");
                 __itt_task_begin(domain, __itt_null, __itt_null, continuous_pair_task);
@@ -311,8 +318,8 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
                 }
                 __itt_task_end(domain);
             }
-        }
-    }
+    //     }
+    // }
 
     for (collision::BroadPhaseCollision& b : broad_phase) {
         int a_id = b.first.first; // geo id
@@ -353,8 +360,6 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
 
 
 std::vector<collision::Cluster> collision::separateCollisionClusters(collision::BroadPhaseCollisions& broad_phase, model::ParticleHandler& particles) {
-    __itt_domain* domain = __itt_domain_create("My Domain");
-
     int num_particles = particles.size();
     Eigen::SparseMatrix<int> interaction_graph(num_particles, num_particles);
 
@@ -460,6 +465,9 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
 
 
 void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
+    __itt_domain* domain = __itt_domain_create("My Domain");
+    __itt_string_handle* time_step_selection_pair_task = __itt_string_handle_create("Time step selection pair task");
+
     int num_particles = cluster.particles.size();
     std::vector<double> step_size;
     step_size.resize(num_particles);
@@ -471,101 +479,109 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
     std::mutex lock;
 
-    #pragma omp parallel
-    {
-        #pragma omp single
-        {
-            #pragma omp taskloop
-            for (int b_i = 0; b_i < cluster.interations.size(); b_i++) {
-                int tid = omp_get_thread_num();
+    tbb::task_group task_group;
 
-                collision::BroadPhaseCollision& b = cluster.interations[b_i];
+    // #pragma omp parallel
+    // {
+    //     #pragma omp single
+    //     {
+    //         #pragma omp taskloop
+    for (int b_i = 0; b_i < cluster.interations.size(); b_i++) {
+        task_group.run([&, b_i] {
+            __itt_task_begin(domain, __itt_null, __itt_null, time_step_selection_pair_task);
+            int tid = omp_get_thread_num();
 
-                int a_id = cluster.particles.getLocalID(b.first.first); // geo id
-                int b_id = cluster.particles.getLocalID(b.second.first);
+            collision::BroadPhaseCollision& b = cluster.interations[b_i];
 
-                Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
-                Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
+            int a_id = cluster.particles.getLocalID(b.first.first); // geo id
+            int b_id = cluster.particles.getLocalID(b.second.first);
 
-                double max_time_step_for_pair = std::min(cluster.particles[a_id].last_time_step_size, cluster.particles[b_id].last_time_step_size); // Use the minimum of the maximum allowed timesteps
+            Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
+            Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
 
-                double min_time;
+            double max_time_step_for_pair = std::min(cluster.particles[a_id].last_time_step_size, cluster.particles[b_id].last_time_step_size); // Use the minimum of the maximum allowed timesteps
 
-                std::vector<collision::ContinuousContact<double>> Ccs = collision::compareTreesFullContinuous<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], max_time_step_for_pair, min_time);
+            double min_time;
 
-                if (Ccs.size() > 0) {
-                    double min_scaling_seen = 1.0;
-                    double min_toc = 1.0;
-                    for (collision::ContinuousContact<double>& c : Ccs) {
-                        Eigen::Vector3d hit_normal = (c.A - c.B);
+            std::vector<collision::ContinuousContact<double>> Ccs = collision::compareTreesFullContinuous<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], max_time_step_for_pair, min_time);
 
-                        double interaction_dist = c.eps_a + c.eps_b;
+            if (Ccs.size() > 0) {
+                double min_scaling_seen = 1.0;
+                double min_toc = 1.0;
+                for (collision::ContinuousContact<double>& c : Ccs) {
+                    Eigen::Vector3d hit_normal = (c.A - c.B);
 
-                        Eigen::Vector<double, 3> a_vel = c.p_a->futurePointVelocity(c.A);
-                        Eigen::Vector<double, 3> b_vel = c.p_b->futurePointVelocity(c.B);
+                    double interaction_dist = c.eps_a + c.eps_b;
 
-                        Eigen::Vector<double, 3> rel_vel = a_vel - b_vel;
+                    Eigen::Vector<double, 3> a_vel = c.p_a->futurePointVelocity(c.A);
+                    Eigen::Vector<double, 3> b_vel = c.p_b->futurePointVelocity(c.B);
 
-                        if (hit_normal.normalized().dot(rel_vel.normalized()) <= 0.0 || hit_normal.norm() < 1e-4) {
-                            if (hit_normal.norm() < 1e-4) {
-                                if (c.toc == 0.0) {
-                                    // throw std::runtime_error("Invalid configuration");
-                                    continue;
-                                }
-                                double rel_vel_norm = rel_vel.norm();
-                                double toc_start_contact = std::max(0.0, c.toc - (rel_vel.norm() * max_time_step_for_pair) / interaction_dist);
-                                // double toc_start_contact = std::max(0.0, 1.0 - (rel_vel.norm() * max_time_step_for_pair) / interaction_dist);
-                                double new_step = common::lerp(toc_start_contact, c.toc, 0.75);
-                                min_scaling_seen = std::min(min_scaling_seen, new_step);
-                                // This is only correct if the velocity is perpendicular to the face tangent. Otherwise it's an underestimate of the toc (which is safe).
-                                // min_scaling_seen = std::min(min_scaling_seen, c.toc * 0.9);
-                                min_toc = std::min(min_toc, c.toc);
+                    Eigen::Vector<double, 3> rel_vel = a_vel - b_vel;
+
+                    if (hit_normal.normalized().dot(rel_vel.normalized()) <= 0.0 || hit_normal.norm() < 1e-4) {
+                        if (hit_normal.norm() < 1e-4) {
+                            if (c.toc == 0.0) {
+                                // throw std::runtime_error("Invalid configuration");
+                                continue;
                             }
-                            else {
-                                if (c.toc < 1.0) {
-                                    min_toc = std::min(min_toc, c.toc);
-                                    // End point is inside range (since it's moving towards each other) => compute start point
-                                    double proj_vel = -(hit_normal.normalized().dot(rel_vel)); // +ve
-                                    double depth = interaction_dist - hit_normal.norm();
-                                    double proj_dist = proj_vel * c.toc * max_time_step_for_pair;
-                                    if (proj_dist > 1e-6) {
-                                        if (depth < proj_dist) {
-                                            // This is the first frame penetrating this eps boundry
-                                            assert((2.0 - depth / proj_dist) / 2.0 <= 1.0);
+                            double rel_vel_norm = rel_vel.norm();
+                            double toc_start_contact = std::max(0.0, c.toc - (rel_vel.norm() * max_time_step_for_pair) / interaction_dist);
+                            // double toc_start_contact = std::max(0.0, 1.0 - (rel_vel.norm() * max_time_step_for_pair) / interaction_dist);
+                            double new_step = common::lerp(toc_start_contact, c.toc, 0.75);
+                            min_scaling_seen = std::min(min_scaling_seen, new_step);
+                            // This is only correct if the velocity is perpendicular to the face tangent. Otherwise it's an underestimate of the toc (which is safe).
+                            // min_scaling_seen = std::min(min_scaling_seen, c.toc * 0.9);
+                            min_toc = std::min(min_toc, c.toc);
+                        }
+                        else {
+                            if (c.toc < 1.0) {
+                                min_toc = std::min(min_toc, c.toc);
+                                // End point is inside range (since it's moving towards each other) => compute start point
+                                double proj_vel = -(hit_normal.normalized().dot(rel_vel)); // +ve
+                                double depth = interaction_dist - hit_normal.norm();
+                                double proj_dist = proj_vel * c.toc * max_time_step_for_pair;
+                                if (proj_dist > 1e-6) {
+                                    if (depth < proj_dist) {
+                                        // This is the first frame penetrating this eps boundry
+                                        assert((2.0 - depth / proj_dist) / 2.0 <= 1.0);
 
-                                            double new_step = common::lerp(c.toc * (1.0 - depth / proj_dist), c.toc, 0.5);
-                                            min_scaling_seen = std::min(min_scaling_seen, new_step);
-                                            if (max_time_step_for_pair * new_step < 1e-6) {
-                                                printf("Small time step 0\n");
-                                            }
+                                        double new_step = common::lerp(c.toc * (1.0 - depth / proj_dist), c.toc, 0.5);
+                                        min_scaling_seen = std::min(min_scaling_seen, new_step);
+                                        if (max_time_step_for_pair * new_step < 1e-6) {
+                                            printf("Small time step 0\n");
                                         }
-                                        else {
-                                            // The contact point was already inside the eps boundry at the start of the timestep
-                                            double future_point = c.toc + (1.0 - c.toc) * interaction_dist / (proj_vel * max_time_step_for_pair);
+                                    }
+                                    else {
+                                        // The contact point was already inside the eps boundry at the start of the timestep
+                                        double future_point = c.toc + (1.0 - c.toc) * interaction_dist / (proj_vel * max_time_step_for_pair);
 
-                                            double new_step = common::lerp(c.toc, std::min(future_point, 1.0), 0.8);
+                                        double new_step = common::lerp(c.toc, std::min(future_point, 1.0), 0.8);
 
-                                            min_scaling_seen = std::min(min_scaling_seen, new_step);
-                                        }
+                                        min_scaling_seen = std::min(min_scaling_seen, new_step);
                                     }
                                 }
                             }
                         }
                     }
-                    double new_time_step_size = max_time_step_for_pair * min_scaling_seen;
-                    double use_time_step_size = std::min(new_time_step_size, std::min(step_size[a_id], step_size[b_id]));
+                }
+                double new_time_step_size = max_time_step_for_pair * min_scaling_seen;
+                double use_time_step_size = std::min(new_time_step_size, std::min(step_size[a_id], step_size[b_id]));
 
-                    std::lock_guard<std::mutex> guard(lock);
-                    if (!cluster.particles[a_id].is_static) {
-                        step_size[a_id] = use_time_step_size;
-                    }
-                    if (!cluster.particles[b_id].is_static) {
-                        step_size[b_id] = use_time_step_size;
-                    }
+                std::lock_guard<std::mutex> guard(lock);
+                if (!cluster.particles[a_id].is_static) {
+                    step_size[a_id] = use_time_step_size;
+                }
+                if (!cluster.particles[b_id].is_static) {
+                    step_size[b_id] = use_time_step_size;
                 }
             }
-        }
+            __itt_task_end(domain);
+        });
     }
+
+    task_group.wait();
+    //     }
+    // }
 
     for (int b_i = 0; b_i < cluster.interations.size(); b_i++) {
         collision::BroadPhaseCollision& b = cluster.interations[b_i];

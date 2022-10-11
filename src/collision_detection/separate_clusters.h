@@ -7,7 +7,7 @@
 
 namespace Delta2 {
     namespace collision {
-        std::vector<ContinuousContact<double>> separateContinuousCollisionClusters(BroadPhaseCollisions& broad_phase, std::vector<Delta2::Particle>& particles, double max_time, std::vector<std::vector<Particle*>>& cluster_particles_out, std::vector<BroadPhaseCollisions>& cluster_interactions_out, std::vector<bool>& sleeping);
+        void separateContinuousCollisionClusters(BroadPhaseCollisions& broad_phase, std::vector<Delta2::Particle>& particles, double max_time, std::vector<std::vector<Particle*>>& cluster_particles_out, std::vector<BroadPhaseCollisions>& cluster_interactions_out, std::vector<bool>& sleeping);
         void separateCollisionClustersWithTimeStepSelection(BroadPhaseCollisions& broad_phase, std::vector<Delta2::Particle>& particles, double max_time, std::vector<std::vector<Particle*>>& cluster_particles_out, std::vector<BroadPhaseCollisions>& cluster_interactions_out, std::vector<double>& cluster_step_size_out, std::vector<bool>& sleeping);
         std::vector<Cluster> separateCollisionClusters(BroadPhaseCollisions& broad_phase, model::ParticleHandler& particles);
         void fineCollisionClustersWithTimeStepSelection(Cluster& cluster);

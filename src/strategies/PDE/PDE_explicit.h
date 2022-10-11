@@ -13,7 +13,7 @@ namespace Delta2 {
         public:
             PDEExplicit(ContactDetectionStrategy& contact_detection, ContactForceStrategy& contact_force, FrictionStrategy& friction, TimeStepSelectionStrategy& time_step, common::Options& opt);
             double selectTimeStep(collision::Cluster& cluster) override;
-            bool step(collision::Cluster& cluster) override;
+            bool step(collision::Cluster& cluster, bool allow_fail=true) override;
             void printType() override {
                 printf("Explicit\n");
             };

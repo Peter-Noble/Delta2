@@ -1,4 +1,6 @@
 #include "mesh.h"
+
+#include "igl/tinyply.h"
 #include "igl/readOBJ.h"
 #include "igl/copyleft/tetgen/tetrahedralize.h"
 #include "igl/volume.h"

@@ -9,7 +9,7 @@ namespace Delta2 {
         class ContactForceStrategy {
         public:
             ContactForceStrategy(FrictionStrategy& friction, common::Options& opt);
-            virtual bool solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits) = 0;
+            virtual bool solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits, bool allow_fail=true) = 0;
             std::function<Eigen::Vector3d(const Particle &)> external_force;
         protected:
             FrictionStrategy& _friction;

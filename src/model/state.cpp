@@ -53,9 +53,11 @@ void State::setVelocity(Eigen::Vector3d v) {
 }
 
 State State::interpolate(State last, double time) const {
+    #ifndef NDEBUG
     if (time > _time || time < last.getTime() || last.getTime() > _time) {
         throw std::runtime_error("Invalid args for interpolation");
     }
+    #endif
     if (last.getTime() == _time) {
         return *this;
     }
@@ -118,7 +120,7 @@ bool State::isValid() const {
 }
 
 bool State::isStationary() const {
-    return getVelocity().norm() < 1e-3 && getAngularMomentum().norm() < 1e-3;
+    return getVelocity().norm() < 1e-3 && getAngularMomentum().norm() < 1e-2;
 }
 
 void State::applyDelta(double t, Eigen::Vector3d force, Eigen::Vector3d torque, double mass, const Eigen::Matrix3d& inverse_inertia) {

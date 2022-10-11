@@ -8,7 +8,7 @@ namespace Delta2 {
         class SequentialImpulses : public ContactForceStrategy {
         public:
             SequentialImpulses(FrictionStrategy& friction, common::Options& opt);
-            bool solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits) override;
+            bool solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits, bool allow_fail=true) override;
         private:
             SequentialImpulseWarmStart _warm_start;
         };

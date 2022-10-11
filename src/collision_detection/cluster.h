@@ -37,6 +37,7 @@ namespace Delta2 {
                         return true;
                     }
                 }
+                return false;
             };
         };
     }

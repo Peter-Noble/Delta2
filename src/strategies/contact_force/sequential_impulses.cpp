@@ -13,6 +13,8 @@
 
 #include "../../globals.h"
 
+#include <ittnotify.h>
+
 using namespace Delta2;
 using namespace strategy;
 using namespace Eigen;
@@ -69,13 +71,46 @@ State updateState(State& future, double t, const Vector3d& impulse, const Vector
     return updated;
 }
 
+State updateStateImmediate(State& future, double t, const Vector3d& impulse, const Vector3d& impulse_offset, const Vector3d& rotational_impulse, const Vector3d& rotational_impulse_offset, Particle* p) {
+    State updated = future;
+
+    updated.setVelocity(future.getVelocity() + impulse / p->getMass());
+    updated.setTranslation(future.getTranslation() + impulse_offset / p->getMass() * t + impulse / p->getMass() * t);
+
+    // https://link.springer.com/content/pdf/10.1007/s00707-013-0914-2.pdf
+
+    Eigen::Vector3d angular_momentum = future.getAngularMomentum() + rotational_impulse;
+
+    Eigen::Quaterniond rotation = future.getRotation();
+
+    updated.setAngular(angular_momentum);
+
+    Eigen::Matrix3d R = rotation.toRotationMatrix();
+    Eigen::Matrix3d Iinv = R * p->getInverseInertiaMatrix() * R.transpose();
+    Eigen::Vector3d omega = Iinv * (future.getAngularMomentum() + t * rotational_impulse_offset + t * rotational_impulse);
+
+    Eigen::Quaterniond rot_delta = Delta2::common::exp(0.5 * omega * t);
+
+    rotation = rot_delta * rotation;
+    updated.setRotation(rotation);
+
+    return updated;
+}
+
 SequentialImpulses::SequentialImpulses(FrictionStrategy& friction,
                                      common::Options& opt) :
                                      ContactForceStrategy(friction, opt) {
 
 }
 
-bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits) {
+bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits, bool allow_fail) {
+    __itt_domain* domain = __itt_domain_create("My Domain");
+    __itt_string_handle* sequential_impulse_solve_task = __itt_string_handle_create("Sequential Impulse solve");
+    __itt_string_handle* sequential_impulse_impulses_task = __itt_string_handle_create("Sequential Impulse impulses");
+    __itt_string_handle* sequential_impulse_friction_task = __itt_string_handle_create("Sequential Impulse friction");
+
+    __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_solve_task);
+
     std::vector<LocalContact> contacts;
 
     std::sort(hits.begin(), hits.end());
@@ -85,7 +120,8 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
         lc.start_dist = (hits[c].A - hits[c].B).norm();
 
-        if (lc.start_dist < 1.e-4) {
+        if (!(lc.start_dist > 0.0) && cluster.step_size > 1e-4 && allow_fail) {
+            __itt_task_end(domain);
             return false;
         }
 
@@ -168,7 +204,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
         Eigen::Vector3d n = contacts[c].global_normal.normalized();
         const double outer_search = hits[c].eps_a + hits[c].eps_b;
-        const double outer = outer_search * 0.1;
+        const double outer = outer_search * 0.25;
 
         Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
         Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
@@ -201,6 +237,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
     if (hits.size() > 0) {
         bool converged = false;
         int it = 0;
+        __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_impulses_task);
         while (!converged && it < 1000) {
             std::vector<Eigen::Vector3d> last_impulse;
             for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
@@ -214,7 +251,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 Eigen::Vector3d n = contacts[c].global_normal.normalized();
 
                 const double outer_search = hits[c].eps_a + hits[c].eps_b;
-                const double outer = outer_search * 0.1 ;
+                const double outer = outer_search * 0.25 ;
 
                 Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
                 Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
@@ -249,8 +286,8 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
                 // ========  OFFSET ALONG NORMAL ========
 
-                const double lower_slop = std::max(outer * 0.1, outer - contacts[c].start_dist);
-                const double slop = common::lerp(lower_slop, outer * 0.1, 0.3);
+                const double lower_slop = std::max(outer * 0.25, outer - contacts[c].start_dist);
+                const double slop = common::lerp(lower_slop, outer * 0.25, 0.3);
                 const double penetration_depth = outer - d1;
 
                 // d1 = i/m * t offset distance with impulse.  m * d1 / t = i
@@ -348,7 +385,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             converged = true;
             for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
                 Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
-                if (impulse_diff.norm() > 1e-5) {
+                if (impulse_diff.norm() > 1e-6) {
                     converged = false;
                     break;
                 }
@@ -362,14 +399,18 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             it++;
         }
 
+        __itt_task_end(domain);
+
+        __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_friction_task);
+
         std::vector<Eigen::Vector3d> updated_friction_total;
         for (int c = 0; c < hits.size(); c++) {
             updated_friction_total.push_back({0, 0, 0});
         }
 
-        for (int it = 0; it < 100; it++) {
+        for (int it = 0; it < 400; it++) {
             std::map<std::pair<int, int>, int> contacts_per_pair;
-            printf("===============================\n");
+            // printf("===============================\n");
 
             std::vector<common::Edge<double>> view_hits;
             bool show = false;
@@ -381,7 +422,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 Eigen::Vector3d n = contacts[c].global_normal.normalized();
 
                 const double outer_search = hits[c].eps_a + hits[c].eps_b;
-                const double outer = outer_search * 0.1;
+                const double outer = outer_search * 0.25;
 
                 Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
                 Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
@@ -427,9 +468,9 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 double m_inv_effective_tangent = k_tangent < 1e-6 ? 0.0 : 1.0 / k_tangent;
 
                 Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * 0.25;
-                if (max_force > 1e-6) {
-                    printf("delta_friction_impulse: %.4f, %.4f, %.4f\n", delta_friction_impulse.x(), delta_friction_impulse.y(), delta_friction_impulse.z());
-                }
+                // if (max_force > 1e-6) {
+                //     printf("delta_friction_impulse: %.4f, %.4f, %.4f\n", delta_friction_impulse.x(), delta_friction_impulse.y(), delta_friction_impulse.z());
+                // }
                 Eigen::Vector3d friction_impulse_total = contacts[c].last_friction_impulse + delta_friction_impulse;
                 friction_impulse_total = friction_impulse_total.normalized() * std::clamp(friction_impulse_total.norm(), 0.0, max_force);
 
@@ -443,22 +484,22 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                     contacts_per_pair[key] = 1;
                 }
 
-                if (it == 99 && max_force > 1e-6) {
-                    printf("v_tangent: %.4f, fric impulse: %.4f, max_force: %.4f\n", v_tangent.norm(), friction_impulse_total.norm(), max_force);
-                    show |= v_tangent.norm() > 1e-3;
-                    view_hits.push_back(common::Edge(hits[c].A, hits[c].B));                    
-                }
+                // if (it == 99 && max_force > 1e-6) {
+                //     printf("v_tangent: %.4f, fric impulse: %.4f, max_force: %.4f\n", v_tangent.norm(), friction_impulse_total.norm(), max_force);
+                //     show |= v_tangent.norm() > 1e-3;
+                //     view_hits.push_back(common::Edge(hits[c].A, hits[c].B));                    
+                // }
             }
 
-            if (show) {
-                common::Viewer view;
-                view.addParticleFuture(cluster.particles[0]);
-                view.addParticleFuture(cluster.particles[1]);
-                for (auto e : view_hits) {
-                    view.addEdge(e);
-                }    
-                view.show();
-            }
+            // if (show) {
+            //     common::Viewer view;
+            //     view.addParticleFuture(cluster.particles[0]);
+            //     view.addParticleFuture(cluster.particles[1]);
+            //     for (auto e : view_hits) {
+            //         view.addEdge(e);
+            //     }    
+            //     view.show();
+            // }
 
             for (int c = 0; c < hits.size(); c++) {
                 uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
@@ -497,6 +538,8 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             }
         }
 
+        __itt_task_end(domain);
+
         {
             std::lock_guard draws_lock(globals::contact_draws_lock);
             for (int c = 0; c < hits.size(); c++) {
@@ -523,6 +566,8 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
     //     view.addEdge(common::Edge(hits[c].A, hits[c].B));
     // }
     // view.show();
+
+    __itt_task_end(domain);
 
     return true;
 }

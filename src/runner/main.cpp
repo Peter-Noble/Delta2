@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
     // }
 
     {
-        Delta2::common::plane(100.0, V, F);
+        Delta2::common::plane(400.0, V, F);
         std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt, true));
         auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
         p.is_static = true;
@@ -104,18 +104,26 @@ int main(int argc, char *argv[]) {
     //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
     //     p.current_state.setTranslation({3.0, 0.0, 3.6});
     // }
-    {
-        auto& p = particles.emplace_back(M, 1.0, 0.95, 0.25);
-        p.current_state.setTranslation({0.0, 0.0, 1.08});
-        p.current_state.setVelocity({1.0, 0.0, 0.0});
-        p.current_state.setAngular({0.0, 0.0, 1.0});
-    }
-    // for (int x = 4; x < 5; x++) {
-    //     for (int i = 0; i < 5; i++) {
-    //         auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-    //         p.current_state.setTranslation({x * 4.0, i * x * 0.2, 1.1 + i * 2.06});
-    //     }
+    // {
+    //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.25);
+    //     p.current_state.setTranslation({0.0, 0.0, 1.5});
+    //     p.current_state.setVelocity({10.0, 0.0, 0.0});
+    //     // p.current_state.setAngular({0.0, 5.0, 10.0});
+    //     // double angle = 135.0 / 180.0 * 3.14159;
+    //     // Eigen::Quaterniond r;
+    //     // r = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitX())
+    //     //     * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitY())
+    //     //     * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
+    //     // p.current_state.setRotation(r);
     // }
+    for (int y = 0; y < 8; y++) {
+        for (int x = 0; x < 40; x++) {
+            for (int i = 0; i < 10; i++) {
+                auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+                p.current_state.setTranslation({-160 + x * 8.0, -160 + y * 40 + i * x * 0.2, 1.1 + i * 2.06});
+            }
+        }
+    }
 
     model::ParticleHandler ph(particles);
 

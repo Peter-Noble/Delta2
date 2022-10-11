@@ -21,11 +21,11 @@ namespace Delta2 {
         template double clamp01(double);
 
         template<typename real>
-        Eigen::Vector<real, 3> lerp(Eigen::Vector<real, 3> A, Eigen::Vector<real, 3> B, real t) {
+        Eigen::Vector<real, 3> lerp(const Eigen::Vector<real, 3>& A, const Eigen::Vector<real, 3>& B, real t) {
             return A * (1 - t) + B * t;
         }
-        template Eigen::Vector3f lerp(Eigen::Vector3f, Eigen::Vector3f, float);
-        template Eigen::Vector3d lerp(Eigen::Vector3d, Eigen::Vector3d, double);
+        template Eigen::Vector3f lerp(const Eigen::Vector3f&, const Eigen::Vector3f&, float);
+        template Eigen::Vector3d lerp(const Eigen::Vector3d&, const Eigen::Vector3d&, double);
 
         template<typename real>
         real lerp(real A, real B, real t) {
