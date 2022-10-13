@@ -360,6 +360,13 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
 
 
 std::vector<collision::Cluster> collision::separateCollisionClusters(collision::BroadPhaseCollisions& broad_phase, model::ParticleHandler& particles) {
+	__itt_domain* domain = __itt_domain_create("My Domain");
+
+    __itt_string_handle* connected_component_task = __itt_string_handle_create("Connected components");
+    __itt_string_handle* create_clusters_task = __itt_string_handle_create("Create clusters");
+    __itt_string_handle* sort_interactions_task = __itt_string_handle_create("Sort interactions");
+
+    __itt_task_begin(domain, __itt_null, __itt_null, connected_component_task);
     int num_particles = particles.size();
     Eigen::SparseMatrix<int> interaction_graph(num_particles, num_particles);
 
@@ -378,7 +385,9 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
     Eigen::MatrixXi components;
     Eigen::MatrixXi sizes;
     igl::connected_components(interaction_graph, components, sizes);
+    __itt_task_end(domain);
 
+    __itt_task_begin(domain, __itt_null, __itt_null, create_clusters_task);
     std::vector<Cluster> clusters;
     std::vector<std::vector<Particle*>> cluster_particles;
 
@@ -402,7 +411,9 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             clusters[components(p_i, 0)].sleeping = false;
         }
     }
+    __itt_task_end(domain);
 
+    __itt_task_begin(domain, __itt_null, __itt_null, sort_interactions_task);
     // Add each broad phase interaction to required clusters
     // TODO this isn't very efficient as each interaction searches through all the particles in all the clusters.
     for (collision::BroadPhaseCollision& b : broad_phase) {
@@ -423,10 +434,12 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             if (a_in) {
                 if (b_in) {
                     clusters[c_i].interations.push_back(b);
+                    break;
                 }
                 else if (particles[b_id].is_static) {
                     cluster_particles[c_i].push_back(address_b);
                     clusters[c_i].interations.push_back(b);
+                    break;
                 }
             }
             else {
@@ -434,11 +447,13 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
                     if (particles[a_id].is_static) {
                         cluster_particles[c_i].push_back(address_a);
                         clusters[c_i].interations.push_back(b);
+                        break;
                     }
                 }
             }
         }
     }
+    __itt_task_end(domain);
 
     for (int c_i = 0; c_i < sizes.rows(); c_i++) {
         for (Particle* p : cluster_particles[c_i]) {

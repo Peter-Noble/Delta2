@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
     // }
 
     {
-        Delta2::common::plane(400.0, V, F);
+        Delta2::common::plane(10.0, V, F);
         std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt, true));
         auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
         p.is_static = true;
@@ -116,13 +116,17 @@ int main(int argc, char *argv[]) {
     //     //     * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
     //     // p.current_state.setRotation(r);
     // }
-    for (int y = 0; y < 8; y++) {
-        for (int x = 0; x < 40; x++) {
-            for (int i = 0; i < 10; i++) {
-                auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-                p.current_state.setTranslation({-160 + x * 8.0, -160 + y * 40 + i * x * 0.2, 1.1 + i * 2.06});
-            }
-        }
+    // for (int y = 0; y < 1; y++) {
+    //     for (int x = 5; x < 6; x++) {
+    //         for (int i = 0; i < 10; i++) {
+    //             auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+    //             p.current_state.setTranslation({-160 + x * 8.0, -160 + y * 40 + i * x * 0.2, 1.1 + i * 2.06});
+    //         }
+    //     }
+    // }
+    for (int i = 0; i < 10; i++) {
+        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+        p.current_state.setTranslation({0.0, i * 2 * 0.2, 1.1 + i * 2.06});
     }
 
     model::ParticleHandler ph(particles);

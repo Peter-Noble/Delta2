@@ -103,6 +103,8 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
 
             tbb::task_group task_group;
 
+            common::Edge failed_at(Eigen::Vector3d({0,0,0}), Eigen::Vector3d({0,0,0}));
+
             for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
             {
                 task_group.run([&, b_i] {
@@ -123,6 +125,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                         {
                             if ((c.A - c.B).norm() < 1e-4) {
                                 failed_at_current = true;
+                                failed_at = common::Edge(c.A, c.B);
                             }
                         }
                     }
@@ -132,6 +135,15 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
 
             task_group.wait();
             cluster.step_size = step_size;
+
+            if (failed_at_current) {
+                common::Viewer view;
+                for (Particle* p : cluster.particles) {
+                    view.addParticle(*p);
+                }
+                view.addEdge(failed_at);
+                view.show();
+            }
 
             if (!first_rollback) {
                 second_step_size += step_size;
