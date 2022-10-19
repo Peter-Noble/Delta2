@@ -308,61 +308,6 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 rotational_impulse_offsets[a_id] += update_rotational_impulse_offset_A;
                 rotational_impulse_offsets[b_id] += update_rotational_impulse_offset_B;
 
-                // ======== FRICTION ========
-
-                // Eigen::Vector3d v1_AB = v1_A - v1_B;
-
-                // Eigen::Vector3d v_tangent = v1_AB - v1_AB.dot(n) * n;
-                // double mu = std::min(cluster.particles[a_id].friction_coeff, cluster.particles[b_id].friction_coeff);
-                // double max_force = contacts[c].impulse * mu;
-
-                // Eigen::Vector3d r_A = hits[c].A - hits[c].p_a->future_state.getTranslation();
-                // Eigen::Vector3d r_B = hits[c].B - hits[c].p_b->future_state.getTranslation();
-
-                // Eigen::Vector3d rn_A = r_A.cross(contacts[c].global_normal);
-                // Eigen::Vector3d rn_B = r_B.cross(contacts[c].global_normal);
-
-                // Eigen::Vector3d tangent = v_tangent.normalized();
-
-                // Eigen::Vector3d rt_A = r_A.cross(tangent);
-                // Eigen::Vector3d rt_B = r_B.cross(tangent);
-
-                // double im_A = 1.0 / hits[c].p_a->getMass();
-                // double im_B = 1.0 / hits[c].p_b->getMass();
-                // Eigen::Matrix3d ii_A = hits[c].p_a->getInverseInertiaMatrix();
-                // Eigen::Matrix3d ii_B = hits[c].p_b->getInverseInertiaMatrix();
-
-                // double k_tangent = 0.0;
-                // if (!hits[c].p_a->is_static) {
-                //     k_tangent += im_A + rt_A.transpose() * ii_A * rt_A;
-
-                // }
-                // if (!hits[c].p_b->is_static) {
-                //     k_tangent += im_B + rt_B.transpose() * ii_B * rt_B;
-                // }
-
-                // double m_inv_effective_tangent = k_tangent < 1e-6 ? 0.0 : 1.0 / k_tangent;
-
-                // Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent;
-                // Eigen::Vector3d friction_impulse_total = contacts[c].last_friction_impulse + delta_friction_impulse;
-                // friction_impulse_total = friction_impulse_total.normalized() * std::clamp(friction_impulse_total.norm(), 0.0, max_force);
-
-                // Eigen::Vector3d update_friction_impulse = friction_impulse_total - contacts[c].last_friction_impulse;
-
-                // contacts[c].last_friction_impulse = friction_impulse_total;
-                // impulses[a_id] += update_friction_impulse;
-                // impulses[b_id] -= update_friction_impulse;
-
-                // Eigen::Vector3d rotational_impulse_friction_A = model::calcTorque(contacts[c].last_friction_impulse, p1_A, FStates[a_id].getTranslation());
-                // Eigen::Vector3d rotational_impulse_friction_B = model::calcTorque(Eigen::Vector3d(-contacts[c].last_friction_impulse), p1_B, FStates[b_id].getTranslation());
-
-                // rotational_impulses[a_id] -= contacts[c].last_friction_rotational_impulse_A;
-                // rotational_impulses[b_id] -= contacts[c].last_friction_rotational_impulse_B;
-                // contacts[c].last_friction_rotational_impulse_A = rotational_impulse_friction_A;
-                // contacts[c].last_friction_rotational_impulse_B = rotational_impulse_friction_B;
-                // rotational_impulses[a_id] += contacts[c].last_friction_rotational_impulse_A;
-                // rotational_impulses[b_id] += contacts[c].last_friction_rotational_impulse_B;
-
                 // ======== INTEGRATE ========
 
                 if (!cluster.particles[a_id].is_static)
