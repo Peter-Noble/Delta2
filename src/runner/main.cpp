@@ -62,71 +62,29 @@ int main(int argc, char *argv[]) {
     //     // }
     // }
 
+    const int max_x = 10;
+    const double spacing_x = 8.0;
+    const int max_y = 8;
+    const double spacing_y = 40.0;
+    const int max_i = 10;
+
     {
-        Delta2::common::plane(10.0, V, F);
+        Delta2::common::plane(std::max(10.0, std::max(max_x * spacing_x, max_y * spacing_y)), V, F);
         std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt, true));
         auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
         p.is_static = true;
     }
 
     Delta2::common::cube(V, F);
-
     std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
-    // {
-    //     auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
-    //     p.current_state.setTranslation({0.0, 0.0, 1.55});
-    //     double angle = 45.0 / 180.0 * 3.14159;
-    //     Eigen::Quaterniond r;
-    //     r = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitX())
-    //         * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitY())
-    //         * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
-    //     p.current_state.setRotation(r);
-    // }
-    // {
-    //     auto& p = particles.emplace_back(M, 1.0, 0.4, 0.5);
-    //     p.current_state.setTranslation({0.0, 0.0, 1.53});
-    //     p.current_state.setVelocity({0.0, 0.0, -0.2});
-    //     // double angle = 1.0 / 180.0 * 3.14159;
-    //     // Eigen::Quaterniond r;
-    //     // r = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitX())
-    //     //     * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitY())
-    //     //     * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
-    //     // p.current_state.setRotation(r);
 
-    // }
-    // {
-    //     auto& p = particles.emplace_back(M, 1.0, 0.4, 0.5);
-    //     p.current_state.setTranslation({0.0, 0.0, 1.53});
-    //     p.current_state.setVelocity({0.0, 1.0, 0.0});
-    //     p.current_state.setAngular({0.0, 0.0, 1.0});
-    // }
-    // {
-    //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-    //     p.current_state.setTranslation({3.0, 0.0, 3.6});
-    // }
-    // {
-    //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.25);
-    //     p.current_state.setTranslation({0.0, 0.0, 1.5});
-    //     p.current_state.setVelocity({10.0, 0.0, 0.0});
-    //     // p.current_state.setAngular({0.0, 5.0, 10.0});
-    //     // double angle = 135.0 / 180.0 * 3.14159;
-    //     // Eigen::Quaterniond r;
-    //     // r = Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitX())
-    //     //     * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitY())
-    //     //     * Eigen::AngleAxisd(angle, Eigen::Vector3d::UnitZ());
-    //     // p.current_state.setRotation(r);
-    // }
-    // for (int y = 0; y < 1; y++) {
-    //     for (int x = 5; x < 6; x++) {
-    //         for (int i = 0; i < 10; i++) {
-    //             auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-    //             p.current_state.setTranslation({-160 + x * 8.0, -160 + y * 40 + i * x * 0.2, 1.1 + i * 2.06});
-    //         }
-    //     }
-    // }
-    for (int i = 0; i < 10; i++) {
-        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-        p.current_state.setTranslation({0.0, i * 2 * 0.2, 1.1 + i * 2.06});
+    for (int y = 0; y < max_y; y++) {
+        for (int x = 0; x < max_x; x++) {
+            for (int i = 0; i < max_i; i++) {
+                auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+                p.current_state.setTranslation({-(max_x / 2 * spacing_x) + x * spacing_x, -(max_y / 2 * spacing_y) + y * spacing_y + i * x * 0.2, 1.1 + i * 2.06});
+            }
+        }
     }
 
     model::ParticleHandler ph(particles);
