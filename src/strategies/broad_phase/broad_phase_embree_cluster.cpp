@@ -25,6 +25,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     __itt_string_handle* step_recursive_task = __itt_string_handle_create("Step recursive task");
     __itt_string_handle* local_pde_task = __itt_string_handle_create("Local pde step");
     __itt_string_handle* compare_individual_pair_current_task = __itt_string_handle_create("Compare individual pair current");
+    __itt_string_handle* compare_individual_pair_last_task = __itt_string_handle_create("Compare individual pair last");
     __itt_string_handle* roll_back_to_valid_current_state_task = __itt_string_handle_create("Roll back to valid current state");
 
     __itt_string_handle* step_rec_after_first_valid_task = __itt_string_handle_create("Step rec after first valid");
@@ -43,7 +44,10 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     // }
 
     __itt_task_begin(domain, __itt_null, __itt_null, local_pde_task);
-    success = _local_pde.step(cluster, depth < 2);
+    if (depth >= 4) {
+        printf("Forced advance\n");
+    }   
+    success = _local_pde.step(cluster, depth < 4);
     __itt_task_end(domain);
 
     // for (Particle* p : cluster.particles) {
@@ -67,14 +71,47 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         strategy::ContactDetectionComparison contact_detection;
 
         bool failed_at_current = true;
+        bool failed_at_last = false;
         bool first_rollback = true;
 
         double second_step_size = 0.0;
         
+
+        tbb::task_group task_group_check_last;
+
+        for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
+        {
+            task_group_check_last.run([&, b_i] {
+                __itt_task_begin(domain, __itt_null, __itt_null, compare_individual_pair_last_task);
+                if (!failed_at_last) {
+                    collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
+
+                    int a_id = cluster.particles.getLocalID(b.first.first); // geo id
+                    int b_id = cluster.particles.getLocalID(b.second.first);
+
+                    Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
+                    Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
+
+                    std::vector<collision::Contact<double>> Cs = collision::compareTreesFullLast<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], contact_detection);
+
+                    for (collision::Contact<double> &c : Cs)
+                    {
+                        if ((c.A - c.B).norm() < 1e-4) {
+                            failed_at_last = true;
+                        }
+                    }
+                }
+                __itt_task_end(domain);
+            });
+        }
+
+        task_group_check_last.wait();
+
         int c = 0;
+        const int max_c = 4;
         while (failed_at_current) {
             c++;
-            if (c > 10) {
+            if (c > max_c) {
                 printf("Can't find valid last state\n");
                 break;
             }
@@ -83,7 +120,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             double new_min_time = 0.0;
             for (Particle* p : cluster.particles) {
                 if (!p->is_static) {
-                    new_min_time = std::max(new_min_time, (p->last_state.getTime() + p->current_state.getTime()) / 2.0);
+                    new_min_time = std::max(new_min_time, common::lerp(p->last_state.getTime(), p->current_state.getTime(), std::pow(0.5, c)));
                 }
             }
 
@@ -94,7 +131,13 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             for (Particle* p : cluster.particles) {
                 if (!p->is_static) {
                     p->future_state = p->current_state;
-                    p->current_state = p->current_state.interpolate(p->last_state, new_min_time);
+                    if (c == max_c) {
+                        p->current_state = p->last_state;
+                        printf("Rolling back to last\n");
+                    }
+                    else {
+                        p->current_state = p->current_state.interpolate(p->last_state, new_min_time);
+                    }
                     // cluster.min_current_time = std::min(cluster.min_current_time, p->current_state.getTime());
                     step_size = p->future_state.getTime() - new_min_time;
                     assert(step_size > 0.0);
@@ -121,8 +164,19 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                         std::vector<collision::Contact<double>> Cs = collision::compareTreesFullCurrent<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], contact_detection);
                         // std::vector<collision::Contact<double>> filtered = collision::filterContacts<double>(Cs, 0.0);
 
+                        // std::vector<collision::Contact<double>> Csl = collision::compareTreesFullLast<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], contact_detection);
+
+                        // bool failed_at_last = false;
+                        // for (collision::Contact<double> &c : Csl)
+                        // {
+                        //     if ((c.A - c.B).norm() < 1e-4) {
+                        //         failed_at_current = failed_at_last;
+                        //     }
+                        // }
+
                         for (collision::Contact<double> &c : Cs)
                         {
+                            // if ((c.A - c.B).norm() < 1e-4 && failed_at_last) {
                             if ((c.A - c.B).norm() < 1e-4) {
                                 failed_at_current = true;
                                 failed_at = common::Edge(c.A, c.B);
@@ -136,14 +190,14 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             task_group.wait();
             cluster.step_size = step_size;
 
-            if (failed_at_current) {
-                common::Viewer view;
-                for (Particle* p : cluster.particles) {
-                    view.addParticle(*p);
-                }
-                view.addEdge(failed_at);
-                view.show();
-            }
+            // if (failed_at_current) {
+            //     common::Viewer view;
+            //     for (Particle* p : cluster.particles) {
+            //         view.addParticle(*p);
+            //     }
+            //     view.addEdge(failed_at);
+            //     view.show();
+            // }
 
             if (!first_rollback) {
                 second_step_size += step_size;
@@ -215,7 +269,12 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         // printf("Success\n");
     }
 
-    cluster.step_size = start_step;
+    // cluster.step_size = start_step;
+
+    // printf("Cluster step size: %f\n", cluster.step_size);
+    // for (Particle* p : cluster.particles) {
+    //     printf("Last time step size: %f\n", p->last_time_step_size);
+    // }
 
     __itt_task_end(domain);
 }
@@ -266,40 +325,39 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
     for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++)
     {
+        collision::Cluster& cl = clusters[cluster_i];
+
+        if (cl.min_current_time > min_final_time)
+        {
+            printf("%i skipping time step selection because min current time ahead of min final time\n", cluster_i);
+            // This cluster can't advance because there is another cluster that is too far behind
+            continue;
+        }
+
+        if (cl.is_static)
+        {
+            // printf("%i skipping time step selection because static cluster\n", cluster_i);
+            // This cluster shouldn't be advanced as it's asleep or static
+            continue;
+        }
+
+        if (cl.sleeping) {
+            printf("%i skipping time step selection because sleeping cluster\n", cluster_i);
+            fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + _opt.time_step_size);
+            continue;
+        }
+
+        // TODO can this test ever pass?  Does the first check for min_current_time > min_final_time catch this?
+        auto it = std::find_if(last_step_clusters.begin(), last_step_clusters.end(), [&cl](const collision::Cluster& last) {return !last.hasAdvanced(cl);});        
+        if (it != last_step_clusters.end()) {
+            // This cluster was the same as it was last iteration (and it didn't advance) so just keep the same step size recommendation.
+            cl.step_size = it->step_size;
+            fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + it->step_size);
+            printf("%i skipping time step selection because time step has already been picked for this cluster since last modification\n", cluster_i);
+            continue;
+        }
+        
         task_group.run([&, cluster_i] {
-            collision::Cluster& cl = clusters[cluster_i];
-
-            if (cl.min_current_time > min_final_time)
-            {
-                printf("%i skipping time step selection because min current time ahead of min final time\n", cluster_i);
-                // This cluster can't advance because there is another cluster that is too far behind
-                return;
-            }
-
-            if (cl.is_static)
-            {
-                // printf("%i skipping time step selection because static cluster\n", cluster_i);
-                // This cluster shouldn't be advanced as it's asleep or static
-                return;
-            }
-
-            if (cl.sleeping) {
-                printf("%i skipping time step selection because sleeping cluster\n", cluster_i);
-                fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + _opt.time_step_size);
-                return;
-            }
-
-            // TODO can this test ever pass?  Does the first check for min_current_time > min_final_time catch this?
-            auto it = std::find_if(last_step_clusters.begin(), last_step_clusters.end(), [&cl](const collision::Cluster& last) {return !last.hasAdvanced(cl);});        
-            if (it != last_step_clusters.end()) {
-                // This cluster was the same as it was last iteration (and it didn't advance) so just keep the same step size recommendation.
-                cl.step_size = it->step_size;
-                std::lock_guard guard(fine_min_final_time_lock);
-                fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + it->step_size);
-                printf("%i skipping time step selection because time step has already been picked for this cluster since last modification\n", cluster_i);
-                return;
-            }
-
             __itt_task_begin(domain, __itt_null, __itt_null, select_time_step_task);
             double step = _local_pde.selectTimeStep(cl);
             __itt_task_end(domain);
@@ -326,49 +384,49 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
     //    Advantage - Only clusters that can advance are advanced.
     //    Disadvantage - We have to wait for all time step selections to be done.
 
-    tbb::task_group step_task_group;
+    std::vector<int> can_advance;
 
-    // printf("Advance\n");
     for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++)
     {
+        if (clusters[cluster_i].min_current_time > fine_min_final_time)
+        {
+            continue;
+        }
+
+        if (clusters[cluster_i].is_static)
+        {
+            continue;
+        }
+
+        if (clusters[cluster_i].sleeping) {
+            _local_pde.stepSleeping(clusters[cluster_i]);
+        }
+        else {
+            can_advance.push_back(cluster_i);
+        }
+    }
+
+    std::sort(can_advance.begin(), can_advance.end(), [&clusters](int a, int b) {
+        return clusters[a].min_current_time < clusters[b].min_current_time;
+    });
+
+    tbb::task_group step_task_group;
+
+    int num_threads = 6;
+    int num_tasks = num_threads * 2;
+
+    // printf("Advance\n");
+    for (int ca = 0; ca < std::min((int)can_advance.size(), num_tasks); ca++)
+    {
+        int cluster_i = can_advance[ca];
         step_task_group.run([&, cluster_i] {
-            if (clusters[cluster_i].min_current_time > fine_min_final_time)
-            {
-                // printf("%i not advancing because another cluster too far behind\n", cluster_i);
-                // This cluster can't advance because there is another cluster that is too far behind
-                return;
-            }
-
-            if (clusters[cluster_i].is_static)
-            {
-                // printf("%i not advancing because it's static\n", cluster_i);
-                // This cluster shouldn't be advanced as it's asleep or static
-                return;
-            }
-
-            if (clusters[cluster_i].sleeping) {
-                _local_pde.stepSleeping(clusters[cluster_i]);
-
-                // printf("%i (sleeping) stepped forward %f\n", clusters[cluster_i].step_size, cluster_i);
-            }
-            else {
-                // printf("Advancing from %f to %f (%f)\n", clusters[cluster_i].min_current_time, clusters[cluster_i].min_current_time + clusters[cluster_i].step_size, clusters[cluster_i].step_size);
-                stepRecursive(clusters[cluster_i], true);
-                for (Particle* p : clusters[cluster_i].particles) {
-                    if (!p->is_static) {
-                        // printf("Post step %i, last: %f, %f\n", p->id, p->last_state.getTime(), p->current_state.getTime());
-                        break;
-                    }
-                }
-
-                // printf("%i stepped forward %f\n", cluster_i, clusters[cluster_i].step_size);
-            }
+            stepRecursive(clusters[cluster_i], true);
         });
     }
 
     step_task_group.wait();
 
-    double min_current = 100000.0;
+    double min_current = std::numeric_limits<double>::infinity();
     for (Particle* p : particles) {
         if (!p->is_static) {
             assert(p->last_state.getTime() <= p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
