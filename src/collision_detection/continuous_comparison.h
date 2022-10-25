@@ -563,8 +563,32 @@ namespace Delta2 {
         template double edgeEdgeCCDLinear(const Delta2::common::Edge<double>&, const Eigen::Matrix<double, 4, 4>&, const Eigen::Matrix<double, 4, 4>&, const Delta2::common::Edge<double>&, const Eigen::Matrix<double, 4, 4>&, const Eigen::Matrix<double, 4, 4>&, Eigen::Vector<double, 3>&, Eigen::Vector<double, 3>&, double&);
 
         template<typename real>
-        real edgeEdgeCCD(const Delta2::common::Edge<real>& a_start, const Delta2::common::Edge<real>& a_end, const Delta2::common::Edge<real>& b_start, const Delta2::common::Edge<real>& b_end, Eigen::Vector<real, 3>& P_out, Eigen::Vector<real, 3>& Q_out, real& toc_out) {
+        bool testAxis(real a_lower, real a_upper, real b_lower, real b_upper, real max_dist) {
+            if (b_lower > a_upper + max_dist) {
+                return false;
+            }
+            if (b_upper + max_dist < a_lower) {
+                return false;
+            }
+            return true;
+        }
+
+        template<typename real>
+        real edgeEdgeCCD(const Delta2::common::Edge<real>& a_start, const Delta2::common::Edge<real>& a_end, const Delta2::common::Edge<real>& b_start, const Delta2::common::Edge<real>& b_end, real search_dist, Eigen::Vector<real, 3>& P_out, Eigen::Vector<real, 3>& Q_out, real& toc_out) {
             // https://physics.stackexchange.com/questions/373534/sweeping-collision-detection-between-two-line-segments-moving-in-3d
+            // Eigen::Vector<real, 3> a_min = a_start.min(a_end);
+            // Eigen::Vector<real, 3> a_max = a_start.max(a_end);
+            // Eigen::Vector<real, 3> b_min = b_start.min(b_end);
+            // Eigen::Vector<real, 3> b_max = b_start.max(b_end);
+            
+            // bool bbox = testAxis(a_min.x(), a_max.x(), b_min.x(), b_max.x(), search_dist);
+            // bbox &= testAxis(a_min.y(), a_max.y(), b_min.y(), b_max.y(), search_dist);
+            // bbox &= testAxis(a_min.z(), a_max.z(), b_min.z(), b_max.z(), search_dist);
+
+            // if (!bbox) {
+            //     return std::numeric_limits<double>::infinity();
+            // }
+
             real min_dist = std::numeric_limits<real>::max();
             
             Eigen::Vector<real, 3> n_start = (a_start.B - a_start.A).cross(b_start.A - a_start.A);
@@ -671,8 +695,8 @@ namespace Delta2 {
             }
             return min_dist;
         }
-        template float edgeEdgeCCD(const Delta2::common::Edge<float>&, const Delta2::common::Edge<float>&, const Delta2::common::Edge<float>&, const Delta2::common::Edge<float>&, Eigen::Vector<float, 3>&, Eigen::Vector<float, 3>&, float&);
-        template double edgeEdgeCCD(const Delta2::common::Edge<double>&, const Delta2::common::Edge<double>&, const Delta2::common::Edge<double>&, const Delta2::common::Edge<double>&, Eigen::Vector<double, 3>&, Eigen::Vector<double, 3>&, double&);
+        template float edgeEdgeCCD(const Delta2::common::Edge<float>&, const Delta2::common::Edge<float>&, const Delta2::common::Edge<float>&, const Delta2::common::Edge<float>&, float search_dist, Eigen::Vector<float, 3>&, Eigen::Vector<float, 3>&, float&);
+        template double edgeEdgeCCD(const Delta2::common::Edge<double>&, const Delta2::common::Edge<double>&, const Delta2::common::Edge<double>&, const Delta2::common::Edge<double>&, double search_dist, Eigen::Vector<double, 3>&, Eigen::Vector<double, 3>&, double&);
 
         /**
          * Return the shortest distance between two triangles as their points are linearly interpolated through the time interval 0-1
@@ -765,7 +789,7 @@ namespace Delta2 {
                     common::Edge<real> b_edge_start(b_start_A, b_start_B);
                     common::Edge<real> a_edge_end(a_end_A, a_end_B);
                     common::Edge<real> b_edge_end(b_end_A, b_end_B);
-                    real dist = edgeEdgeCCD(a_edge_start, a_edge_end, b_edge_start, b_edge_end, P, Q, t);
+                    real dist = edgeEdgeCCD(a_edge_start, a_edge_end, b_edge_start, b_edge_end, dist_min, P, Q, t);
 
                     if (dist < dist_min || (dist == dist_min && t < TOC_out)) {
                         dist_min = dist;
@@ -833,7 +857,7 @@ namespace Delta2 {
 			int total_vert_tri = 0;
             int total_edge_edge = 0;
             
-            float search_dist = a.geo_eps + b.geo_eps;
+            real search_dist = a.geo_eps + b.geo_eps;
             pair_used_out.reserve(bucket_pairs.size());
             pair_used_out.clear();
 
@@ -897,7 +921,7 @@ namespace Delta2 {
                         
                         Eigen::Vector<real, 3> P, Q;
                         real toc;
-                        real dist = Delta2::collision::edgeEdgeCCD(a_edge_start, a_edge_end, b_edge_start, b_edge_end, P, Q, toc);
+                        real dist = Delta2::collision::edgeEdgeCCD(a_edge_start, a_edge_end, b_edge_start, b_edge_end, search_dist, P, Q, toc);
 
 						if (dist < search_dist) {
 							ContinuousContact<real> ci(Q, P, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);

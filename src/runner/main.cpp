@@ -29,14 +29,14 @@ using namespace Delta2;
 
 std::mutex globals::contact_draws_lock;
 std::vector<std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d>> globals::contact_draws;
+Delta2::common::Options globals::opt;
 
 void guiThread(common::AnimationViewer* view) {
     view->show();
 }
 
 int main(int argc, char *argv[]) {
-    Delta2::common::Options opt;
-    int opt_result = opt.fromArgs(argc, argv);
+    int opt_result = globals::opt.fromArgs(argc, argv);
     if (opt_result > 0) {
         return opt_result;
     }
@@ -64,25 +64,26 @@ int main(int argc, char *argv[]) {
 
     const int max_x = 10;
     const double spacing_x = 8.0;
-    const int max_y = 8;
+    const int max_y = 20;
     const double spacing_y = 40.0;
     const int max_i = 10;
+    const int tilt_offset = 0;
 
     {
         Delta2::common::plane(std::max(10.0, std::max(max_x * spacing_x, max_y * spacing_y)), V, F);
-        std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt, true));
+        std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, globals::opt, true));
         auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
         p.is_static = true;
     }
 
     Delta2::common::cube(V, F);
-    std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
+    std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, globals::opt));
 
     for (int y = 0; y < max_y; y++) {
         for (int x = 0; x < max_x; x++) {
             for (int i = 0; i < max_i; i++) {
                 auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-                p.current_state.setTranslation({-(max_x / 2 * spacing_x) + x * spacing_x, -(max_y / 2 * spacing_y) + y * spacing_y + i * x * 0.2, 1.1 + i * 2.06});
+                p.current_state.setTranslation({-(max_x / 2 * spacing_x) + x * spacing_x, -(max_y / 2 * spacing_y) + y * spacing_y + i * (x + tilt_offset) * 0.2, 1.1 + i * 2.06});
             }
         }
     }
@@ -92,25 +93,25 @@ int main(int argc, char *argv[]) {
     std::thread gui;
     Delta2::common::AnimationViewer view(&particles);
 
-    if (opt.gui) {
+    if (globals::opt.gui) {
         std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> empty;
         view.recordFrame(empty);
         gui = std::thread(guiThread, &view);
     }
 
     strategy::ContactDetectionContinuousComparison contact_detection_continuous;
-    strategy::TimeStepSelectionDynamicContinuous time_step(contact_detection_continuous, opt);
+    strategy::TimeStepSelectionDynamicContinuous time_step(contact_detection_continuous, globals::opt);
     strategy::ContactDetectionComparison contact_detection;
-    strategy::FrictionIterative friction(opt);
-    strategy::SequentialImpulses contact_force(friction, opt);
-    strategy::PDEExplicit PDE(contact_detection, contact_force, friction, time_step, opt);
-    strategy::BroadPhaseEmbreeCluster broad_phase(PDE, opt);
+    strategy::FrictionIterative friction(globals::opt);
+    strategy::SequentialImpulses contact_force(friction, globals::opt);
+    strategy::PDEExplicit PDE(contact_detection, contact_force, friction, time_step, globals::opt);
+    strategy::BroadPhaseEmbreeCluster broad_phase(PDE, globals::opt);
 
     // PDE.printType();
 
     time_step.init(ph);
 
-    bool cont = opt.final_time > 0.0 || (opt.final_time < 0.0 && opt.num_time_steps > 0);
+    bool cont = globals::opt.final_time > 0.0 || (globals::opt.final_time < 0.0 && globals::opt.num_time_steps > 0);
     int step = 0;
     while (cont) {
         printf("Step: %i\n", step);
@@ -122,16 +123,16 @@ int main(int argc, char *argv[]) {
 
         broad_phase.step(ph);
 
-        if (opt.gui) {
+        if (globals::opt.gui) {
             view.recordFrame(globals::contact_draws);
         }
 
         step++;
-        if (opt.final_time > 0.0) {
+        if (globals::opt.final_time > 0.0) {
             cont = false;
             for (const Delta2::Particle& p : particles) {
                 double time = p.current_state.getTime();
-                double final_time = opt.final_time;
+                double final_time = globals::opt.final_time;
                 bool is_static = p.is_static;
                 if (time < final_time && !is_static) {
                     cont = true;
@@ -139,14 +140,14 @@ int main(int argc, char *argv[]) {
             }
         }
         else {
-            cont = step < opt.num_time_steps;
+            cont = step < globals::opt.num_time_steps;
         }
         
     }
 
     printf("================ Done ================\n");
 
-    if (opt.gui) {
+    if (globals::opt.gui) {
         gui.join();
     }
 }

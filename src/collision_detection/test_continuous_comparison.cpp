@@ -181,7 +181,7 @@ TEMPLATE_TEST_CASE("Edge edge Newton-Raphson intersect", "[grp_collision_detecti
     Delta2::common::Triangle<TestType> b_start = tri1.transformed(b_T_start);
     Delta2::common::Triangle<TestType> b_end = tri1.transformed(b_T_end);
 
-    TestType dist = Delta2::collision::edgeEdgeCCD(a_start.AB(), a_end.AB(), b_start.AB(), b_end.AB(), P, Q, toc);
+    TestType dist = Delta2::collision::edgeEdgeCCD(a_start.AB(), a_end.AB(), b_start.AB(), b_end.AB(), 10000.0, P, Q, toc);
 
     REQUIRE( toc == Approx(0.87).margin(0.01) );
     REQUIRE_THAT( P, VectorEqual(Eigen::Vector<TestType, 3>({0.0, 0.0, 0.6})).margin(0.01) );
@@ -210,7 +210,7 @@ TEMPLATE_TEST_CASE("Edge edge Newton-Raphson no intersect", "[grp_collision_dete
     Delta2::common::Triangle<TestType> b_start = tri1.transformed(b_T_start);
     Delta2::common::Triangle<TestType> b_end = tri1.transformed(b_T_end);
 
-    TestType dist = Delta2::collision::edgeEdgeCCD(a_start.AB(), a_end.AB(), b_start.AB(), b_end.AB(), P, Q, toc);
+    TestType dist = Delta2::collision::edgeEdgeCCD(a_start.AB(), a_end.AB(), b_start.AB(), b_end.AB(), 100000, P, Q, toc);
 
     REQUIRE( toc == Approx(1.0).margin(0.02) );
     REQUIRE_THAT( P, VectorEqual(Eigen::Vector<TestType, 3>({0.0, 0.0, 0.5})).margin(0.1) );

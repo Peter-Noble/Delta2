@@ -64,13 +64,33 @@ namespace Delta2 {
                     return lerp(clamp01(t));
                 }
 
-                Eigen::Vector<real, 3> lerp(real t) const{
+                Eigen::Vector<real, 3> lerp(real t) const {
                     return Delta2::common::lerp(A, B, t);
                 }
 
                 real project(Eigen::Vector<real, 3> V) const {
                     Eigen::Vector<real, 3> AB = B - A;
                     return (V - A).dot(AB) / AB.dot(AB);
+                }
+
+                Eigen::Vector<real, 3> min() const {
+                    return Eigen::Vector<real, 3>(std::min(A.x(), B.x()), std::min(A.y(), B.y()), std::min(A.z(), B.z()));
+                }
+
+                Eigen::Vector<real, 3> min(const Edge<real>& other) const {
+                    Eigen::Vector<real, 3> other_min = other.min();
+                    Eigen::Vector<real, 3> this_min = min();
+                    return Eigen::Vector<real, 3>(std::min(this_min.x(), other_min.x()), std::min(this_min.y(), other_min.y()), std::min(this_min.z(), other_min.z()));
+                }
+
+                Eigen::Vector<real, 3> max() const {
+                    return Eigen::Vector<real, 3>(std::max(A.x(), B.x()), std::max(A.y(), B.y()), std::max(A.z(), B.z()));
+                }
+
+                Eigen::Vector<real, 3> max(const Edge<real>& other) const {
+                    Eigen::Vector<real, 3> other_max = other.max();
+                    Eigen::Vector<real, 3> this_max = max();
+                    return Eigen::Vector<real, 3>(std::max(this_max.x(), other_max.x()), std::max(this_max.y(), other_max.y()), std::max(this_max.z(), other_max.z()));
                 }
         };
         template class Edge<float>;

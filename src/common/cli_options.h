@@ -24,6 +24,10 @@ namespace Delta2 {
 			bool print_debug;
 			bool gui;
 
+			int sequential_impulse_total_iterations;
+			int sequential_impulse_inner_iterations;
+			int sequential_impulse_grain_size;
+
 			pcg32_random_t rng;
 
 			Options() {
@@ -42,6 +46,10 @@ namespace Delta2 {
 				print_tree = false;
 				print_debug = false;
 				gui = false;
+
+				sequential_impulse_total_iterations = 1000;
+				sequential_impulse_inner_iterations = 20;
+				sequential_impulse_grain_size = 1000;
 
 				pcg32_srandom_r(&rng, 42u, 54u);
 			}
@@ -104,6 +112,10 @@ namespace Delta2 {
 				else {
 					printf("Suppress all output:   false\n");
 				}
+				printf("======== Sequential Impulses ========\n");
+				printf("Seq total iterations:  %i\n", sequential_impulse_total_iterations);
+				printf("Seq inner iterations:  %i\n", sequential_impulse_inner_iterations);
+				printf("Seq grain size:        %i\n", sequential_impulse_grain_size);
 				printf("==========================================\n");
 			}
 			void validate() {
@@ -128,6 +140,10 @@ namespace Delta2 {
 				app.add_option("--mesh_metrics", mesh_metric, "Takes a path to a mesh and computes some metrics about it");
 				app.add_option("--geo_eps", geo_eps, "Geometry eps");
 				app.add_flag("-g,--gui", gui, "Toggle GUI on");
+
+				app.add_option("--seq_total_iter", sequential_impulse_total_iterations, "Total number of iterations to use for sequential impulses");
+				app.add_option("--seq_inner_iter", sequential_impulse_inner_iterations, "Number of inner iterations to use for sequential impulses");
+				app.add_option("--seq_grain_size", sequential_impulse_grain_size, "Grain size to use for sequential impulses");
 
 				CLI11_PARSE(app, argc, argv);
 
