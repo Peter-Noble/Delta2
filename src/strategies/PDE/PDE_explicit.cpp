@@ -87,8 +87,8 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
             __itt_task_begin(domain, __itt_null, __itt_null, compare_individual_pair_task);
             collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
 
-            int a_id = cluster.particles.getLocalID(b.first.first); // geo id
-            int b_id = cluster.particles.getLocalID(b.second.first);
+            int a_id = cluster.particles.getLocalID(b.A.first); // geo id
+            int b_id = cluster.particles.getLocalID(b.B.first);
 
             Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
             Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();

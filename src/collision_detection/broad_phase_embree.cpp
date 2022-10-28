@@ -143,7 +143,7 @@ unsigned int createUserGeomIndividualTime(RTCDevice device, RTCScene scene, Delt
 
 void collideFunc(void *userPtr, RTCCollision *collisions, unsigned int num_collisions)
 {
-    for (size_t i = 0; i < num_collisions;)
+    for (int i = 0; i < num_collisions;)
     {
         bool intersect;
 
@@ -172,20 +172,20 @@ void collideFunc(void *userPtr, RTCCollision *collisions, unsigned int num_colli
         return;
 
     std::lock_guard<std::mutex> guard(lock);
-    for (size_t i = 0; i < num_collisions; i++)
+    for (int i = 0; i < num_collisions; i++)
     {
         const unsigned geomID0 = collisions[i].geomID0;
         const unsigned primID0 = collisions[i].primID0;
         const unsigned geomID1 = collisions[i].geomID1;
         const unsigned primID1 = collisions[i].primID1;
 
-        static_cast<Delta2::collision::BroadPhaseCollisions *>(userPtr)->push_back(std::make_pair(std::make_pair(geomID0, primID0), std::make_pair(geomID1, primID1)));
+        static_cast<Delta2::collision::BroadPhaseCollisions *>(userPtr)->push_back({.A=std::make_pair(geomID0, primID0), .B=std::make_pair(geomID1, primID1), .min_toc=0.0, .target_toc=0.0});
     }
 }
 
 void collideFuncIndividualTime(void *userPtr, RTCCollision *collisions, unsigned int num_collisions)
 {
-    for (size_t i = 0; i < num_collisions;)
+    for (int i = 0; i < num_collisions;)
     {
         bool intersect;
 
@@ -226,14 +226,14 @@ void collideFuncIndividualTime(void *userPtr, RTCCollision *collisions, unsigned
         return;
 
     std::lock_guard<std::mutex> guard(lock);
-    for (size_t i = 0; i < num_collisions; i++)
+    for (int i = 0; i < num_collisions; i++)
     {
         const unsigned geomID0 = collisions[i].geomID0;
         const unsigned primID0 = collisions[i].primID0;
         const unsigned geomID1 = collisions[i].geomID1;
         const unsigned primID1 = collisions[i].primID1;
 
-        static_cast<Delta2::collision::BroadPhaseCollisions *>(userPtr)->push_back(std::make_pair(std::make_pair(geomID0, primID0), std::make_pair(geomID1, primID1)));
+        static_cast<Delta2::collision::BroadPhaseCollisions *>(userPtr)->push_back({.A=std::make_pair(geomID0, primID0), .B=std::make_pair(geomID1, primID1), .min_toc=0.0, .target_toc=0.0});
     }
 }
 

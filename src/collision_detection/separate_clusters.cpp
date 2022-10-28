@@ -22,8 +22,8 @@ void collision::separateContinuousCollisionClusters(collision::BroadPhaseCollisi
     for (int b_i = 0; b_i < broad_phase.size(); b_i++) {
         collision::BroadPhaseCollision& b = broad_phase[b_i];
 
-        int a_id = b.first.first; // geo id
-        int b_id = b.second.first;
+        int a_id = b.A.first; // geo id
+        int b_id = b.B.first;
 
         if (!particles[a_id].is_static && !particles[b_id].is_static) {
             // std::lock_guard<std::mutex> guard(lock);
@@ -73,8 +73,8 @@ void collision::separateContinuousCollisionClusters(collision::BroadPhaseCollisi
 
             collision::BroadPhaseCollision& b = broad_phase[b_i];
 
-            int a_id = b.first.first; // geo id
-            int b_id = b.second.first;
+            int a_id = b.A.first; // geo id
+            int b_id = b.B.first;
 
             Eigen::Vector3d a_centre = particles[a_id].current_state.getTranslation();
             Eigen::Vector3d b_centre = particles[b_id].current_state.getTranslation();
@@ -104,8 +104,8 @@ void collision::separateContinuousCollisionClusters(collision::BroadPhaseCollisi
     task_group.wait();
 
     for (collision::BroadPhaseCollision& b : broad_phase) {
-        int a_id = b.first.first; // geo id
-        int b_id = b.second.first;
+        int a_id = b.A.first; // geo id
+        int b_id = b.B.first;
         int id;
         int static_id = -1;
         int cluster_id;
@@ -159,8 +159,8 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
     for (int b_i = 0; b_i < broad_phase.size(); b_i++) {
         collision::BroadPhaseCollision& b = broad_phase[b_i];
 
-        int a_id = b.first.first; // geo id
-        int b_id = b.second.first;
+        int a_id = b.A.first; // geo id
+        int b_id = b.B.first;
 
         if (!particles[a_id].is_static && !particles[b_id].is_static) {
             // std::lock_guard<std::mutex> guard(lock);
@@ -225,8 +225,8 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
 
                 collision::BroadPhaseCollision& b = broad_phase[b_i];
 
-                int a_id = b.first.first; // geo id
-                int b_id = b.second.first;
+                int a_id = b.A.first; // geo id
+                int b_id = b.B.first;
 
                 Eigen::Vector3d a_centre = particles[a_id].current_state.getTranslation();
                 Eigen::Vector3d b_centre = particles[b_id].current_state.getTranslation();
@@ -322,8 +322,8 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
     // }
 
     for (collision::BroadPhaseCollision& b : broad_phase) {
-        int a_id = b.first.first; // geo id
-        int b_id = b.second.first;
+        int a_id = b.A.first; // geo id
+        int b_id = b.B.first;
         int id;
         int static_id = -1;
         int cluster_id;
@@ -373,8 +373,8 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
     for (int b_i = 0; b_i < broad_phase.size(); b_i++) {
         collision::BroadPhaseCollision& b = broad_phase[b_i];
 
-        int a_id = particles.getLocalID(b.first.first); // local geo id
-        int b_id = particles.getLocalID(b.second.first);
+        int a_id = particles.getLocalID(b.A.first); // local geo id
+        int b_id = particles.getLocalID(b.B.first);
 
         if (!particles[a_id].is_static && !particles[b_id].is_static) {
             interaction_graph.coeffRef(a_id, b_id) = 1;
@@ -417,8 +417,8 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
     // Add each broad phase interaction to required clusters
     // TODO this isn't very efficient as each interaction searches through all the particles in all the clusters.
     for (collision::BroadPhaseCollision& b : broad_phase) {
-        int a_id = particles.getLocalID(b.first.first); // local geo id
-        int b_id = particles.getLocalID(b.second.first);
+        int a_id = particles.getLocalID(b.A.first); // local geo id
+        int b_id = particles.getLocalID(b.B.first);
 
         for (int c_i = 0; c_i < clusters.size(); c_i++) {
             Particle* address_a = &(particles[a_id]);
@@ -508,8 +508,11 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
             collision::BroadPhaseCollision& b = cluster.interations[b_i];
 
-            int a_id = cluster.particles.getLocalID(b.first.first); // geo id
-            int b_id = cluster.particles.getLocalID(b.second.first);
+            b.min_toc = std::numeric_limits<float>::infinity();
+            b.target_toc = std::numeric_limits<float>::infinity();
+
+            int a_id = cluster.particles.getLocalID(b.A.first); // geo id
+            int b_id = cluster.particles.getLocalID(b.B.first);
 
             Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
             Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
@@ -537,10 +540,12 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                         if (hit_normal.norm() < 1e-4) {
                             if (c.toc == 0.0) {
                                 // throw std::runtime_error("Invalid configuration");
+                                b.min_toc = 0.0;
                                 continue;
                             }
                             double rel_vel_norm = rel_vel.norm();
                             double toc_start_contact = std::max(0.0, c.toc - (rel_vel.norm() * max_time_step_for_pair) / interaction_dist);
+                            b.min_toc = std::min((float)toc_start_contact, b.min_toc);
                             // double toc_start_contact = std::max(0.0, 1.0 - (rel_vel.norm() * max_time_step_for_pair) / interaction_dist);
                             double new_step = common::lerp(toc_start_contact, c.toc, 0.75);
                             min_scaling_seen = std::min(min_scaling_seen, new_step);
@@ -560,6 +565,8 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                                         // This is the first frame penetrating this eps boundry
                                         assert((2.0 - depth / proj_dist) / 2.0 <= 1.0);
 
+                                        b.min_toc = std::min(b.min_toc, (float)std::max(0.0, c.toc * (1.0 - depth / proj_dist)));
+
                                         double new_step = common::lerp(c.toc * (1.0 - depth / proj_dist), c.toc, 0.5);
                                         min_scaling_seen = std::min(min_scaling_seen, new_step);
                                         if (max_time_step_for_pair * new_step < 1e-6) {
@@ -568,6 +575,8 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                                     }
                                     else {
                                         // The contact point was already inside the eps boundry at the start of the timestep
+                                        b.min_toc = 0.0;
+
                                         double future_point = c.toc + (1.0 - c.toc) * interaction_dist / (proj_vel * max_time_step_for_pair);
 
                                         double new_step = common::lerp(c.toc, std::min(future_point, 1.0), 0.8);
@@ -575,10 +584,14 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                                         min_scaling_seen = std::min(min_scaling_seen, new_step);
                                     }
                                 }
+                                else {
+                                    b.min_toc = c.toc;
+                                }
                             }
                         }
                     }
                 }
+                b.target_toc = std::min(b.target_toc, (float)min_scaling_seen);
                 double new_time_step_size = max_time_step_for_pair * min_scaling_seen;
                 double use_time_step_size = std::min(new_time_step_size, std::min(step_size[a_id], step_size[b_id]));
 
@@ -590,6 +603,12 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                     step_size[b_id] = use_time_step_size;
                 }
             }
+            else {
+                b.min_toc = 1.0;
+                b.target_toc = 1.0;
+            }
+            b.min_toc *= max_time_step_for_pair;
+            b.target_toc *= max_time_step_for_pair;
             __itt_task_end(domain);
         });
     }
@@ -600,8 +619,8 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
     for (int b_i = 0; b_i < cluster.interations.size(); b_i++) {
         collision::BroadPhaseCollision& b = cluster.interations[b_i];
-        int a_id = cluster.particles.getLocalID(b.first.first); // geo id
-        int b_id = cluster.particles.getLocalID(b.second.first);
+        int a_id = cluster.particles.getLocalID(b.A.first); // geo id
+        int b_id = cluster.particles.getLocalID(b.B.first);
         int id;
 
         if (!cluster.particles[a_id].is_static && !cluster.particles[b_id].is_static) {
@@ -685,8 +704,8 @@ void collision::fineWitnessCollisionClustersWithTimeStepSelection(std::vector<De
 
                     collision::BroadPhaseCollision& b = cluster_interactions_out[c_i][b_i];
 
-                    int a_id = b.first.first; // geo id
-                    int b_id = b.second.first;
+                    int a_id = b.A.first; // geo id
+                    int b_id = b.B.first;
 
                     Eigen::Vector3d a_centre = particles[a_id].current_state.getTranslation();
                     Eigen::Vector3d b_centre = particles[b_id].current_state.getTranslation();
@@ -786,8 +805,8 @@ void collision::fineWitnessCollisionClustersWithTimeStepSelection(std::vector<De
     for (int c_i = 0; c_i < cluster_interactions_out.size(); c_i++) {
         for (int b_i = 0; b_i < cluster_interactions_out[c_i].size(); b_i++) {
             collision::BroadPhaseCollision& b = cluster_interactions_out[c_i][b_i];
-            int a_id = b.first.first; // geo id
-            int b_id = b.second.first;
+            int a_id = b.A.first; // geo id
+            int b_id = b.B.first;
             int id;
 
             if (!particles[a_id].is_static && !particles[b_id].is_static) {
@@ -818,3 +837,125 @@ void collision::fineWitnessCollisionClustersWithTimeStepSelection(std::vector<De
     }
 }
 
+std::vector<collision::Cluster> collision::separateClusterByTimestep(Cluster& cluster) {
+    int num_particles = cluster.particles.size();
+    Eigen::SparseMatrix<int> interaction_graph(num_particles, num_particles);
+
+    bool is_cut = false;
+
+    for (int b_i = 0; b_i < cluster.interations.size(); b_i++) {
+        collision::BroadPhaseCollision& b = cluster.interations[b_i];
+
+        if (b.min_toc * 1.1 > cluster.step_size) {
+            // cut edge
+            is_cut = true;
+        } else {
+            // still valid
+            int a_id = cluster.particles.getLocalID(b.A.first); // local geo id
+            int b_id = cluster.particles.getLocalID(b.B.first);
+
+            if (!cluster.particles[a_id].is_static && !cluster.particles[b_id].is_static) {
+                interaction_graph.coeffRef(a_id, b_id) = 1;
+                interaction_graph.coeffRef(b_id, a_id) = 1;
+            }
+        }
+    }
+
+    if (!is_cut) {
+        return {cluster};
+    }
+
+    Eigen::MatrixXi components;
+    Eigen::MatrixXi sizes;
+    igl::connected_components(interaction_graph, components, sizes);
+
+    std::vector<Cluster> clusters;
+    std::vector<std::vector<Particle*>> cluster_particles;
+
+    if (sizes.rows() <= 1) {
+        return {cluster};
+    }
+
+    for (int c = 0; c < sizes.rows(); c++) {
+        Cluster& C = clusters.emplace_back();
+
+        C.sleeping = true;
+        C.min_current_time = cluster.min_current_time;
+        C.step_size = cluster.step_size;
+        C.is_static = true;
+
+        cluster_particles.push_back({});
+    }
+
+    for (int p_i = 0; p_i < num_particles; p_i++) {
+        Particle* address = &(cluster.particles[p_i]);
+        cluster_particles[components(p_i, 0)].push_back(address);
+        // clusters[components(p_i, 0)].min_current_time = std::min(clusters[components(p_i, 0)].min_current_time, cluster.particles[p_i].current_state.getTime());
+        clusters[components(p_i, 0)].step_size = std::min(clusters[components(p_i, 0)].step_size, address->last_time_step_size);
+        if (!cluster.particles[p_i].getSleeping()) {
+            clusters[components(p_i, 0)].sleeping = false;
+        }
+    }
+
+    // Add each broad phase interaction to required clusters
+    // TODO this isn't very efficient as each interaction searches through all the particles in all the clusters.
+    for (collision::BroadPhaseCollision& b : cluster.interations) {
+        int a_id = cluster.particles.getLocalID(b.A.first); // local geo id
+        int b_id = cluster.particles.getLocalID(b.B.first);
+
+        for (int c_i = 0; c_i < clusters.size(); c_i++) {
+            Particle* address_a = &(cluster.particles[a_id]);
+            Particle* address_b = &(cluster.particles[b_id]);
+            
+            if (cluster.particles[a_id].is_static && cluster.particles[b_id].is_static) {
+                continue;
+            }
+
+            bool a_in = std::find(cluster_particles[c_i].begin(), cluster_particles[c_i].end(), address_a) != cluster_particles[c_i].end();
+            bool b_in = std::find(cluster_particles[c_i].begin(), cluster_particles[c_i].end(), address_b) != cluster_particles[c_i].end();
+
+            if (a_in) {
+                if (b_in) {
+                    clusters[c_i].interations.push_back(b);
+                    break;
+                }
+                else if (cluster.particles[b_id].is_static) {
+                    cluster_particles[c_i].push_back(address_b);
+                    clusters[c_i].interations.push_back(b);
+                    break;
+                }
+            }
+            else {
+                if (b_in) {
+                    if (cluster.particles[a_id].is_static) {
+                        cluster_particles[c_i].push_back(address_a);
+                        clusters[c_i].interations.push_back(b);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    for (int c_i = 0; c_i < sizes.rows(); c_i++) {
+        for (Particle* p : cluster_particles[c_i]) {
+            if (!p->is_static) {
+                // p->rollBackState(clusters[c_i].min_current_time);
+                clusters[c_i].is_static = false;
+            }
+        }
+    }
+
+    // Filter out the clusters that have no non-sleeping particles
+    int cluster_target = 0;
+    for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++) {
+        if (!clusters[cluster_i].is_static) {
+            clusters[cluster_target] = clusters[cluster_i];
+            clusters[cluster_target].particles = model::ParticleHandler(cluster_particles[cluster_i]);
+            cluster_target++;
+        }
+    }
+    clusters.resize(cluster_target); // Removed (and calls destructor) for the end clusters that are no longer needed
+
+    return clusters;
+}

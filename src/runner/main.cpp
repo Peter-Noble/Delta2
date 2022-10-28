@@ -62,12 +62,12 @@ int main(int argc, char *argv[]) {
     //     // }
     // }
 
-    const int max_x = 10;
+    const int max_x = 1;
     const double spacing_x = 8.0;
-    const int max_y = 20;
+    const int max_y = 1;
     const double spacing_y = 40.0;
-    const int max_i = 10;
-    const int tilt_offset = 0;
+    const int max_i = 4;
+    const int tilt_offset = 4;
 
     {
         Delta2::common::plane(std::max(10.0, std::max(max_x * spacing_x, max_y * spacing_y)), V, F);

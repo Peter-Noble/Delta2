@@ -86,8 +86,8 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                 if (!failed_at_last) {
                     collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
 
-                    int a_id = cluster.particles.getLocalID(b.first.first); // geo id
-                    int b_id = cluster.particles.getLocalID(b.second.first);
+                    int a_id = cluster.particles.getLocalID(b.A.first); // geo id
+                    int b_id = cluster.particles.getLocalID(b.B.first);
 
                     Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
                     Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
@@ -155,8 +155,8 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                     if (!failed_at_current) {
                         collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
 
-                        int a_id = cluster.particles.getLocalID(b.first.first); // geo id
-                        int b_id = cluster.particles.getLocalID(b.second.first);
+                        int a_id = cluster.particles.getLocalID(b.A.first); // geo id
+                        int b_id = cluster.particles.getLocalID(b.B.first);
 
                         Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
                         Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
@@ -323,6 +323,9 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
     // printf("Select time step sizes\n");
     tbb::task_group task_group;
 
+    std::vector<collision::Cluster> clusters_tmp;
+    clusters_tmp.reserve(clusters.size());
+
     for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++)
     {
         collision::Cluster& cl = clusters[cluster_i];
@@ -360,20 +363,28 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         task_group.run([&, cluster_i] {
             __itt_task_begin(domain, __itt_null, __itt_null, select_time_step_task);
             double step = _local_pde.selectTimeStep(cl);
+            std::vector<collision::Cluster> sub_clusters = collision::separateClusterByTimestep(cl);
+
+            int up_to_cluster = clusters_tmp.size();
             __itt_task_end(domain);
             {
                 std::lock_guard guard(fine_min_final_time_lock);
                 fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + step);
+                clusters_tmp.insert(clusters_tmp.end(), sub_clusters.begin(), sub_clusters.end());
             }
 
-            printf("Selected time: %f for cluster %i\n", step, cluster_i);
+            printf("Selected time: %f for cluster %i and splitting into %i\n", step, cluster_i, sub_clusters.size());
 
-            for (Particle* p : cl.particles) {
-                p->cluster_id = cluster_i;
+            for (int sub_i = 0; sub_i < sub_clusters.size(); sub_i++) {
+                for (Particle* p : sub_clusters[sub_i].particles) {
+                    p->cluster_id = up_to_cluster + sub_i;
+                }
             }
         });
     }
     task_group.wait();
+
+    clusters.swap(clusters_tmp);
 
     for (Particle* p : particles)
     {
