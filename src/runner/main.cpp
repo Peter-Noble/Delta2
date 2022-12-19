@@ -62,31 +62,90 @@ int main(int argc, char *argv[]) {
     //     // }
     // }
 
-    const int max_x = 1;
+    const int max_x = 8;
     const double spacing_x = 8.0;
-    const int max_y = 1;
+    const int max_y = 8;
     const double spacing_y = 40.0;
-    const int max_i = 4;
+    const int max_i = 10;
     const int tilt_offset = 4;
 
-    {
-        Delta2::common::plane(std::max(10.0, std::max(max_x * spacing_x, max_y * spacing_y)), V, F);
-        std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, globals::opt, true));
-        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-        p.is_static = true;
-    }
+    // {
+    //     Delta2::common::plane(std::max(10.0, std::max(max_x * spacing_x, max_y * spacing_y)), V, F);
+    //     std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, globals::opt, true));
+    //     auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+    //     p.is_static = true;
+    // }
 
     Delta2::common::cube(V, F);
     std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, globals::opt));
 
-    for (int y = 0; y < max_y; y++) {
-        for (int x = 0; x < max_x; x++) {
-            for (int i = 0; i < max_i; i++) {
-                auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-                p.current_state.setTranslation({-(max_x / 2 * spacing_x) + x * spacing_x, -(max_y / 2 * spacing_y) + y * spacing_y + i * (x + tilt_offset) * 0.2, 1.1 + i * 2.06});
-            }
-        }
+    const double start_offset = 10;
+    const double offset = 8;
+    const int line = 10;
+    const double vel_mult = 10;
+
+    Eigen::Vector3d normal = {0, 1, 0};
+    normal.normalize();
+
+    for (int x = 0; x < line; x++) {
+        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+        p.current_state.setTranslation((start_offset + x * offset) * normal);
+        p.current_state.setVelocity(-normal * vel_mult);
     }
+    
+    normal = {0, 1, 1};
+    normal.normalize();
+
+    for (int x = 0; x < line; x++) {
+        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+        p.current_state.setTranslation((1.0 + start_offset + x * offset) * normal);
+        p.current_state.setVelocity(-normal * vel_mult);
+    }
+    
+    normal = {0, -1, 1};
+    normal.normalize();
+
+    for (int x = 0; x < line; x++) {
+        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+        p.current_state.setTranslation((2.0 + start_offset + x * offset) * normal);
+        p.current_state.setVelocity(-normal * vel_mult);
+    }
+    
+    normal = {0.5, 1, 0};
+    normal.normalize();
+
+    for (int x = 0; x < line; x++) {
+        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+        p.current_state.setTranslation((3.0 + start_offset + x * offset) * normal);
+        p.current_state.setVelocity(-normal * vel_mult);
+    }
+    
+    normal = {0, 1, -1};
+    normal.normalize();
+
+    for (int x = 0; x < line; x++) {
+        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+        p.current_state.setTranslation((4.0 + start_offset + x * offset) * normal);
+        p.current_state.setVelocity(-normal * vel_mult);
+    }
+    
+    normal = {1, 0, 0};
+    normal.normalize();
+
+    for (int x = 0; x < line; x++) {
+        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+        p.current_state.setTranslation((5.0 + start_offset + x * offset) * normal);
+        p.current_state.setVelocity(-normal * vel_mult);
+    }
+
+    // for (int y = 0; y < max_y; y++) {
+    //     for (int x = 0; x < max_x; x++) {
+    //         for (int i = 0; i < max_i; i++) {
+    //             auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+    //             p.current_state.setTranslation({-(max_x / 2 * spacing_x) + x * spacing_x, -(max_y / 2 * spacing_y) + y * spacing_y + i * (x + tilt_offset) * 0.2, 1.1 + i * 2.06});
+    //         }
+    //     }
+    // }
 
     model::ParticleHandler ph(particles);
 

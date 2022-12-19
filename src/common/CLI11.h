@@ -5794,6 +5794,9 @@ class App {
         args.reserve(static_cast<std::size_t>(argc) - 1);
         for(int i = argc - 1; i > 0; i--)
             args.emplace_back(argv[i]);
+        for (int i = 0; i < args.size(); i++) {
+            printf("Arg: %s\n", args[i].c_str());
+        }
         parse(std::move(args));
     }
 

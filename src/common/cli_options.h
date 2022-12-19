@@ -28,6 +28,8 @@ namespace Delta2 {
 			int sequential_impulse_inner_iterations;
 			int sequential_impulse_grain_size;
 
+			float cluster_separation_factor;
+
 			pcg32_random_t rng;
 
 			Options() {
@@ -50,6 +52,8 @@ namespace Delta2 {
 				sequential_impulse_total_iterations = 1000;
 				sequential_impulse_inner_iterations = 20;
 				sequential_impulse_grain_size = 1000;
+
+				cluster_separation_factor = 0.25;
 
 				pcg32_srandom_r(&rng, 42u, 54u);
 			}
@@ -117,6 +121,8 @@ namespace Delta2 {
 				printf("Seq inner iterations:  %i\n", sequential_impulse_inner_iterations);
 				printf("Seq grain size:        %i\n", sequential_impulse_grain_size);
 				printf("==========================================\n");
+				printf("Cluster sep factor:    %f\n", cluster_separation_factor);
+				printf("==========================================\n");
 			}
 			void validate() {
 				if (scenario_lod < -1) {
@@ -140,6 +146,8 @@ namespace Delta2 {
 				app.add_option("--mesh_metrics", mesh_metric, "Takes a path to a mesh and computes some metrics about it");
 				app.add_option("--geo_eps", geo_eps, "Geometry eps");
 				app.add_flag("-g,--gui", gui, "Toggle GUI on");
+
+				app.add_option("-c,--cluster_sep_factor", cluster_separation_factor, "Multiply the min time-of-contact by this factor before separating clusters");
 
 				app.add_option("--seq_total_iter", sequential_impulse_total_iterations, "Total number of iterations to use for sequential impulses");
 				app.add_option("--seq_inner_iter", sequential_impulse_inner_iterations, "Number of inner iterations to use for sequential impulses");

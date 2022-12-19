@@ -5,6 +5,8 @@
 #include <omp.h>
 #include <ittnotify.h>
 #include "tbb/task_group.h"
+#include "../globals.h"
+
 
 using namespace Delta2;
 
@@ -475,6 +477,33 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
     }
     clusters.resize(cluster_target); // Removed (and calls destructor) for the end clusters that are no longer needed
 
+    for (Particle* p : particles) {
+        if (!p->is_static || !p->getSleeping()) {
+            bool found = false;
+
+            for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++) {
+                for (Particle* pc : clusters[cluster_i].particles) {
+                    if (pc->id == p->id) {
+                        found = true;
+                        // printf("Found: %i in %i\n", p->id, cluster_i);
+                        break;
+                    }
+                }
+                if (found) {
+                    break;
+                }
+            }
+            if (found) {
+                continue;
+            }
+            assert(false);
+        }
+        // else {
+        //     printf("Skipping: %i\n", p->id);
+        // }
+    }
+
+    // printf("%i total clusters\n", clusters.size());
     return clusters;
 }
 
@@ -551,11 +580,11 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                             min_scaling_seen = std::min(min_scaling_seen, new_step);
                             // This is only correct if the velocity is perpendicular to the face tangent. Otherwise it's an underestimate of the toc (which is safe).
                             // min_scaling_seen = std::min(min_scaling_seen, c.toc * 0.9);
-                            min_toc = std::min(min_toc, c.toc);
+                            // min_toc = std::min(min_toc, c.toc);
                         }
                         else {
                             if (c.toc < 1.0) {
-                                min_toc = std::min(min_toc, c.toc);
+                                // min_toc = std::min(min_toc, c.toc);
                                 // End point is inside range (since it's moving towards each other) => compute start point
                                 double proj_vel = -(hit_normal.normalized().dot(rel_vel)); // +ve
                                 double depth = interaction_dist - hit_normal.norm();
@@ -592,6 +621,12 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                     }
                 }
                 b.target_toc = std::min(b.target_toc, (float)min_scaling_seen);
+
+                if (std::isinf(b.min_toc)) {
+                    // None of the continuous contacts set the min_toc so it can advance all the way.
+                    b.min_toc = 1.0;
+                }
+
                 double new_time_step_size = max_time_step_for_pair * min_scaling_seen;
                 double use_time_step_size = std::min(new_time_step_size, std::min(step_size[a_id], step_size[b_id]));
 
@@ -607,6 +642,9 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                 b.min_toc = 1.0;
                 b.target_toc = 1.0;
             }
+
+            // printf("b.min_toc: %f, b.target_toc: %f\n", b.min_toc, b.target_toc);
+
             b.min_toc *= max_time_step_for_pair;
             b.target_toc *= max_time_step_for_pair;
             __itt_task_end(domain);
@@ -837,7 +875,7 @@ void collision::fineWitnessCollisionClustersWithTimeStepSelection(std::vector<De
     }
 }
 
-std::vector<collision::Cluster> collision::separateClusterByTimestep(Cluster& cluster) {
+std::vector<collision::Cluster> collision::separateClusterByTimestep(Cluster& cluster, float min_toc_offset) {
     int num_particles = cluster.particles.size();
     Eigen::SparseMatrix<int> interaction_graph(num_particles, num_particles);
 
@@ -846,7 +884,7 @@ std::vector<collision::Cluster> collision::separateClusterByTimestep(Cluster& cl
     for (int b_i = 0; b_i < cluster.interations.size(); b_i++) {
         collision::BroadPhaseCollision& b = cluster.interations[b_i];
 
-        if (b.min_toc * 1.1 > cluster.step_size) {
+        if (b.min_toc * globals::opt.cluster_separation_factor - min_toc_offset > cluster.step_size) {
             // cut edge
             is_cut = true;
         } else {
@@ -862,7 +900,7 @@ std::vector<collision::Cluster> collision::separateClusterByTimestep(Cluster& cl
     }
 
     if (!is_cut) {
-        return {cluster};
+        return {};
     }
 
     Eigen::MatrixXi components;
@@ -873,7 +911,7 @@ std::vector<collision::Cluster> collision::separateClusterByTimestep(Cluster& cl
     std::vector<std::vector<Particle*>> cluster_particles;
 
     if (sizes.rows() <= 1) {
-        return {cluster};
+        return {};
     }
 
     for (int c = 0; c < sizes.rows(); c++) {
@@ -891,7 +929,7 @@ std::vector<collision::Cluster> collision::separateClusterByTimestep(Cluster& cl
         Particle* address = &(cluster.particles[p_i]);
         cluster_particles[components(p_i, 0)].push_back(address);
         // clusters[components(p_i, 0)].min_current_time = std::min(clusters[components(p_i, 0)].min_current_time, cluster.particles[p_i].current_state.getTime());
-        clusters[components(p_i, 0)].step_size = std::min(clusters[components(p_i, 0)].step_size, address->last_time_step_size);
+        // clusters[components(p_i, 0)].step_size = std::min(clusters[components(p_i, 0)].step_size, address->last_time_step_size);
         if (!cluster.particles[p_i].getSleeping()) {
             clusters[components(p_i, 0)].sleeping = false;
         }

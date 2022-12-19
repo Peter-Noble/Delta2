@@ -54,7 +54,7 @@ void State::setVelocity(Eigen::Vector3d v) {
 
 State State::interpolate(State last, double time) const {
     #ifndef NDEBUG
-    if (time > _time || time < last.getTime() || last.getTime() > _time) {
+    if (time > _time + 1e-4 || time + 1e-4 < last.getTime() || last.getTime() > _time + 1e-4) {
         throw std::runtime_error("Invalid args for interpolation");
     }
     #endif

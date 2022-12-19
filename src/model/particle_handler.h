@@ -18,6 +18,7 @@ namespace Delta2 {
             std::vector<Particle*>::iterator end();
             std::vector<Particle*>::const_iterator begin() const;
             std::vector<Particle*>::const_iterator end() const;
+            bool isValid() const;
         private:
             std::vector<Particle*> _ps;
             std::unordered_map<uint32_t, uint32_t> _global_to_local_ids;

@@ -127,10 +127,10 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
             willSleep &= p->last_state.isStationary() && p->current_state.isStationary() && p->future_state.isStationary();
             willSleep &= p->last_state.getTime() < p->current_state.getTime() && p->current_state.getTime() < p->future_state.getTime();
 
-            // printf("Updating %i last: %f, current: %f, future: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
             p->last_state = p->current_state;
             p->current_state = p->future_state;
             p->projectFutureState(cluster.step_size);
+            // printf("Updating %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
 
             assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
             // printf("Post integration state of %i: last time %f, time %f, future time %f, sleep from %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), p->sleep_candidate_time);

@@ -14,6 +14,10 @@ ParticleHandler::ParticleHandler(std::vector<Particle*>& ps) {
         Particle *p = ps[p_i];
         _global_to_local_ids[p->id] = p_i;
     }
+
+    if (!isValid()) {
+        throw std::runtime_error("Particle handler doesn't have a valid map!");
+    }
 }
 
 ParticleHandler::ParticleHandler(std::vector<Particle>& ps) {
@@ -22,6 +26,10 @@ ParticleHandler::ParticleHandler(std::vector<Particle>& ps) {
     for (int p_i = 0; p_i < ps.size(); p_i++) {
         _ps.push_back(&ps[p_i]);
         _global_to_local_ids[ps[p_i].id] = p_i;
+    }
+
+    if (!isValid()) {
+        throw std::runtime_error("Particle handler doesn't have a valid map!");
     }
 }
 
@@ -60,4 +68,16 @@ std::vector<Particle*>::const_iterator ParticleHandler::begin() const {
 
 std::vector<Particle*>::const_iterator ParticleHandler::end() const {
     return _ps.cend();
+}
+
+bool ParticleHandler::isValid() const {
+    bool result = true;
+    for (Particle* p : _ps) {
+        if (_global_to_local_ids.find(p->id) == _global_to_local_ids.end()) {
+            result = false;
+            break;
+        }
+    }
+    assert(result);
+    return result;
 }

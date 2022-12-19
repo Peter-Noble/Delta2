@@ -40,7 +40,7 @@ DEFINES = -DTASKING_INTERNAL
 # -I/home/peter/Documents/likwid-5.2.0/src/includes
 # -L/home/peter/Documents/likwid-5.2.0
 
-INCLUDE = -I/home/peter/Documents/eigen -I/opt/intel/oneapi/vtune/latest/include -I/home/peter/Documents/simde -I/home/peter/Documents/embree-3.13.2.x86_64.linux/include/embree3 -I/home/peter/Documents/embree-3.13.2.x86_64.linux/include -I/home/peter/Documents/Catch2/single_include -I/home/peter/Documents/libigl/include -I/usr/include $(VINCLUDE)
+INCLUDE = -I/home/peter/Documents/eigen -I/opt/intel/oneapi/vtune/latest/include -I/home/peter/Documents/simde -I/home/peter/Documents/embree-3.13.2.x86_64.linux/include/embree3 -I/home/peter/Documents/embree-3.13.2.x86_64.linux/include -I/home/peter/Documents/Catch2/single_include -I/home/peter/Documents/libigl/include -I/usr/include -I/opt/intel/oneapi/tbb/latest/include $(VINCLUDE)
 LIBS = -L/home/peter/Documents/embree-3.13.2.x86_64.linux/lib -lgmp -lstdc++ -lm -ldl -ltbb
 LIBNAMES = /opt/intel/oneapi/vtune/latest/sdk/lib64/libittnotify.a /home/peter/Documents/embree-3.13.2.x86_64.linux/lib/libembree3.so.3 /usr/lib/x86_64-linux-gnu/libglfw.so.3.3 $(VLIBNAMES)
 
@@ -93,11 +93,11 @@ endif
 
 .PHONY: cleandebug
 cleandebug:
-	rm -f $(all_obj) Delta2 ./runner/main.o
+	rm -f $(all_obj) ../build/Delta2.debug ./runner/main.o
 	
 .PHONY: cleanrelease
 cleanrelease:
-	rm -f $(release_obj) Delta2 ./runner/main.o.release
+	rm -f $(release_obj) ../build/Delta2 ./runner/main.o.release
 
 .PHONY: cleandep
 cleandep:

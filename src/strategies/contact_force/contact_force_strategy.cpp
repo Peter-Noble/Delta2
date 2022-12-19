@@ -8,7 +8,8 @@ ContactForceStrategy::ContactForceStrategy(FrictionStrategy& friction,
                                            _opt(opt),
                                            _friction(friction) {
     external_force = [](const Delta2::Particle& p) {
-        Eigen::Vector3d f = p.getMass() * Eigen::Vector3d({0, 0, -9.8});
-        return f; 
+        // Eigen::Vector3d f = p.getMass() * Eigen::Vector3d({0, 0, -9.8});
+        // return f; 
+        return Eigen::Vector3d({0, 0, 0});
     };
 }
