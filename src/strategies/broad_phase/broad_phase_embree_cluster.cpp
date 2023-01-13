@@ -48,6 +48,8 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         }
     }
 
+    double target_time = time + cluster.step_size;
+
     __itt_task_begin(domain, __itt_null, __itt_null, step_recursive_task);
 
     double start_step = cluster.step_size;
@@ -159,7 +161,9 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             double new_min_time = 0.0;
             for (Particle* p : cluster.particles) {
                 if (!p->is_static) {
+                    assert(p->current_state.getTime() - p->last_state.getTime() > 1e-6);
                     new_min_time = std::max(new_min_time, common::lerp(p->last_state.getTime(), p->current_state.getTime(), std::pow(0.5, c)));
+                    assert(new_min_time - p->last_state.getTime() > 1e-6);
                 }
             }
 
@@ -178,7 +182,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                         p->current_state = p->current_state.interpolate(p->last_state, new_min_time);
                     }
                     // cluster.min_current_time = std::min(cluster.min_current_time, p->current_state.getTime());
-                    step_size = p->future_state.getTime() - new_min_time;
+                    step_size = p->future_state.getTime() - p->current_state.getTime();
                     assert(step_size > 0.0);
                 }
             }
@@ -253,10 +257,15 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         __itt_task_end(domain);
 
         for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
-            double current_time = cluster.particles[p_i].current_state.getTime();
-            double advanced = cluster.step_size + second_step_size;
-            double difference = current_time + advanced - time;
-            assert(difference < 1e-5);
+            if (!cluster.particles[p_i].is_static) {
+                double current_time = cluster.particles[p_i].current_state.getTime();
+
+                second_step_size = time - current_time - cluster.step_size;
+
+                double advanced = cluster.step_size + second_step_size;
+                double difference = current_time + advanced - time;
+                assert(difference < 1e-5);
+            }
         }
         for (Particle* p : cluster.particles) {
             assert(p->current_state.getTime() + (cluster.step_size + second_step_size) - time < 1e-5);
@@ -299,6 +308,8 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             if (!p->is_static) {
                 cluster.min_current_time = p->current_state.getTime();
                 p->projectFutureState(cluster.step_size);
+
+                assert(std::fabs(p->current_state.getTime() + cluster.step_size - time) < 1e-5);
             }
         }
 
@@ -313,6 +324,20 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             __itt_task_begin(domain, __itt_null, __itt_null, step_rec_after_first_invalid_task);
             stepRecursive(cluster, false, depth + 1);
             __itt_task_end(domain);
+            
+            for (Particle* p : cluster.particles) {
+                if (!p->is_static) {
+                    // Should be back to the same current time
+                    assert(std::fabs(p->current_state.getTime() - time) < 1e-5);
+                }
+            }
+        }
+
+        for (Particle* p : cluster.particles) {
+            if (!p->is_static) {
+                // Should be back to the same current time
+                assert(std::fabs(p->current_state.getTime() - time) < 1e-5);
+            }
         }
 
         std::vector<State> last_state_final;
@@ -330,6 +355,8 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             if (!p->is_static) {
                 cluster.min_current_time = p->current_state.getTime();
                 p->projectFutureState(cluster.step_size);
+
+                assert(std::fabs((p->current_state.getTime() + sub_steps * cluster.step_size) - (time + orig_step_size)) < 1e-5);
             }
         }
 
@@ -341,38 +368,67 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         // }
 
         // double time = std::numeric_limits<double>::infinity();
-        for (Particle* p : cluster.particles) {
-            if (!p->is_static) {
-                // Should be back to the same current time
-                assert(std::fabs(p->current_state.getTime() - time) < 1e-5);
-            }
-        }
 
         __itt_task_begin(domain, __itt_null, __itt_null, step_rec_div_task);
         for (int s = 0; s < sub_steps; s++) {
-            std::vector<collision::Cluster> sub_step_separated_clusters = separateClusterByTimestep(cluster, s * cluster.step_size);
+            // std::vector<collision::Cluster> sub_step_separated_clusters = separateClusterByTimestep(cluster, s * cluster.step_size);
+            std::vector<collision::Cluster> sub_step_separated_clusters = {};
             if (sub_step_separated_clusters.size() > 1) {
                 tbb::task_group sub_step_task_group;
                 printf("Separating sub step clusters into %i\n", sub_step_separated_clusters.size());
 
                 for (int sub_ci = 0; sub_ci < sub_step_separated_clusters.size(); sub_ci++) {
                     sub_step_task_group.run([&, sub_ci] {
+
+                    for (Particle* p : sub_step_separated_clusters[sub_ci].particles) {
+                        if (!p->is_static) {
+                            assert(std::fabs((p->current_state.getTime() + (sub_steps - s) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                        }
+                    }
+
                     __itt_task_begin(domain, __itt_null, __itt_null, step_rec_div_sep_task);
                     stepRecursive(sub_step_separated_clusters[sub_ci], false, depth + 1);
                     __itt_task_end(domain);
+                
+                    for (Particle* p : sub_step_separated_clusters[sub_ci].particles) {
+                        if (!p->is_static) {
+                            assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                        }
+                    }
+
                     });
                 }
 
                 sub_step_task_group.wait();
             }
             else {
+                double target_time_tmp;
+                double t0_tmp;
+                for (Particle* p : cluster.particles) {
+                    if (!p->is_static) {
+                        assert(std::fabs((p->current_state.getTime() + (sub_steps - s) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                        t0_tmp = p->current_state.getTime();
+                        target_time_tmp = t0_tmp + cluster.step_size;
+                    }
+                }
+
                 stepRecursive(cluster, false, depth + 1);
+
+                for (Particle* p : cluster.particles) {
+                    if (!p->is_static) {
+                        assert(std::fabs(p->current_state.getTime() - (t0_tmp + cluster.step_size) < 1e-5));
+                        assert(std::fabs(p->current_state.getTime() - target_time_tmp) < 1e-5);
+                        assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                    }
+                }
             }
 
             for (Particle* p : cluster.particles) {
                 if (!p->is_static) {
                     cluster.min_current_time = p->current_state.getTime();
                     // printf("Step 3 %i, last: %f, current: %f, future: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
+
+                    assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
                 }
             }
         }
@@ -394,7 +450,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                 p->last_time_step_size = std::min(p->last_time_step_size, start_step / 2.0);
             }
         }        
-    }
+    } 
     // else {
     //     printf("Success\n");
     // }
@@ -402,17 +458,21 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     // cluster.step_size = start_step;
 
     // printf("Cluster step size: %f\n", cluster.step_size);
-    time = std::numeric_limits<double>::infinity();
+    double final_time = std::numeric_limits<double>::infinity();
     for (Particle* p : cluster.particles) {
         if (!p->is_static) {
-            if (std::isinf(time)) {
-                time = p->current_state.getTime();
+            assert(std::fabs(p->current_state.getTime() - target_time) < 1e-5);
+
+            if (std::isinf(final_time)) {
+                final_time = p->current_state.getTime();
             }
             else {
-                assert(std::fabs(p->current_state.getTime() - time) < 1e-5);
+                assert(std::fabs(p->current_state.getTime() - final_time) < 1e-5);
             }
         }
     }
+
+    cluster.step_size = orig_step_size;
 
     __itt_task_end(domain);
 }
@@ -473,7 +533,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
         if (cl.min_current_time > min_final_time)
         {
-            printf("%i skipping time step selection because min current time ahead of min final time\n", cluster_i);
+            // printf("%i skipping time step selection because min current time ahead of min final time\n", cluster_i);
             // clusters_tmp.push_back(cl);
             // This cluster can't advance because there is another cluster that is too far behind
             continue;
@@ -488,7 +548,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         }
 
         if (cl.sleeping) {
-            printf("%i skipping time step selection because sleeping cluster\n", cluster_i);
+            // printf("%i skipping time step selection because sleeping cluster\n", cluster_i);
             fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + _opt.time_step_size);
             // clusters_tmp.push_back(cl);
             continue;
@@ -500,7 +560,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
             // This cluster was the same as it was last iteration (and it didn't advance) so just keep the same step size recommendation.
             cl.step_size = it->step_size;
             fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + it->step_size);
-            printf("%i skipping time step selection because time step has already been picked for this cluster since last modification\n", cluster_i);
+            // printf("%i skipping time step selection because time step has already been picked for this cluster since last modification\n", cluster_i);
             // clusters_tmp.push_back(cl);
             continue;
         }
