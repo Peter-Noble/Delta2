@@ -459,7 +459,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             converged = true;
             for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
                 Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
-                if (impulse_diff.norm() > 1e-6) {
+                if (impulse_diff.norm() > 1e-8) {
                     converged = false;
                     break;
                 }
@@ -474,7 +474,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             __itt_task_end(domain);
         }
 
-        // printf("Iterations used: %i\n", it);
+        printf("Iterations used: %i\n", it);
 
         __itt_task_end(domain);
 
@@ -485,7 +485,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             updated_friction_total.push_back({0, 0, 0});
         }
 
-        for (int it = 0; it < 400; it++) {
+        for (int it = 0; it < 800; it++) {
             std::map<std::pair<int, int>, int> contacts_per_pair;
             // printf("===============================\n");
 

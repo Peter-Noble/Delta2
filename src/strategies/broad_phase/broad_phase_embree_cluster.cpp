@@ -62,11 +62,13 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     // }
 
     __itt_task_begin(domain, __itt_null, __itt_null, local_pde_task);
-    if (depth >= 4) {
+    if (depth >= 6) {
         printf("Forced advance\n");
     }   
-    success = _local_pde.step(cluster, depth < 4);
+    success = _local_pde.step(cluster, depth < 6);
     __itt_task_end(domain);
+
+    strategy::ContactDetectionComparison contact_detection;
 
     if (success) {
         for (Particle* p : cluster.particles) {
@@ -101,7 +103,6 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         // Set last_final to the stored current_new and each of the particles last_time_step_size to min(last_time_step_size, step_size_start / 2.0)
         
         __itt_task_begin(domain, __itt_null, __itt_null, roll_back_to_valid_current_state_task);
-        strategy::ContactDetectionComparison contact_detection;
 
         bool failed_at_current = true;
         bool failed_at_last = false;
@@ -163,7 +164,9 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                 if (!p->is_static) {
                     assert(p->current_state.getTime() - p->last_state.getTime() > 1e-6);
                     new_min_time = std::max(new_min_time, common::lerp(p->last_state.getTime(), p->current_state.getTime(), std::pow(0.5, c)));
-                    assert(new_min_time - p->last_state.getTime() > 1e-6);
+                    if (new_min_time - p->last_state.getTime() < 1e-5) {
+                        c = max_c;
+                    }
                 }
             }
 
@@ -280,8 +283,8 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         //     }
         // }
 
-        std::vector<collision::Cluster> after_first_valid_separated_clusters = separateClusterByTimestep(cluster);
-        // std::vector<collision::Cluster> after_first_valid_separated_clusters = {cluster};
+        // std::vector<collision::Cluster> after_first_valid_separated_clusters = separateClusterByTimestep(cluster);
+        std::vector<collision::Cluster> after_first_valid_separated_clusters = {};
 
         if (after_first_valid_separated_clusters.size() > 1) {
             tbb::task_group after_valid_task_group;
@@ -643,7 +646,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
     tbb::task_group step_task_group;
 
-    int num_threads = 6;
+    int num_threads = 16;
     int num_tasks = num_threads * 2;
 
 

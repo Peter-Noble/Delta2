@@ -2,6 +2,7 @@
 
 #include "../../collision_detection/full_tree_comparison.h"
 #include "../../model/forces.h"
+#include "../../strategies/contact_detection/contact_detection_comparison.h"
 
 #include "tbb/task_group.h"
 
@@ -114,6 +115,42 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
         return false;
     }
     
+    strategy::ContactDetectionComparison contact_detection;
+    tbb::task_group task_group_check_last;
+    bool failed_at_last_after_step = false;
+
+
+    for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
+    {
+        task_group_check_last.run([&, b_i] {
+            // __itt_task_begin(domain, __itt_null, __itt_null, compare_individual_pair_last_task);
+            if (!failed_at_last_after_step) {
+                collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
+
+                int a_id = cluster.particles.getLocalID(b.A.first); // geo id
+                int b_id = cluster.particles.getLocalID(b.B.first);
+
+                Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
+                Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
+
+                std::vector<collision::Contact<double>> Cs = collision::compareTreesFull<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], contact_detection);
+
+                for (collision::Contact<double> &c : Cs)
+                {
+                    if ((c.A - c.B).norm() < 1e-4) {
+                        failed_at_last_after_step = true;
+                    }
+                }
+            }
+            // __itt_task_end(domain);
+        });
+    }
+
+    task_group_check_last.wait();
+    if (failed_at_last_after_step) {
+        return false;
+    }
+
     for (Particle* p : cluster.particles)
     {
         assert(p->last_state.getTime() <= p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);

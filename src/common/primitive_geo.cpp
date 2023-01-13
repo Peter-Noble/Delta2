@@ -3,16 +3,16 @@
 
 namespace Delta2 {
     namespace common {
-        void cube(Eigen::Matrix<double, -1, -1>& V, Eigen::MatrixXi& F) {
+        void cube(double r, Eigen::Matrix<double, -1, -1>& V, Eigen::MatrixXi& F) {
             V = Eigen::Matrix<double, -1, -1>({
-                { 1.0,  1.0,  1.0},
-                { 1.0,  1.0, -1.0},
-                { 1.0, -1.0,  1.0},
-                { 1.0, -1.0, -1.0},
-                {-1.0,  1.0,  1.0},
-                {-1.0,  1.0, -1.0},
-                {-1.0, -1.0,  1.0},
-                {-1.0, -1.0, -1.0},
+                { r,  r,  r},
+                { r,  r, -r},
+                { r, -r,  r},
+                { r, -r, -r},
+                {-r,  r,  r},
+                {-r,  r, -r},
+                {-r, -r,  r},
+                {-r, -r, -r},
             });
             F = Eigen::MatrixXi({
                 {0, 2, 1},
