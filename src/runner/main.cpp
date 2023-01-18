@@ -23,6 +23,8 @@
 #include "../strategies/PDE/PDE_explicit.h"
 #include "../strategies/broad_phase/broad_phase_embree_cluster.h"
 
+#include "../scenarios/zero_g_bundle.h"
+
 #include "../globals.h"
 
 using namespace Delta2;
@@ -41,166 +43,27 @@ int main(int argc, char *argv[]) {
         return opt_result;
     }
     
+    strategy::FrictionIterative friction(globals::opt);
+    strategy::SequentialImpulses contact_force(friction, globals::opt);
+    strategy::ContactDetectionContinuousComparison contact_detection_continuous;
+    strategy::TimeStepSelectionDynamicContinuous time_step(contact_detection_continuous, globals::opt);
+    strategy::ContactDetectionComparison contact_detection;
+    strategy::PDEExplicit PDE(contact_detection, contact_force, friction, time_step, globals::opt);
+    strategy::BroadPhaseEmbreeCluster broad_phase(PDE, globals::opt);
+
     std::vector<Delta2::Particle> particles;
-    Eigen::MatrixXd V;
-    Eigen::MatrixXi F;
 
-    // {
-    //     Delta2::common::sphere(1.0, 9, V, F);
+    int scenario = 0;
 
-    //     std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
-    //     {
-    //         auto& p = particles.emplace_back(M, 1.0, 0.4, 0.05);
-    //         p.current_state.setTranslation({0.0, 0.0, 1.03});
-    //         p.current_state.setVelocity({0.0, 0.0, -0.2});
-    //         // p.current_state.setAngular({-10, -5, 0});
-    //     }
-    //     // {
-    //     //     auto& p = particles.emplace_back(M, 1.0, 0.95, 0.05);
-    //     //     p.current_state.setTranslation({3.0, 6.0, 1.1});
-    //     //     p.current_state.setVelocity({0.0, -3.0, 0.0});
-    //     // }
-    // }
-
-    const int max_x = 8;
-    const double spacing_x = 8.0;
-    const int max_y = 8;
-    const double spacing_y = 40.0;
-    const int max_i = 10;
-    const int tilt_offset = 4;
-
-    // {
-    //     Delta2::common::plane(std::max(10.0, std::max(max_x * spacing_x, max_y * spacing_y)), V, F);
-    //     std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, globals::opt, true));
-    //     auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-    //     p.is_static = true;
-    // }
-
-    Delta2::common::cube(1.0, V, F);
-    std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, globals::opt));
-
-    Delta2::common::cube(0.5, V, F);
-    std::shared_ptr<Delta2::MeshData> M1(new Delta2::MeshData(V, F, globals::opt));
-
-    Delta2::common::sphere(4, 6, V, F);
-    std::shared_ptr<Delta2::MeshData> M2(new Delta2::MeshData(V, F, globals::opt));
-
-    const double start_offset = 10;
-    const double offset = 8;
-    const int line = 10;
-    const double vel_mult = 10;
-
-    Eigen::Vector3d normal = {0, 1, 0};
-    normal.normalize();
-
-    for (int x = 0; x < line; x++) {
-        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-        p.current_state.setTranslation((10 + start_offset + x * offset) * normal + Eigen::Vector3d({0, 0, -10}));
-        p.current_state.setVelocity(-normal * vel_mult);
+    switch (scenario) {
+    case 0:
+        {
+            Scenarios::zero_g_bundle(particles, contact_force);
+            break;
+        }
+    default:
+        throw std::runtime_error("No scenario given");
     }
-
-    normal = {-1, 0, 0};
-    normal.normalize();
-
-    for (int x = 0; x < line; x++) {
-        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-        p.current_state.setTranslation(((start_offset + 2.0) + x * offset) * normal + Eigen::Vector3d({-10, -10, -10}));
-        p.current_state.setVelocity(-normal * vel_mult * 1.5);
-    }
-    
-    normal = {0, 1, 1};
-    normal.normalize();
-
-    for (int x = 0; x < line; x++) {
-        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-        p.current_state.setTranslation((1.0 + start_offset + x * offset) * normal);
-        p.current_state.setVelocity(-normal * vel_mult);
-    }
-    
-    normal = {0, -1, 1};
-    normal.normalize();
-
-    for (int x = 0; x < line; x++) {
-        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-        p.current_state.setTranslation((2.0 + start_offset + x * offset) * normal);
-        p.current_state.setVelocity(-normal * vel_mult);
-    }
-
-    normal = {0, -1, 1};
-    normal.normalize();
-
-    for (int x = 0; x < line; x++) {
-        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-        p.current_state.setTranslation((10.0 + start_offset + x * offset) * normal + Eigen::Vector3d({15, 0, 0}));
-        p.current_state.setVelocity(-normal * vel_mult * 0.75);
-    }
-
-    normal = {-1, -1, -1};
-    normal.normalize();
-
-    for (int x = 0; x < line; x++) {
-        auto& p = particles.emplace_back(M2, 1.0, 10.0, 0.25);
-        p.current_state.setTranslation((10.0 + start_offset + x * offset * 2.5) * normal + Eigen::Vector3d({10, 0, 0}));
-        p.current_state.setVelocity(-normal * vel_mult * 0.6);
-    }
-
-    normal = {1, 1, 1};
-    normal.normalize();
-
-    for (int i = -2; i <= 2; i++) {
-        for (int j = -2; j <= 2; j++) {
-            for (int x = 0; x < line * 2; x++) {
-                auto& p = particles.emplace_back(M1, 1.0, 10.0, 0.25);
-                p.current_state.setTranslation((4.0 + start_offset + x * offset) * normal + Eigen::Vector3d({6, i * 2, j * 2}));
-                p.current_state.setVelocity(-normal * vel_mult * 2.0);
-            }
-        }   
-    }
-
-    normal = {1, 0, 1};
-    normal.normalize();
-
-    for (int x = 0; x < line; x++) {
-        auto& p = particles.emplace_back(M1, 1.0, 10.0, 0.25);
-        p.current_state.setTranslation((5.0 + start_offset + x * offset) * normal + Eigen::Vector3d({10, 0, 0}));
-        p.current_state.setVelocity(-normal * vel_mult * 2.0);
-    }
-    
-    normal = {0.5, 1, 0};
-    normal.normalize();
-
-    for (int x = 0; x < line; x++) {
-        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-        p.current_state.setTranslation((3.0 + start_offset + x * offset) * normal);
-        p.current_state.setVelocity(-normal * vel_mult);
-    }
-    
-    normal = {0, 1, -1};
-    normal.normalize();
-
-    for (int x = 0; x < line; x++) {
-        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-        p.current_state.setTranslation((4.0 + start_offset + x * offset) * normal);
-        p.current_state.setVelocity(-normal * vel_mult);
-    }
-    
-    normal = {1, 0, 0};
-    normal.normalize();
-
-    for (int x = 0; x < line; x++) {
-        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-        p.current_state.setTranslation((5.0 + start_offset + x * offset) * normal);
-        p.current_state.setVelocity(-normal * vel_mult);
-    }
-
-    // for (int y = 0; y < max_y; y++) {
-    //     for (int x = 0; x < max_x; x++) {
-    //         for (int i = 0; i < max_i; i++) {
-    //             auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-    //             p.current_state.setTranslation({-(max_x / 2 * spacing_x) + x * spacing_x, -(max_y / 2 * spacing_y) + y * spacing_y + i * (x + tilt_offset) * 0.2, 1.1 + i * 2.06});
-    //         }
-    //     }
-    // }
 
     model::ParticleHandler ph(particles);
 
@@ -212,14 +75,6 @@ int main(int argc, char *argv[]) {
         view.recordFrame(empty);
         gui = std::thread(guiThread, &view);
     }
-
-    strategy::ContactDetectionContinuousComparison contact_detection_continuous;
-    strategy::TimeStepSelectionDynamicContinuous time_step(contact_detection_continuous, globals::opt);
-    strategy::ContactDetectionComparison contact_detection;
-    strategy::FrictionIterative friction(globals::opt);
-    strategy::SequentialImpulses contact_force(friction, globals::opt);
-    strategy::PDEExplicit PDE(contact_detection, contact_force, friction, time_step, globals::opt);
-    strategy::BroadPhaseEmbreeCluster broad_phase(PDE, globals::opt);
 
     // PDE.printType();
 
