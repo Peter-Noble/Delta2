@@ -174,7 +174,12 @@ void AnimationViewer::show() {
                 assert(p_i < _states[_frame].size());
                 switch (_states[_frame][p_i]) {
                     case ParticleState::Active:
-                        use_colour = group_colours[_groups[_frame][p_i] % group_colours.size()];
+                        if (_groups[_frame][p_i] < 0) {
+                            use_colour = {0.1, 0.1, 0.1};
+                        }
+                        else {
+                            use_colour = group_colours[_groups[_frame][p_i] % group_colours.size()];
+                        }
                         break;
                     case ParticleState::Sleeping:
                         use_colour = {0.5, 0.4, 0.1};

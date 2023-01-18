@@ -505,9 +505,20 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
 
 
     for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++) {
+        int cluster_id = -1;
         for (Particle* p : clusters[cluster_i].particles) {
             if (!p->is_static) {
-                p->cluster_id = cluster_i;
+                if (cluster_id == -1) {
+                    cluster_id = p->id;
+                }
+                else {
+                    cluster_id = std::min(p->id, cluster_id);
+                }
+            }
+        }
+        for (Particle* p : clusters[cluster_i].particles) {
+            if (!p->is_static) {
+                p->cluster_id = cluster_id;
             }
         }
     }
