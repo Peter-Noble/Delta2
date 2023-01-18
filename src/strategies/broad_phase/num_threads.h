@@ -1,3 +1,3 @@
 #pragma once
 
-int num_threads = 16;
+int num_threads = 8;

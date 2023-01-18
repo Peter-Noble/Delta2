@@ -24,8 +24,11 @@
 #include "../strategies/broad_phase/broad_phase_embree_cluster.h"
 
 #include "../scenarios/zero_g_bundle.h"
+#include "../scenarios/towers.h"
 
 #include "../globals.h"
+
+#include "tbb/tbb.h"
 
 using namespace Delta2;
 
@@ -38,6 +41,8 @@ void guiThread(common::AnimationViewer* view) {
 }
 
 int main(int argc, char *argv[]) {
+    // tbb::global_control(tbb::global_control::max_allowed_parallelism, 8);  Doesn't do anything?
+
     int opt_result = globals::opt.fromArgs(argc, argv);
     if (opt_result > 0) {
         return opt_result;
@@ -55,10 +60,15 @@ int main(int argc, char *argv[]) {
 
     int scenario = 0;
 
-    switch (scenario) {
+    switch (globals::opt.scenario) {
     case 0:
         {
-            Scenarios::zero_g_bundle(particles, contact_force);
+            scenarios::zero_g_bundle(particles, contact_force);
+            break;
+        }
+    case 1:
+        {
+            scenarios::towers(particles, contact_force);
             break;
         }
     default:

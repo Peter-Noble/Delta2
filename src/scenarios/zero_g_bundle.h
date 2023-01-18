@@ -6,7 +6,7 @@
 #include "../model/particle.h"
 
 namespace Delta2 {
-    namespace Scenarios {
+    namespace scenarios {
         void zero_g_bundle(std::vector<Delta2::Particle>& particles, strategy::ContactForceStrategy& force_strategy) {
             force_strategy.external_force = [](const Delta2::Particle& p) {
                 return Eigen::Vector3d({0, 0, 0});
