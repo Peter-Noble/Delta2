@@ -20,7 +20,15 @@ BroadPhaseEmbreeCluster::BroadPhaseEmbreeCluster(PDEStrategy& local_pde, common:
 }
 
 void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster, bool first_call, int depth) {
-    printf("Step size: %f, %s\n", cluster.step_size, first_call ? "First" : "Following");
+    int cluster_id = -1;
+    for (Particle* p : cluster.particles) {
+        if (!p->is_static) {
+            cluster_id = p->cluster_id;
+            break;
+        }
+    }
+
+    printf("%i: Step size: %f, %s\n", cluster_id, cluster.step_size, first_call ? "First" : "Following");
     assert(cluster.step_size > 0.0);
     __itt_domain* domain = __itt_domain_create("My Domain");
     __itt_string_handle* step_recursive_task = __itt_string_handle_create("Step recursive task");
@@ -62,10 +70,11 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     // }
 
     __itt_task_begin(domain, __itt_null, __itt_null, local_pde_task);
-    if (depth >= 6) {
-        printf("Forced advance\n");
+    const int max_recursive_step_depth = 8;
+    if (depth >= max_recursive_step_depth) {
+        printf("%i: Forced advance\n", cluster_id);
     }   
-    success = _local_pde.step(cluster, depth < 6);
+    success = _local_pde.step(cluster, depth < max_recursive_step_depth);
     __itt_task_end(domain);
 
     strategy::ContactDetectionComparison contact_detection;
@@ -92,7 +101,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     //     }
     // }
     if (!success) {
-        printf("Fail\n");
+        printf("%i: Fail\n", cluster_id);
         // Interpolate current_new back to 50% between last_start and current_start
         // Set future_new to current_start
         // Step forward from there to the current_start (recursive call)
@@ -146,12 +155,15 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             tmp_orig_times.push_back(p->current_state.getTime());
         }
 
+        bool rolling_back = false;
+        bool rolling_back_to_start = false;
+
         int c = 0;
         const int max_c = 4;
         while (failed_at_current) {
             c++;
             if (c > max_c) {
-                printf("Can't find valid last state\n");
+                printf("%i: Can't find valid last state\n", cluster_id);
                 // #ifndef NDEBUG
                 // throw std::runtime_error("Can't find valid last state");
                 // #endif
@@ -179,10 +191,12 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                     p->future_state = p->current_state;
                     if (c == max_c) {
                         p->current_state = p->last_state;
-                        printf("Rolling back to last\n");
+                        rolling_back = true;
+                        rolling_back_to_start = true;
                     }
                     else {
                         p->current_state = p->current_state.interpolate(p->last_state, new_min_time);
+                        rolling_back = true;
                     }
                     // cluster.min_current_time = std::min(cluster.min_current_time, p->current_state.getTime());
                     step_size = p->future_state.getTime() - p->current_state.getTime();
@@ -258,6 +272,13 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             }
         }
         __itt_task_end(domain);
+
+        if (rolling_back && !rolling_back_to_start) {
+            printf("%i: Rolling back. Cluster of %i\n", cluster_id, cluster.particles.size());
+        }
+        if (rolling_back_to_start) {
+            printf("%i: Rolling back to last. Cluster of %i\n", cluster_id, cluster.particles.size());
+        }
 
         for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
             if (!cluster.particles[p_i].is_static) {
@@ -378,7 +399,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             std::vector<collision::Cluster> sub_step_separated_clusters = {};
             if (sub_step_separated_clusters.size() > 1) {
                 tbb::task_group sub_step_task_group;
-                printf("Separating sub step clusters into %i\n", sub_step_separated_clusters.size());
+                printf("%i: Separating sub step clusters into %i\n", cluster_id, sub_step_separated_clusters.size());
 
                 for (int sub_ci = 0; sub_ci < sub_step_separated_clusters.size(); sub_ci++) {
                     sub_step_task_group.run([&, sub_ci] {
@@ -571,7 +592,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         task_group.run([&, cluster_i] {  // TODO this causes segfaults when used with cluster separation for some reason
             __itt_task_begin(domain, __itt_null, __itt_null, select_time_step_task);
             double step = _local_pde.selectTimeStep(clusters[cluster_i]);
-            std::vector<collision::Cluster> sub_clusters = collision::separateClusterByTimestep(clusters[cluster_i]);
+            // std::vector<collision::Cluster> sub_clusters = collision::separateClusterByTimestep(clusters[cluster_i]);
             // std::vector<collision::Cluster> sub_clusters = {clusters[cluster_i]};
 
             __itt_task_end(domain);
@@ -580,26 +601,26 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
                 fine_min_final_time = std::min(fine_min_final_time, clusters[cluster_i].min_current_time + step);
 
 
-                if (sub_clusters.size() > 1) {
-                    int up_to_cluster = clusters.size();
-                    for (int sub_i = 0; sub_i < sub_clusters.size(); sub_i++) {
-                        collision::Cluster sub_cl = sub_clusters[sub_i];
-                        for (Particle* p : sub_cl.particles) {
-                            p->cluster_id = up_to_cluster + sub_i;
-                        }
-                        // if (sub_i == 0) {
-                        //     clusters[cluster_i] = sub_cl;
-                        // }
-                        // else {
-                        //     clusters.push_back(sub_cl);
-                        // }
-                        // clusters_tmp.push_back(sub_cl);
-                    }
+                // if (sub_clusters.size() > 1) {
+                //     int up_to_cluster = clusters.size();
+                //     for (int sub_i = 0; sub_i < sub_clusters.size(); sub_i++) {
+                //         collision::Cluster sub_cl = sub_clusters[sub_i];
+                //         for (Particle* p : sub_cl.particles) {
+                //             p->cluster_id = up_to_cluster + sub_i;
+                //         }
+                //         // if (sub_i == 0) {
+                //         //     clusters[cluster_i] = sub_cl;
+                //         // }
+                //         // else {
+                //         //     clusters.push_back(sub_cl);
+                //         // }
+                //         // clusters_tmp.push_back(sub_cl);
+                //     }
 
-                    printf("Selected time: %f for cluster %i\n", step, cluster_i);
+                //     printf("Selected time: %f for cluster %i\n", step, cluster_i);
 
-                    printf("Splitting into %i\n", sub_clusters.size());
-                }
+                //     printf("Splitting into %i\n", sub_clusters.size());
+                // }
             }
         });
     }
@@ -646,7 +667,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
     tbb::task_group step_task_group;
 
-    int num_threads = 16;
+    int num_threads = 4;
     int num_tasks = num_threads * 2;
 
 

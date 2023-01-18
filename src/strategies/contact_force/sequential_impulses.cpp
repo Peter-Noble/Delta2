@@ -135,6 +135,14 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
     __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_solve_task);
 
+    int cluster_id = -1;
+    for (Particle* p : cluster.particles) {
+        if (!p->is_static) {
+            cluster_id = p->cluster_id;
+            break;
+        }
+    }
+
     std::vector<LocalContact> contacts;
 
     std::sort(hits.begin(), hits.end());
@@ -474,7 +482,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             __itt_task_end(domain);
         }
 
-        printf("Iterations used: %i\n", it);
+        printf("%i: Iterations used: %i\n", cluster_id, it);
 
         __itt_task_end(domain);
 
@@ -485,7 +493,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             updated_friction_total.push_back({0, 0, 0});
         }
 
-        for (int it = 0; it < 800; it++) {
+        for (int it = 0; it < 400; it++) {
             std::map<std::pair<int, int>, int> contacts_per_pair;
             // printf("===============================\n");
 
@@ -616,6 +624,211 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
         }
 
         __itt_task_end(domain);
+
+
+
+
+
+        it = 0;
+        converged = false;
+        __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_impulses_task);
+        while (!converged && it < max_iterations) {
+            if (it < max_iterations - 1) {
+                __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_iteration_task);
+            }
+            else {
+                __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_last_iteration_task);
+            }
+            std::vector<Eigen::Vector3d> last_impulse;
+            for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
+                last_impulse.push_back(impulses[p_i]);
+            }
+            
+            #ifndef USETBB
+            {
+                    for (int c = 0; c < hits.size(); c++) {
+            #else
+            // tbb::parallel_for(tbb::blocked_range<int>(0, hits.size(), grain_size),
+            //     [&](const tbb::blocked_range<int>& r) {
+            //         for (int inner_i = 0; inner_i < inner_iterations; inner_i++) {
+            //         for (int c = r.begin(); c < r.end(); c++) {
+            tbb::task_group task_group;
+            task_group.run([&] {
+                for (int inner_i = 0; inner_i < inner_iterations; inner_i++) {
+                    for (int c = 0; c < hits.size(); c++) {
+
+            #endif
+                        uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
+                        uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
+
+                        uint32_t lower_id = std::min(a_id, b_id);
+                        uint32_t upper_id = std::max(a_id, b_id);
+
+                        Eigen::Matrix4d a_FState_transformation;
+                        Eigen::Matrix4d b_FState_transformation;
+                        Eigen::Matrix3d a_inverse_inertia_matrix;
+                        Eigen::Matrix3d b_inverse_inertia_matrix;
+                        Eigen::Vector3d a_FState_translation;
+                        Eigen::Vector3d b_FState_translation;
+                        
+                        {
+                            // #ifdef USETBB
+                            // // particle_access_lock.lock();
+                            // mxs[lower_id]->lock();
+                            // mxs[upper_id]->lock();
+                            // #endif
+
+                            a_FState_transformation = FStates[a_id].getTransformation();
+                            b_FState_transformation = FStates[b_id].getTransformation();
+                            a_inverse_inertia_matrix = hits[c].p_a->getInverseInertiaMatrix();
+                            b_inverse_inertia_matrix = hits[c].p_b->getInverseInertiaMatrix();
+                            a_FState_translation = FStates[a_id].getTranslation();
+                            b_FState_translation = FStates[b_id].getTranslation();
+
+                            // #ifdef USETBB
+                            // mxs[lower_id]->unlock();
+                            // mxs[upper_id]->unlock();
+                            // // particle_access_lock.unlock();
+                            // #endif
+                        }
+
+                        Eigen::Vector3d n = contacts[c].global_normal.normalized();
+
+                        const double outer_search = hits[c].eps_a + hits[c].eps_b;
+                        const double outer = outer_search * 0.25 ;
+
+                        Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, a_FState_transformation);
+                        Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, b_FState_transformation);
+                        const double d1 = p1_B.dot(n) - p1_A.dot(n);
+
+                        Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, a_inverse_inertia_matrix);
+                        Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, b_inverse_inertia_matrix);
+                        const double v1 = v1_A.dot(n) - v1_B.dot(n);
+
+                        const double m = contacts[c].mass_eff_normal;
+
+                        // ======== CANCEL RELATIVE VELOCITY ALONG NORMAL ========
+
+                        const double delta_damp = common::lerp(0.5, 0.1, (double)it/(double)max_iterations);
+                        // v1 = im / m to cancel velocity
+                        const double delta_impulse_mag = d1 < outer ? v1 * m * delta_damp : -contacts[c].impulse;
+
+                        double last_impulse_mag = contacts[c].impulse;
+                        contacts[c].impulse = std::max(contacts[c].impulse + delta_impulse_mag, 0.0);
+                        const double update_impulse_mag = contacts[c].impulse - last_impulse_mag;
+
+                        Eigen::Vector3d update_impulse = -n * update_impulse_mag;
+
+
+                        Eigen::Vector3d update_rotational_impulse_A = model::calcTorque(update_impulse, p1_A, a_FState_translation);
+                        Eigen::Vector3d update_rotational_impulse_B = model::calcTorque(Eigen::Vector3d(-update_impulse), p1_B, b_FState_translation);
+
+                        // ========  OFFSET ALONG NORMAL ========
+
+                        const double lower_slop = std::max(outer * 0.25, outer - contacts[c].start_dist);
+                        const double slop = common::lerp(lower_slop, outer * 0.25, 0.3);
+                        const double penetration_depth = outer - d1;
+
+                        // d1 = i/m * t offset distance with impulse.  m * d1 / t = i
+                        const double delta_impulse_offset_mag = d1 < outer ? delta_damp * m * std::max(0.0, penetration_depth - slop) / t : -contacts[c].impulse_offset;
+
+                        double last_impulse_offset_mag = contacts[c].impulse_offset;
+                        contacts[c].impulse_offset = std::max(contacts[c].impulse_offset + delta_impulse_offset_mag, 0.0);
+                        const double update_impulse_offset_mag = contacts[c].impulse_offset - last_impulse_offset_mag;
+
+                        Eigen::Vector3d update_impulse_offset = -n * update_impulse_offset_mag;
+
+                        Eigen::Vector3d update_rotational_impulse_offset_A = model::calcTorque(update_impulse_offset, p1_A, a_FState_translation);
+                        Eigen::Vector3d update_rotational_impulse_offset_B = model::calcTorque(Eigen::Vector3d(-update_impulse_offset), p1_B, b_FState_translation);
+
+                        {
+                            // ======== INTEGRATE ========
+
+                            Eigen::Vector3d impulse_a;
+                            Eigen::Vector3d rotational_impulse_a;
+                            Eigen::Vector3d impulse_offset_a;
+                            Eigen::Vector3d rotational_impulse_offset_a;
+                            Eigen::Vector3d impulse_b;
+                            Eigen::Vector3d rotational_impulse_b;
+                            Eigen::Vector3d impulse_offset_b;
+                            Eigen::Vector3d rotational_impulse_offset_b;
+
+                            if (!cluster.particles[a_id].is_static)
+                            {
+                                // #ifdef USETBB
+                                // mxs[a_id]->lock();
+                                // #endif
+
+                                impulses[a_id] += update_impulse;
+                                rotational_impulses[a_id] += update_rotational_impulse_A;
+                                impulse_offsets[a_id] += update_impulse_offset;
+                                rotational_impulse_offsets[a_id] += update_rotational_impulse_offset_A;
+
+                                Eigen::Vector3d impulse_a = impulses[a_id];
+                                Eigen::Vector3d rotational_impulse_a = rotational_impulses[a_id];
+                                Eigen::Vector3d impulse_offset_a = impulse_offsets[a_id];
+                                Eigen::Vector3d rotational_impulse_offset_a = rotational_impulse_offsets[a_id];
+
+                                FStates[a_id] = updateState(cluster.particles[a_id].future_state, t, impulse_a, impulse_offset_a, rotational_impulse_a, rotational_impulse_offset_a, &cluster.particles[a_id]);
+                                
+                                // #ifdef USETBB
+                                // mxs[a_id]->unlock();
+                                // #endif
+                            }
+                            if (!cluster.particles[b_id].is_static)
+                            {
+                                // #ifdef USETBB
+                                // mxs[b_id]->lock();
+                                // #endif
+
+                                impulses[b_id] -= update_impulse;
+                                rotational_impulses[b_id] += update_rotational_impulse_B;
+                                impulse_offsets[b_id] -= update_impulse_offset;
+                                rotational_impulse_offsets[b_id] += update_rotational_impulse_offset_B;
+
+                                Eigen::Vector3d impulse_b = impulses[b_id];
+                                Eigen::Vector3d rotational_impulse_b = rotational_impulses[b_id];
+                                Eigen::Vector3d impulse_offset_b = impulse_offsets[b_id];
+                                Eigen::Vector3d rotational_impulse_offset_b = rotational_impulse_offsets[b_id];
+
+                                FStates[b_id] = updateState(cluster.particles[b_id].future_state, t, impulse_b, impulse_offset_b, rotational_impulse_b, rotational_impulse_offset_b, &cluster.particles[b_id]);
+                                
+                                // #ifdef USETBB
+                                // mxs[b_id]->unlock();
+                                // #endif
+                            }
+                        }
+                    }
+                }
+            #ifdef USETBB
+                }
+            );
+            task_group.wait();
+            #endif
+
+            converged = true;
+            for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
+                Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
+                if (impulse_diff.norm() > 1e-8) {
+                    converged = false;
+                    break;
+                }
+            }
+            for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
+                Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
+                // printf("impulse: %f, %f, %f\n", impulses[p_i].x(), impulses[p_i].y(), impulses[p_i].z());
+                // printf("impulse diff: %f, %f, %f\n", impulse_diff.x(), impulse_diff.y(), impulse_diff.z());
+            }
+
+            it++;
+            __itt_task_end(domain);
+        }
+
+        printf("%i: Iterations used 2nd phase: %i\n", cluster_id, it);
+
+
+
+
 
         {
             std::lock_guard draws_lock(globals::contact_draws_lock);

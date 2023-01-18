@@ -503,6 +503,15 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
         // }
     }
 
+
+    for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++) {
+        for (Particle* p : clusters[cluster_i].particles) {
+            if (!p->is_static) {
+                p->cluster_id = cluster_i;
+            }
+        }
+    }
+
     // printf("%i total clusters\n", clusters.size());
     return clusters;
 }
