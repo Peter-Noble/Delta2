@@ -56,3 +56,5 @@ AdvisorFromHamilton/
 
 bf_results/variable_s1_bf/
 .env
+
+src/strategies/broad_phase/num_threads.h
