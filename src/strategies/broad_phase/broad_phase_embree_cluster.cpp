@@ -7,6 +7,8 @@
 #include "../../common/viewer.h"
 #include "../../strategies/contact_detection/contact_detection_comparison.h"
 
+#include "num_threads.h"
+
 #include <ittnotify.h>
 // #include "tbb/task_group.h"
 #include "tbb/tbb.h"
@@ -667,7 +669,6 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
     tbb::task_group step_task_group;
 
-    int num_threads = 4;
     int num_tasks = num_threads * 2;
 
 
