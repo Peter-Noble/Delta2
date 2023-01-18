@@ -849,6 +849,18 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
     #endif
 
     for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
+        assert(!impulses[p_i].hasNaN());
+        assert(impulses[p_i].norm() < 10000);
+        if (impulses[p_i].norm() > 10000) {
+            printf("Really big impulse\n");
+        }
+        if (impulses[p_i].hasNaN()) {
+            printf("Nan!\n");
+            return false;
+        }
+    }
+
+    for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
         cluster.particles[p_i].future_state = FStates[p_i];
     }
 
