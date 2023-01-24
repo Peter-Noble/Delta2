@@ -35,13 +35,20 @@ using namespace Delta2;
 std::mutex globals::contact_draws_lock;
 std::vector<std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d>> globals::contact_draws;
 Delta2::common::Options globals::opt;
+Delta2::common::IttHandles globals::itt_handles;
+Delta2::common::Logger globals::logger;
 
 void guiThread(common::AnimationViewer* view) {
     view->show();
-}
+}   
 
 int main(int argc, char *argv[]) {
-    // tbb::global_control(tbb::global_control::max_allowed_parallelism, 8);  Doesn't do anything?
+    globals::logger.printf("Main\n");
+    globals::itt_handles.disable_detailed_domain();
+
+    if (globals::opt.threads > 0) {
+        tbb::global_control global_limit(tbb::global_control::max_allowed_parallelism, globals::opt.threads);  // TODO Does this do something?
+    }
 
     int opt_result = globals::opt.fromArgs(argc, argv);
     if (opt_result > 0) {
@@ -93,7 +100,7 @@ int main(int argc, char *argv[]) {
     bool cont = globals::opt.final_time > 0.0 || (globals::opt.final_time < 0.0 && globals::opt.num_time_steps > 0);
     int step = 0;
     while (cont) {
-        printf("Step: %i\n", step);
+        globals::logger.printf("Step: %i\n", step);
         // std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> view_draws;
         {
             std::lock_guard draws_lock(globals::contact_draws_lock);
@@ -124,7 +131,7 @@ int main(int argc, char *argv[]) {
         
     }
 
-    printf("================ Done ================\n");
+    globals::logger.printf("================ Done ================\n");
 
     if (globals::opt.gui) {
         gui.join();

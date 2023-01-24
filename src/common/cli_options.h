@@ -23,6 +23,7 @@ namespace Delta2 {
 			bool print_tree;
 			bool print_debug;
 			bool gui;
+			int threads;
 
 			int sequential_impulse_total_iterations;
 			int sequential_impulse_inner_iterations;
@@ -48,6 +49,7 @@ namespace Delta2 {
 				print_tree = false;
 				print_debug = false;
 				gui = false;
+				threads = -1;
 
 				sequential_impulse_total_iterations = 1000;
 				sequential_impulse_inner_iterations = 20;
@@ -93,6 +95,7 @@ namespace Delta2 {
 				else {
 					printf("GUI:                   false\n");
 				}
+				printf("Threads:               %i\n", threads);
 				printf("======== Time stepping ========\n");
 				printf("Num steps:             %i\n", num_time_steps);
 				printf("Final time:            %f\n", final_time);
@@ -146,6 +149,7 @@ namespace Delta2 {
 				app.add_option("--mesh_metrics", mesh_metric, "Takes a path to a mesh and computes some metrics about it");
 				app.add_option("--geo_eps", geo_eps, "Geometry eps");
 				app.add_flag("-g,--gui", gui, "Toggle GUI on");
+				app.add_option("--threads", threads, "Maximum threads");
 
 				app.add_option("-c,--cluster_sep_factor", cluster_separation_factor, "Multiply the min time-of-contact by this factor before separating clusters");
 

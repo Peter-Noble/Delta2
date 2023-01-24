@@ -2,7 +2,7 @@ CC = clang-12
 
 # Excluded: $(wildcard ./timestepping/*.cpp)
 strategy_src = $(wildcard ./strategies/broad_phase/*.cpp) $(wildcard ./strategies/contact_detection/*.cpp) $(wildcard ./strategies/contact_detection_continuous/*.cpp) $(wildcard ./strategies/contact_force/*.cpp) $(wildcard ./strategies/friction/*.cpp) $(wildcard ./strategies/PDE/*.cpp) $(wildcard ./strategies/time_step_size/*.cpp)
-all_src = $(wildcard *.cpp) $(wildcard ./model/*.cpp) $(wildcard ./common/*.cpp) $(wildcard ./collision_detection/*.cpp) $(shell ls ./embree_common/**/*.cpp | grep -v "cmake" | grep -v "taskschedulerppl" | grep -v "taskschedulertbb") $(wildcard ./quickhull/*.cpp) $(wildcard ./quickhull/Structs/*.cpp) $(strategy_src)
+all_src = $(wildcard *.cpp) $(wildcard ./model/*.cpp) $(wildcard ./common/*.cpp) $(wildcard ./collision_detection/*.cpp) $(shell ls ./embree_common/**/*.cpp | grep -v "cmake" | grep -v "taskschedulerppl" | grep -v "taskschedulerinternal") $(wildcard ./quickhull/*.cpp) $(wildcard ./quickhull/Structs/*.cpp) $(strategy_src)
 test_src = $(wildcard test_*.cpp) $(wildcard ./model/test_*.cpp) $(wildcard ./common/test_*.cpp) $(wildcard ./collision_detection/test_*.cpp)
 src = $(filter-out $(test_src), $(all_src))
 clean_src = $(all_src) runner/main.cpp runner/unit_test_runner.cpp
@@ -30,7 +30,7 @@ endif
 
 CFLAGS = -std=c++17 -DCGAL_DISABLE_ROUNDING_MATH_CHECK $(VCFLAGS)
 FLAGS = -march=native -g $(VFLAGS)
-DEFINES = -DTASKING_INTERNAL
+DEFINES = -DTASKING_TBB
 
 #  -fsanitize=memory -fno-optimize-sibling-calls
 

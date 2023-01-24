@@ -6,6 +6,8 @@
 
 #include "tbb/task_group.h"
 
+#include "../../globals.h"
+
 #include <mutex>
 
 using namespace Delta2;
@@ -31,9 +33,16 @@ double PDEExplicit::selectTimeStep(collision::Cluster& cluster) {
 }
 
 bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
-    __itt_domain* domain = __itt_domain_create("My Domain");
     __itt_string_handle* compare_individual_pair_task = __itt_string_handle_create("Compare individual pair");
     
+    int cluster_id = -1;
+    for (Particle* p : cluster.particles) {
+        if (!p->is_static) {
+            cluster_id = p->cluster_id;
+            break;
+        }
+    }
+
     std::vector<Eigen::Vector3d> forces;
     std::vector<Eigen::Vector3d> torques;
     std::vector<int> counts;
@@ -77,6 +86,8 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
 
     tbb::task_group task_group;
 
+    bool failed_before_force_solve = false;
+
     // #pragma omp parallel
     // {
     //     #pragma omp single
@@ -85,24 +96,34 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
     for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
     {
         task_group.run([&, b_i] {
-            __itt_task_begin(domain, __itt_null, __itt_null, compare_individual_pair_task);
-            collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
+            if (!failed_before_force_solve) {
+                __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_task);
+                collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
 
-            int a_id = cluster.particles.getLocalID(b.A.first); // geo id
-            int b_id = cluster.particles.getLocalID(b.B.first);
+                int a_id = cluster.particles.getLocalID(b.A.first); // geo id
+                int b_id = cluster.particles.getLocalID(b.B.first);
 
-            Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
-            Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
+                Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
+                Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
 
-            std::vector<collision::Contact<double>> Cs = collision::compareTreesFull<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], _contact_detection);
-            std::vector<collision::Contact<double>> filtered = collision::filterContacts<double>(Cs, 0.0);
+                std::vector<collision::Contact<double>> Cs = collision::compareTreesFull<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], _contact_detection);
+                std::vector<collision::Contact<double>> filtered = collision::filterContacts<double>(Cs, 0.0);
 
-            std::lock_guard<std::mutex> guard(lock);
-            for (collision::Contact<double> &c : filtered)
-            {
-                hits.push_back(c);
+                for (collision::Contact<double> &c : Cs)
+                {
+                    if ((c.A - c.B).norm() < 1e-4) {
+                        failed_before_force_solve = true;
+                    }
+                }
+                
+                std::lock_guard<std::mutex> guard(lock);
+                for (collision::Contact<double> &c : filtered)
+                {
+                    hits.push_back(c);
+                }
+
+                __itt_task_end(globals::itt_handles.detailed_domain);
             }
-            __itt_task_end(domain);
         });
     }
     //     }
@@ -110,6 +131,14 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
 
     task_group.wait();
     
+    if (failed_before_force_solve) {
+        if (cluster.step_size < 1e-8) {
+            throw std::runtime_error(std::to_string(cluster_id) + std::string(": Failed before contact solve on tiny timestep"));
+        }
+        printf("%i: Failed before contact solve\n", cluster_id);
+        return false;
+    }
+
     bool success = _contact_force.solve(cluster, hits, allow_fail);
     if (!success) {
         return false;
@@ -123,7 +152,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
     for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
     {
         task_group_check_last.run([&, b_i] {
-            // __itt_task_begin(domain, __itt_null, __itt_null, compare_individual_pair_last_task);
+            // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_last_task);
             if (!failed_at_last_after_step) {
                 collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
 
@@ -142,12 +171,15 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
                     }
                 }
             }
-            // __itt_task_end(domain);
+            // __itt_task_end(globals::itt_handles.detailed_domain);
         });
     }
 
     task_group_check_last.wait();
     if (failed_at_last_after_step) {
+        if (cluster.step_size < 1e-6) {
+            throw std::runtime_error("Failed after contact solve on tiny timestep");
+        }
         return false;
     }
 

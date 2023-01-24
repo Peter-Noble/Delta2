@@ -4,6 +4,7 @@
 #include "../model/forces.h"
 #include "../model/integrate.h"
 #include "../collision_detection/separate_clusters.h"
+#include "../globals.h"
 
 #include <chrono>
 #include <omp.h>
@@ -42,11 +43,9 @@ timestepping::ExplicitAdaptiveClustersScheme::ExplicitAdaptiveClustersScheme(std
 
 void timestepping::ExplicitAdaptiveClustersScheme::step(double time, std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> &view_draws)
 {
-	__itt_domain* domain = __itt_domain_create("My Domain");
-
     auto t0 = std::chrono::high_resolution_clock::now();
     __itt_string_handle* setup_task = __itt_string_handle_create("Setup particles");
-    __itt_task_begin(domain, __itt_null, __itt_null, setup_task);
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, setup_task);
 
     if (_last_time_step_size <= 0.0)
     {
@@ -64,20 +63,20 @@ void timestepping::ExplicitAdaptiveClustersScheme::step(double time, std::vector
         p.projectFutureState(p.last_time_step_size);
     }
 
-    __itt_task_end(domain);
+    __itt_task_end(globals::itt_handles.detailed_domain);
     auto t1 = std::chrono::high_resolution_clock::now();
     printf("Setup particles:              %ldms\n", std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
     __itt_string_handle* broad_phase_task = __itt_string_handle_create("Broad phase");
-    __itt_task_begin(domain, __itt_null, __itt_null, broad_phase_task);
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, broad_phase_task);
 
     collision::BroadPhaseCollisions B;
     B = collision::broadPhaseEmbree(*_particles);
 
-    __itt_task_end(domain);
+    __itt_task_end(globals::itt_handles.detailed_domain);
     auto t2 = std::chrono::high_resolution_clock::now();
     printf("Broad phase:                  %ldms\n", std::chrono::duration_cast<std::chrono::milliseconds>(t2 - t1).count());
     __itt_string_handle* separate_task = __itt_string_handle_create("Separate");
-    __itt_task_begin(domain, __itt_null, __itt_null, separate_task);
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, separate_task);
 
     std::vector<double> min_times;
     double min_final_time = std::numeric_limits<double>::max();
@@ -92,11 +91,11 @@ void timestepping::ExplicitAdaptiveClustersScheme::step(double time, std::vector
     collision::separateCollisionClusters(B, *_particles, cluster_particles, cluster_interactions, cluster_sleeping, min_current_times);
     collision::fineCollisionClustersWithTimeStepSelection(*_particles, cluster_particles, cluster_interactions, cluster_step_size, cluster_sleeping, min_current_times);
     
-    __itt_task_end(domain);
+    __itt_task_end(globals::itt_handles.detailed_domain);
     auto t2_5 = std::chrono::high_resolution_clock::now();
     printf("Separate Clusters:            %ldms\n", std::chrono::duration_cast<std::chrono::milliseconds>(t2_5 - t2).count());
     __itt_string_handle* min_times_task = __itt_string_handle_create("Min times");
-    __itt_task_begin(domain, __itt_null, __itt_null, min_times_task);
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, min_times_task);
     
     for (int cluster_i = 0; cluster_i < cluster_particles.size(); cluster_i++)
     {
@@ -129,25 +128,25 @@ void timestepping::ExplicitAdaptiveClustersScheme::step(double time, std::vector
         }
     }
 
-    __itt_task_end(domain);
+    __itt_task_end(globals::itt_handles.detailed_domain);
     auto t3 = std::chrono::high_resolution_clock::now();
     printf("particlesMin times:                    %ldms\n", std::chrono::duration_cast<std::chrono::milliseconds>(t3 - t2_5).count());
     __itt_string_handle* process_clusters_task = __itt_string_handle_create("Process all clusters");
-    __itt_task_begin(domain, __itt_null, __itt_null, process_clusters_task);
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, process_clusters_task);
     __itt_string_handle* process_cluster_task = __itt_string_handle_create("Process cluster");
 
     for (int cluster_i = 0; cluster_i < cluster_particles.size(); cluster_i++)
     {
-        __itt_task_begin(domain, __itt_null, __itt_null, process_cluster_task);
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, process_cluster_task);
 
         if (min_times[cluster_i] > min_final_time)
         {
-            __itt_task_end(domain);
+            __itt_task_end(globals::itt_handles.detailed_domain);
             continue;
         }
 
         if (cluster_sleeping[cluster_i] || min_times[cluster_i] == -1) {
-            __itt_task_end(domain);
+            __itt_task_end(globals::itt_handles.detailed_domain);
             continue;
         }
 
@@ -170,7 +169,7 @@ void timestepping::ExplicitAdaptiveClustersScheme::step(double time, std::vector
         }
 
         __itt_string_handle* compare_trees_task = __itt_string_handle_create("Compare all trees");
-        __itt_task_begin(domain, __itt_null, __itt_null, compare_trees_task);
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_trees_task);
         std::vector<std::tuple<int, int, collision::Contact<double>>> hits;
         bool valid_timestep_found = false;
         while (!valid_timestep_found)
@@ -209,7 +208,7 @@ void timestepping::ExplicitAdaptiveClustersScheme::step(double time, std::vector
             for (int b_i = 0; b_i < cluster_interactions[cluster_i].size(); b_i++)
             {
                 task_group.run([&,b_i] {
-                    __itt_task_begin(domain, __itt_null, __itt_null, tree_comparison_task);
+                    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, tree_comparison_task);
                     int tid = omp_get_thread_num();
 
                     collision::BroadPhaseCollision &b = cluster_interactions[cluster_i][b_i]; 
@@ -236,7 +235,7 @@ void timestepping::ExplicitAdaptiveClustersScheme::step(double time, std::vector
                         }
                         hits.push_back(std::make_tuple(a_id, b_id, c));
                     }
-                    __itt_task_end(domain);
+                    __itt_task_end(globals::itt_handles.detailed_domain);
                 });
             }
             //     }
@@ -244,10 +243,10 @@ void timestepping::ExplicitAdaptiveClustersScheme::step(double time, std::vector
 
             task_group.wait();
         }
-        __itt_task_end(domain);
+        __itt_task_end(globals::itt_handles.detailed_domain);
 
         __itt_string_handle* accumulate_hits_task = __itt_string_handle_create("Accumulate hits");
-        __itt_task_begin(domain, __itt_null, __itt_null, accumulate_hits_task);
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, accumulate_hits_task);
         for (auto &[a_id, b_id, c] : hits)
         {
             Eigen::Vector3d a_centre = (*_particles)[a_id].current_state.getTranslation();
@@ -285,10 +284,10 @@ void timestepping::ExplicitAdaptiveClustersScheme::step(double time, std::vector
                 view_draws.push_back(std::make_pair(a_hit_point, b_hit_point));
             }
         }
-        __itt_task_end(domain);
+        __itt_task_end(globals::itt_handles.detailed_domain);
         
         __itt_string_handle* integrate_1st_task = __itt_string_handle_create("Integrate 1st");
-        __itt_task_begin(domain, __itt_null, __itt_null, integrate_1st_task);
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, integrate_1st_task);
         for (Particle *p : cluster_particles[cluster_i])
         {
             if (!p->is_static)
@@ -307,15 +306,15 @@ void timestepping::ExplicitAdaptiveClustersScheme::step(double time, std::vector
                 // model::staticApply(*p, cluster_step_size[cluster_i], false);
             }
         }
-        __itt_task_end(domain);
+        __itt_task_end(globals::itt_handles.detailed_domain);
 
         __itt_string_handle* friction_solve_task = __itt_string_handle_create("Friction solve");
-        __itt_task_begin(domain, __itt_null, __itt_null, friction_solve_task);
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, friction_solve_task);
         Delta2::model::friction_solve(*_particles, hits, forces, torques, counts, _external_force, cluster_step_size[cluster_i], global_to_local_ids);
-        __itt_task_end(domain);
+        __itt_task_end(globals::itt_handles.detailed_domain);
 
         __itt_string_handle* integrate_2nd_task = __itt_string_handle_create("Integrate 2nd");
-        __itt_task_begin(domain, __itt_null, __itt_null, integrate_2nd_task);
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, integrate_2nd_task);
         for (Particle *p : cluster_particles[cluster_i])
         {
             if (!p->is_static)
@@ -348,11 +347,11 @@ void timestepping::ExplicitAdaptiveClustersScheme::step(double time, std::vector
             }
             printf("Post integration state of %i: last time %f, time %f, future time %f, sleep from %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), _sleep_candidates[p->id]);
         }
-        __itt_task_end(domain);
-        __itt_task_end(domain);
+        __itt_task_end(globals::itt_handles.detailed_domain);
+        __itt_task_end(globals::itt_handles.detailed_domain);
     }
 
-    __itt_task_end(domain);
+    __itt_task_end(globals::itt_handles.detailed_domain);
     auto t4 = std::chrono::high_resolution_clock::now();
     printf("Process Clusters:             %ldms\n", std::chrono::duration_cast<std::chrono::milliseconds>(t4 - t3).count());
 }

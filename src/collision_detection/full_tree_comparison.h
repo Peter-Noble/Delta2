@@ -180,7 +180,6 @@ namespace Delta2 {
 
         template<typename real, int branching, int bucket_size>
         std::vector<ContinuousContact<real>> compareTreesFullContinuous(Particle& a, Particle& b, real max_time, real& min_time_out) {
-	        // __itt_domain* domain = __itt_domain_create("My Domain");
             // __itt_string_handle* bucket_contact_soup_task = __itt_string_handle_create("findContactsBucketContinuousComparison");
             // __itt_string_handle* bucket_contact_connected_task = __itt_string_handle_create("findContactsBucketConnectedContinuousComparison");
             

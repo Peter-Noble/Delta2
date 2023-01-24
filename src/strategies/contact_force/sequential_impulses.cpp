@@ -126,14 +126,13 @@ SequentialImpulses::SequentialImpulses(FrictionStrategy& friction,
 }
 
 bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collision::Contact<double>>& hits, bool allow_fail) {
-    __itt_domain* domain = __itt_domain_create("My Domain");
     __itt_string_handle* sequential_impulse_solve_task = __itt_string_handle_create("Sequential Impulse solve");
     __itt_string_handle* sequential_impulse_impulses_task = __itt_string_handle_create("Sequential Impulse impulses");
     __itt_string_handle* sequential_impulse_friction_task = __itt_string_handle_create("Sequential Impulse friction");
     __itt_string_handle* sequential_impulse_iteration_task = __itt_string_handle_create("Sequential Impulse iteration");
     __itt_string_handle* sequential_impulse_last_iteration_task = __itt_string_handle_create("Sequential Impulse last iteration");
 
-    __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_solve_task);
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_impulse_solve_task);
 
     int cluster_id = -1;
     for (Particle* p : cluster.particles) {
@@ -153,7 +152,10 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
         lc.start_dist = (hits[c].A - hits[c].B).norm();
 
         if (!(lc.start_dist > 0.0) && cluster.step_size > 1e-4 && allow_fail) {
-            __itt_task_end(domain);
+            __itt_task_end(globals::itt_handles.detailed_domain);
+            if (cluster.step_size < 1e-6) {
+                printf("Failed near zero impulse solve\n");
+            }
             return false;
         }
 
@@ -271,11 +273,14 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
     // #define USETBB
     #ifndef USETBB
     const int max_iterations = globals::opt.sequential_impulse_total_iterations;
+    // printf("Max iterations: %i\n", max_iterations);
     #else
     const int max_iterations = globals::opt.sequential_impulse_total_iterations / globals::opt.sequential_impulse_inner_iterations;
     const int inner_iterations = globals::opt.sequential_impulse_inner_iterations;
     const int grain_size = globals::opt.sequential_impulse_grain_size;
     #endif
+
+    // printf("Max iters: %i\n", max_iterations);
 
     // printf("hits size: %i, max: %i, inner: %i, grain: %i\n", hits.size(), max_iterations, inner_iterations, grain_size);
 
@@ -289,13 +294,14 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
     if (hits.size() > 0) {
         bool converged = false;
         int it = 0;
-        __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_impulses_task);
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_impulse_impulses_task);
         while (!converged && it < max_iterations) {
+            bool all_d1_above = true;
             if (it < max_iterations - 1) {
-                __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_iteration_task);
+                __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_impulse_iteration_task);
             }
             else {
-                __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_last_iteration_task);
+                __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_impulse_last_iteration_task);
             }
             std::vector<Eigen::Vector3d> last_impulse;
             for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
@@ -359,6 +365,8 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                         Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, b_FState_transformation);
                         const double d1 = p1_B.dot(n) - p1_A.dot(n);
 
+                        all_d1_above &= d1 > 0.0;
+
                         Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, a_inverse_inertia_matrix);
                         Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, b_inverse_inertia_matrix);
                         const double v1 = v1_A.dot(n) - v1_B.dot(n);
@@ -388,7 +396,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                         const double penetration_depth = outer - d1;
 
                         // d1 = i/m * t offset distance with impulse.  m * d1 / t = i
-                        const double delta_impulse_offset_mag = d1 < outer ? delta_damp * m * std::max(0.0, penetration_depth - slop) / t : -contacts[c].impulse_offset;
+                        const double delta_impulse_offset_mag = d1 < outer ? delta_damp * m * std::max(0.0, penetration_depth - slop) / std::max(t, 1e-5) : -contacts[c].impulse_offset;
 
                         double last_impulse_offset_mag = contacts[c].impulse_offset;
                         contacts[c].impulse_offset = std::max(contacts[c].impulse_offset + delta_impulse_offset_mag, 0.0);
@@ -429,6 +437,10 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
                                 FStates[a_id] = updateState(cluster.particles[a_id].future_state, t, impulse_a, impulse_offset_a, rotational_impulse_a, rotational_impulse_offset_a, &cluster.particles[a_id]);
                                 
+                                if (FStates[a_id].getTransformation().hasNaN()) {
+                                    throw std::runtime_error("Nan");
+                                }
+
                                 // #ifdef USETBB
                                 // mxs[a_id]->unlock();
                                 // #endif
@@ -451,6 +463,10 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
                                 FStates[b_id] = updateState(cluster.particles[b_id].future_state, t, impulse_b, impulse_offset_b, rotational_impulse_b, rotational_impulse_offset_b, &cluster.particles[b_id]);
                                 
+                                if (FStates[b_id].getTransformation().hasNaN()) {
+                                    throw std::runtime_error("Nan");
+                                }
+
                                 // #ifdef USETBB
                                 // mxs[b_id]->unlock();
                                 // #endif
@@ -464,14 +480,17 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             task_group.wait();
             #endif
 
-            converged = true;
-            for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
-                Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
-                if (impulse_diff.norm() > 1e-8) {
-                    converged = false;
-                    break;
+            converged = all_d1_above;
+            if (converged) {
+                for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
+                    Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
+                    if (impulse_diff.norm() > 1e-8) {
+                        converged = false;
+                        break;
+                    }
                 }
             }
+
             for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
                 Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
                 // printf("impulse: %f, %f, %f\n", impulses[p_i].x(), impulses[p_i].y(), impulses[p_i].z());
@@ -479,14 +498,27 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             }
 
             it++;
-            __itt_task_end(domain);
+            __itt_task_end(globals::itt_handles.detailed_domain);
         }
 
         printf("%i: Iterations used: %i\n", cluster_id, it);
 
-        __itt_task_end(domain);
+        for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
+            assert(!impulses[p_i].hasNaN());
+            assert(impulses[p_i].norm() < 10000);
+            if (impulses[p_i].norm() > 10000) {
+                printf("Really big impulse\n");
+            }
+            if (impulses[p_i].hasNaN()) {
+                throw std::runtime_error("Nan!");
+                printf("Nan!\n");
+                return false;
+            }
+        }
 
-        __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_friction_task);
+        __itt_task_end(globals::itt_handles.detailed_domain);
+
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_impulse_friction_task);
 
         std::vector<Eigen::Vector3d> updated_friction_total;
         for (int c = 0; c < hits.size(); c++) {
@@ -561,6 +593,24 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
                 updated_friction_total[c] = friction_impulse_total;
 
+                if (updated_friction_total[c].hasNaN()) {
+                    printf("c: %i\n", c);
+                    printf(FStates[a_id].getTransformation().hasNaN() ? "FStates a_id has nan" : "FStates a_id is valid\n");
+                    printf(FStates[b_id].getTransformation().hasNaN() ? "FStates b_id has nan" : "FStates b_id is valid\n");
+                    printf("contacts[c].local_A: %f, %f, %f\n", contacts[c].local_A.x(), contacts[c].local_A.y(), contacts[c].local_A.z());
+                    printf("contacts[c].local_B: %f, %f, %f\n", contacts[c].local_B.x(), contacts[c].local_B.y(), contacts[c].local_B.z());
+                    printf("p1_A: %f, %f, %f\n", p1_A.x(), p1_A.y(), p1_A.z());
+                    printf("p1_B: %f, %f, %f\n", p1_B.x(), p1_B.y(), p1_B.z());
+                    printf("v1_AB: %f, %f, %f\n", v1_AB.x(), v1_AB.y(), v1_AB.z());
+                    printf("rt_A: %f, %f, %f\n", rt_A.x(), rt_A.y(), rt_A.z());
+                    printf("rt_B: %f, %f, %f\n", rt_B.x(), rt_B.y(), rt_B.z());
+                    printf("tangent: %f, %f, %f\n", tangent.x(), tangent.y(), tangent.z());
+                    printf("k_tangent: %f\n", k_tangent);
+                    printf("m_inv_effective_tangent: %f\n", m_inv_effective_tangent);
+                    printf("delta_friction_impulse: %f, %f, %f\n", delta_friction_impulse.x(), delta_friction_impulse.y(), delta_friction_impulse.z());
+                    throw std::runtime_error("Nans");
+                }
+
                 auto key = std::make_pair(std::min(a_id, b_id), std::max(a_id, b_id));
                 if (contacts_per_pair.find(key) != contacts_per_pair.end()) {
                     contacts_per_pair[key]++;
@@ -623,21 +673,33 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             }
         }
 
-        __itt_task_end(domain);
+        __itt_task_end(globals::itt_handles.detailed_domain);
 
-
+        for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
+            assert(!impulses[p_i].hasNaN());
+            assert(impulses[p_i].norm() < 10000);
+            if (impulses[p_i].norm() > 10000) {
+                printf("Really big impulse\n");
+            }
+            if (impulses[p_i].hasNaN()) {
+                throw std::runtime_error("Nan!");
+                printf("Nan!\n");
+                return false;
+            }
+        }
 
 
 
         it = 0;
         converged = false;
-        __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_impulses_task);
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_impulse_impulses_task);
         while (!converged && it < max_iterations) {
+            bool all_d1_above = true;
             if (it < max_iterations - 1) {
-                __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_iteration_task);
+                __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_impulse_iteration_task);
             }
             else {
-                __itt_task_begin(domain, __itt_null, __itt_null, sequential_impulse_last_iteration_task);
+                __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_impulse_last_iteration_task);
             }
             std::vector<Eigen::Vector3d> last_impulse;
             for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
@@ -700,6 +762,8 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                         Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, a_FState_transformation);
                         Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, b_FState_transformation);
                         const double d1 = p1_B.dot(n) - p1_A.dot(n);
+
+                        all_d1_above &= d1 > 0.0;
 
                         Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, a_inverse_inertia_matrix);
                         Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, b_inverse_inertia_matrix);
@@ -806,12 +870,14 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             task_group.wait();
             #endif
 
-            converged = true;
-            for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
-                Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
-                if (impulse_diff.norm() > 1e-8) {
-                    converged = false;
-                    break;
+            converged = all_d1_above;
+            if (converged) {
+                for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
+                    Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
+                    if (impulse_diff.norm() > 1e-8) {
+                        converged = false;
+                        break;
+                    }
                 }
             }
             for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
@@ -820,8 +886,13 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 // printf("impulse diff: %f, %f, %f\n", impulse_diff.x(), impulse_diff.y(), impulse_diff.z());
             }
 
+            if (converged && !all_d1_above) {
+                printf("Incorrectly converged\n");
+                throw std::runtime_error("Incorrectly converged");
+            }
+
             it++;
-            __itt_task_end(domain);
+            __itt_task_end(globals::itt_handles.detailed_domain);
         }
 
         printf("%i: Iterations used 2nd phase: %i\n", cluster_id, it);
@@ -855,6 +926,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             printf("Really big impulse\n");
         }
         if (impulses[p_i].hasNaN()) {
+            throw std::runtime_error("Nan!");
             printf("Nan!\n");
             return false;
         }
@@ -875,7 +947,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
     // }
     // view.show();
 
-    __itt_task_end(domain);
+    __itt_task_end(globals::itt_handles.detailed_domain);
 
     return true;
 }

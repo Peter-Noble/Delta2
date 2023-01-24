@@ -14,8 +14,6 @@ using namespace Delta2;
  *  toc on the resulting collisions is 
  */
 void collision::separateContinuousCollisionClusters(collision::BroadPhaseCollisions& broad_phase, std::vector<Delta2::Particle>& particles, double max_time, std::vector<std::vector<Particle*>>& cluster_particles_out, std::vector<collision::BroadPhaseCollisions>& cluster_interactions_out, std::vector<bool>& sleeping) {
-    __itt_domain* domain = __itt_domain_create("My Domain");
-
     int num_particles = particles.size();
     Eigen::SparseMatrix<int> interaction_graph(num_particles, num_particles);
 
@@ -69,7 +67,7 @@ void collision::separateContinuousCollisionClusters(collision::BroadPhaseCollisi
     //         #pragma omp taskloop
     for (int b_i = 0; b_i < broad_phase.size(); b_i++) {
         task_group.run([&, b_i] {
-            __itt_task_begin(domain, __itt_null, __itt_null, continuous_pair_task);
+            __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, continuous_pair_task);
 
             int tid = omp_get_thread_num();
 
@@ -85,9 +83,9 @@ void collision::separateContinuousCollisionClusters(collision::BroadPhaseCollisi
 
             double min_time;
 
-            __itt_task_begin(domain, __itt_null, __itt_null, continuous_trees_continuous_task);
+            __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, continuous_trees_continuous_task);
             std::vector<collision::ContinuousContact<double>> Ccs = collision::compareTreesFullContinuous<double, 8, 8>(particles[a_id], particles[b_id], max_time_step_for_pair, min_time);
-            __itt_task_end(domain);
+            __itt_task_end(globals::itt_handles.detailed_domain);
 
             if (Ccs.size() > 0) {
                 double min_scaling_seen = 1.0;
@@ -97,7 +95,7 @@ void collision::separateContinuousCollisionClusters(collision::BroadPhaseCollisi
                 }
                 printf("Min toc: %f\n", min_toc);
             }
-            __itt_task_end(domain);
+            __itt_task_end(globals::itt_handles.detailed_domain);
         });
     }
     //     }
@@ -145,8 +143,6 @@ void collision::separateContinuousCollisionClusters(collision::BroadPhaseCollisi
 //  1. Broadphase separate connected components
 //  2. CompareTreesContinuous
 void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadPhaseCollisions& broad_phase, std::vector<Delta2::Particle>& particles, double max_time, std::vector<std::vector<Particle*>>& cluster_particles_out, std::vector<collision::BroadPhaseCollisions>& cluster_interactions_out, std::vector<double>& cluster_step_size_out, std::vector<bool>& sleeping) {
-    __itt_domain* domain = __itt_domain_create("My Domain");
-
     int num_particles = particles.size();
     Eigen::SparseMatrix<int> interaction_graph(num_particles, num_particles);
 
@@ -221,7 +217,7 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
     //         #pragma omp taskloop
             for (int b_i = 0; b_i < broad_phase.size(); b_i++) {
                 __itt_string_handle* continuous_pair_task = __itt_string_handle_create("Continuous pair");
-                __itt_task_begin(domain, __itt_null, __itt_null, continuous_pair_task);
+                __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, continuous_pair_task);
 
                 int tid = omp_get_thread_num();
 
@@ -238,9 +234,9 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
                 double min_time;
 
                 __itt_string_handle* continuous_trees_continuous_task = __itt_string_handle_create("Compare trees full continuous");
-                __itt_task_begin(domain, __itt_null, __itt_null, continuous_trees_continuous_task);
+                __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, continuous_trees_continuous_task);
                 std::vector<collision::ContinuousContact<double>> Ccs = collision::compareTreesFullContinuous<double, 8, 8>(particles[a_id], particles[b_id], max_time_step_for_pair, min_time);
-                __itt_task_end(domain);
+                __itt_task_end(globals::itt_handles.detailed_domain);
 
                 // if (Ccs.size() > 0) {
                 //     step_size[a_id] = std::min(step_size[a_id], min_time * 0.5);
@@ -318,7 +314,7 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
                     }
                     printf("Min toc: %f\n", min_toc);
                 }
-                __itt_task_end(domain);
+                __itt_task_end(globals::itt_handles.detailed_domain);
             }
     //     }
     // }
@@ -362,13 +358,11 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
 
 
 std::vector<collision::Cluster> collision::separateCollisionClusters(collision::BroadPhaseCollisions& broad_phase, model::ParticleHandler& particles) {
-	__itt_domain* domain = __itt_domain_create("My Domain");
-
     __itt_string_handle* connected_component_task = __itt_string_handle_create("Connected components");
     __itt_string_handle* create_clusters_task = __itt_string_handle_create("Create clusters");
     __itt_string_handle* sort_interactions_task = __itt_string_handle_create("Sort interactions");
 
-    __itt_task_begin(domain, __itt_null, __itt_null, connected_component_task);
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, connected_component_task);
     int num_particles = particles.size();
     Eigen::SparseMatrix<int> interaction_graph(num_particles, num_particles);
 
@@ -387,9 +381,9 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
     Eigen::MatrixXi components;
     Eigen::MatrixXi sizes;
     igl::connected_components(interaction_graph, components, sizes);
-    __itt_task_end(domain);
+    __itt_task_end(globals::itt_handles.detailed_domain);
 
-    __itt_task_begin(domain, __itt_null, __itt_null, create_clusters_task);
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, create_clusters_task);
     std::vector<Cluster> clusters;
     std::vector<std::vector<Particle*>> cluster_particles;
 
@@ -413,9 +407,9 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             clusters[components(p_i, 0)].sleeping = false;
         }
     }
-    __itt_task_end(domain);
+    __itt_task_end(globals::itt_handles.detailed_domain);
 
-    __itt_task_begin(domain, __itt_null, __itt_null, sort_interactions_task);
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sort_interactions_task);
     // Add each broad phase interaction to required clusters
     // TODO this isn't very efficient as each interaction searches through all the particles in all the clusters.
     for (collision::BroadPhaseCollision& b : broad_phase) {
@@ -455,7 +449,7 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             }
         }
     }
-    __itt_task_end(domain);
+    __itt_task_end(globals::itt_handles.detailed_domain);
 
     for (int c_i = 0; c_i < sizes.rows(); c_i++) {
         for (Particle* p : cluster_particles[c_i]) {
@@ -529,7 +523,6 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
 
 
 void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
-    __itt_domain* domain = __itt_domain_create("My Domain");
     __itt_string_handle* time_step_selection_pair_task = __itt_string_handle_create("Time step selection pair task");
 
     int num_particles = cluster.particles.size();
@@ -552,7 +545,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
     //         #pragma omp taskloop
     for (int b_i = 0; b_i < cluster.interations.size(); b_i++) {
         task_group.run([&, b_i] {
-            __itt_task_begin(domain, __itt_null, __itt_null, time_step_selection_pair_task);
+            __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, time_step_selection_pair_task);
             int tid = omp_get_thread_num();
 
             collision::BroadPhaseCollision& b = cluster.interations[b_i];
@@ -667,7 +660,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
             b.min_toc *= max_time_step_for_pair;
             b.target_toc *= max_time_step_for_pair;
-            __itt_task_end(domain);
+            __itt_task_end(globals::itt_handles.detailed_domain);
         });
     }
 
@@ -708,8 +701,6 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
 
 void collision::fineWitnessCollisionClustersWithTimeStepSelection(std::vector<Delta2::Particle>& particles, std::vector<std::vector<Particle*>>& cluster_particles_out, std::vector<collision::BroadPhaseCollisions>& cluster_interactions_out, std::vector<double>& cluster_step_size_out, std::vector<bool>& sleeping, std::vector<double>& min_current_time, collision::ContactStateCache& cache) {
-    __itt_domain* domain = __itt_domain_create("My Domain");
-
     double max_reachable_time = 0.0;
 
     for (int c = 0; c < cluster_particles_out.size(); c++) {
@@ -756,7 +747,7 @@ void collision::fineWitnessCollisionClustersWithTimeStepSelection(std::vector<De
                 #pragma omp taskloop
                 for (int b_i = 0; b_i < cluster_interactions_out[c_i].size(); b_i++) {
                     __itt_string_handle* continuous_pair_task = __itt_string_handle_create("Continuous pair");
-                    __itt_task_begin(domain, __itt_null, __itt_null, continuous_pair_task);
+                    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, continuous_pair_task);
 
                     int tid = omp_get_thread_num();
 
@@ -773,11 +764,11 @@ void collision::fineWitnessCollisionClustersWithTimeStepSelection(std::vector<De
                     double min_time;
 
                     __itt_string_handle* continuous_trees_continuous_task = __itt_string_handle_create("Compare trees full continuous");
-                    __itt_task_begin(domain, __itt_null, __itt_null, continuous_trees_continuous_task);
+                    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, continuous_trees_continuous_task);
                     // std::vector<collision::ContinuousContact<double>> Ccs = collision::compareTreesFullContinuous<double, 8, 8>(particles[a_id], particles[b_id], max_time_step_for_pair, min_time);
                     std::vector<collision::ContinuousContact<double>> Ccs = collision::compareTreesFullContinuousWitnesses(particles[a_id], particles[b_id], cache, max_time_step_for_pair, min_time);
 
-                    __itt_task_end(domain);
+                    __itt_task_end(globals::itt_handles.detailed_domain);
 
                     // if (Ccs.size() > 0) {
                     //     step_size[a_id] = std::min(step_size[a_id], min_time * 0.5);
@@ -854,7 +845,7 @@ void collision::fineWitnessCollisionClustersWithTimeStepSelection(std::vector<De
                             step_size[b_id] = use_time_step_size;
                         }
                     }
-                    __itt_task_end(domain);
+                    __itt_task_end(globals::itt_handles.detailed_domain);
                 }
             }
         }

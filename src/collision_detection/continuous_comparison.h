@@ -806,7 +806,6 @@ namespace Delta2 {
 
         template<int branching, class bucket_real>
 		void findContactsBucketContinuousComparison(std::vector<DeferredCompare>& bucket_pairs, Particle& a, Particle& b, std::vector<ContinuousContact<bucket_real>>& hits, std::vector<int>& pair_used_out) {
-			// __itt_domain* domain = __itt_domain_create("My Domain");
             // __itt_string_handle* continuous_soup_bucket_task = __itt_string_handle_create("Continuous soup bucket");
             // __itt_string_handle* continuous_soup_triangle_task = __itt_string_handle_create("Continuous soup triangle");
             
