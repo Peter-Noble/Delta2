@@ -26,7 +26,7 @@ PDEExplicit::PDEExplicit(ContactDetectionStrategy& contact_detection,
 }
 
 double PDEExplicit::selectTimeStep(collision::Cluster& cluster) {
-    // printf("Selecting explicit time step\n");
+    // globals::logger.printf("Selecting explicit time step\n");
     double time = _time_step.selectTimeStep(cluster);
     cluster.step_size = time;
     return time;
@@ -135,7 +135,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
         if (cluster.step_size < 1e-8) {
             throw std::runtime_error(std::to_string(cluster_id) + std::string(": Failed before contact solve on tiny timestep"));
         }
-        printf("%i: Failed before contact solve\n", cluster_id);
+        globals::logger.printf("%i: Failed before contact solve\n", cluster_id);
         return false;
     }
 
@@ -199,10 +199,10 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
             p->last_state = p->current_state;
             p->current_state = p->future_state;
             p->projectFutureState(cluster.step_size);
-            // printf("Updating %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
+            // globals::logger.printf("Updating %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
 
             assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
-            // printf("Post integration state of %i: last time %f, time %f, future time %f, sleep from %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), p->sleep_candidate_time);
+            // globals::logger.printf("Post integration state of %i: last time %f, time %f, future time %f, sleep from %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), p->sleep_candidate_time);
         }
     }
 

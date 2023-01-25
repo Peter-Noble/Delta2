@@ -4,9 +4,10 @@ Delta2::common::Logger::Logger() {
     disable = false;
 }
 
-void Delta2::common::Logger::printf(char* fmt, ...) {
+void Delta2::common::Logger::printf(const char* fmt, ...) {
     if (!disable) {
         std::lock_guard guard(print_lock);
+        std::printf("<Logger> ");
         va_list args;
         va_start(args, fmt);
         vprintf(fmt, args);
