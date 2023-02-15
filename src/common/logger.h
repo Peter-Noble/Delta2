@@ -7,8 +7,9 @@ namespace Delta2 {
         class Logger {
             public:
             Logger();
-            void printf(const char* fmt, ...);
+            void printf(int prio, const char* fmt, ...);
             void disablePrinting();
+            int priority;
             private:
             std::mutex print_lock;
             bool disable;

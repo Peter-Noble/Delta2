@@ -81,3 +81,9 @@ bool ParticleHandler::isValid() const {
     assert(result);
     return result;
 }
+
+void ParticleHandler::initLast() {
+    for (Particle* p : _ps) {
+        p->last_state = p->current_state;
+    }
+}

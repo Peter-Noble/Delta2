@@ -47,6 +47,10 @@ double Particle::getMass() const {
     return _mass;
 }
 
+Eigen::MatrixXd Particle::getTransformedVerticesLast() const {
+    return common::transform(mesh->getVertices(), last_state.getTransformation());
+}
+
 Eigen::MatrixXd Particle::getTransformedVertices() const {
     return common::transform(mesh->getVertices(), current_state.getTransformation());
 }

@@ -24,6 +24,7 @@ namespace Delta2 {
                 }
 
                 void addEigenMesh(const Eigen::Matrix4d& V, const Eigen::MatrixXi& F);
+                void addParticleLast(const Particle& P);
                 void addParticle(const Particle& P);
                 void addParticleFuture(const Particle& P);
                 void addParticleInterval(const Particle& P);

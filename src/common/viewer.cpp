@@ -36,6 +36,10 @@ void Viewer::addEigenMesh(const Eigen::Matrix4d& V, const Eigen::MatrixXi& F) {
     concatMesh(_V, _F, V, F, _V, _F);
 }
 
+void Viewer::addParticleLast(const Particle& P) {
+    concatMesh(_V, _F, P.getTransformedVerticesLast(), P.getFaces(), _V, _F);
+}
+
 void Viewer::addParticle(const Particle& P) {
     concatMesh(_V, _F, P.getTransformedVertices(), P.getFaces(), _V, _F);
 }

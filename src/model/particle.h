@@ -16,6 +16,7 @@ namespace Delta2 {
 
         double getMass() const;
 
+        Eigen::MatrixXd getTransformedVerticesLast() const;
         Eigen::MatrixXd getTransformedVertices() const;
         Eigen::MatrixXd getTransformedVerticesFuture() const;
         Eigen::MatrixXi getFaces() const;

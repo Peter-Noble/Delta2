@@ -4,8 +4,8 @@ Delta2::common::Logger::Logger() {
     disable = false;
 }
 
-void Delta2::common::Logger::printf(const char* fmt, ...) {
-    if (!disable) {
+void Delta2::common::Logger::printf(int prio, const char* fmt, ...) {
+    if (!disable && prio <= priority) {
         std::lock_guard guard(print_lock);
         std::printf("<Logger> ");
         va_list args;

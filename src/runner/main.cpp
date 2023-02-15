@@ -23,8 +23,12 @@
 #include "../strategies/PDE/PDE_explicit.h"
 #include "../strategies/broad_phase/broad_phase_embree_cluster.h"
 
+#include "../strategies/contact_force/resolve_penetrations_pbd.h"
+
 #include "../scenarios/zero_g_bundle.h"
 #include "../scenarios/towers.h"
+#include "../scenarios/start_intersecting.h"
+#include "../scenarios/pairs.h"
 
 #include "../globals.h"
 
@@ -43,7 +47,7 @@ void guiThread(common::AnimationViewer* view) {
 }   
 
 int main(int argc, char *argv[]) {
-    globals::logger.printf("Main\n");
+    globals::logger.printf(0, "Main\n");
     globals::itt_handles.disable_detailed_domain();
 
     if (globals::opt.threads > 0) {
@@ -54,6 +58,8 @@ int main(int argc, char *argv[]) {
     if (opt_result > 0) {
         return opt_result;
     }
+
+    globals::logger.priority = globals::opt.print_priority;
     
     strategy::FrictionIterative friction(globals::opt);
     strategy::SequentialImpulses contact_force(friction, globals::opt);
@@ -78,11 +84,22 @@ int main(int argc, char *argv[]) {
             scenarios::towers(particles, contact_force);
             break;
         }
+    case 2:
+        {
+            scenarios::start_intersecting(particles, contact_force);
+            break;
+        }
+    case 3:
+        {
+            scenarios::pairs(particles, contact_force);
+            break;
+        }
     default:
         throw std::runtime_error("No scenario given");
     }
 
     model::ParticleHandler ph(particles);
+    ph.initLast();
 
     std::thread gui;
     Delta2::common::AnimationViewer view(&particles);
@@ -100,7 +117,7 @@ int main(int argc, char *argv[]) {
     bool cont = globals::opt.final_time > 0.0 || (globals::opt.final_time < 0.0 && globals::opt.num_time_steps > 0);
     int step = 0;
     while (cont) {
-        globals::logger.printf("Step: %i\n", step);
+        globals::logger.printf(1, "Step: %i\n", step);
         // std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> view_draws;
         {
             std::lock_guard draws_lock(globals::contact_draws_lock);
@@ -131,7 +148,7 @@ int main(int argc, char *argv[]) {
         
     }
 
-    globals::logger.printf("================ Done ================\n");
+    globals::logger.printf(0, "================ Done ================\n");
 
     if (globals::opt.gui) {
         gui.join();

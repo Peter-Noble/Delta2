@@ -7,6 +7,10 @@
 
 namespace Delta2 {
 	namespace common {
+		const int PRINT_STARTUP = 0;
+		const int PRINT_OUTER_STEPS = 1;
+		const int PRINT_DEBUG = 2;
+		
 		struct Options {
 			float time_step_size;
 			float adaptive_time_step_factor;
@@ -18,12 +22,17 @@ namespace Delta2 {
 			bool suppress_all_output;
 			int export_skip;
 			int scenario_lod;
+			int scenario_size;
 			std::string mesh_metric;
 			float geo_eps;
 			bool print_tree;
 			bool print_debug;
 			bool gui;
 			int threads;
+			int print_priority;
+			bool limit_clusters_per_step;
+			bool check_post_solve;
+			bool local_ts;
 
 			int sequential_impulse_total_iterations;
 			int sequential_impulse_inner_iterations;
@@ -43,19 +52,25 @@ namespace Delta2 {
 				print_iteration_count = false;
 				suppress_all_output = false;
 				export_skip = 0;
-				scenario_lod = -1;  // -1 for full
+				scenario_lod = 0;
+				scenario_size = -1;
 				mesh_metric = "";
 				geo_eps = 0.01;
 				print_tree = false;
 				print_debug = false;
 				gui = false;
 				threads = -1;
+				limit_clusters_per_step = false;
+				check_post_solve = false;
+				local_ts = false;
+
+				print_priority = 0;
 
 				sequential_impulse_total_iterations = 1000;
 				sequential_impulse_inner_iterations = 20;
 				sequential_impulse_grain_size = 1000;
 
-				cluster_separation_factor = 0.25;
+				cluster_separation_factor = 0.75;
 
 				pcg32_srandom_r(&rng, 42u, 54u);
 			}
@@ -95,7 +110,26 @@ namespace Delta2 {
 				else {
 					printf("GUI:                   false\n");
 				}
+				if (limit_clusters_per_step) {
+					printf("Limit clusters /step   true\n");
+				}
+				else {
+					printf("Limit cluster /step    false\n");
+				}
+				if (check_post_solve) {
+					printf("Check post solve       true\n");
+				}
+				else {
+					printf("Check post solve       false\n");
+				}
+				if (local_ts) {
+					printf("Local time step        true\n");
+				}
+				else {
+					printf("Local time step        false\n");
+				}
 				printf("Threads:               %i\n", threads);
+				printf("Print priority:        %i\n", print_priority);
 				printf("======== Time stepping ========\n");
 				printf("Num steps:             %i\n", num_time_steps);
 				printf("Final time:            %f\n", final_time);
@@ -136,7 +170,9 @@ namespace Delta2 {
 			int fromArgs(int argc, char *argv[]) {
 				CLI::App app{"App description"};
 
-				app.add_option("-s,--scenario", scenario, "Scenario (Not implemented)");
+				app.add_option("-s,--scenario", scenario, "Scenario");
+				app.add_option("-l,--scenario_lod", scenario_lod, "Scenario LOD");
+				app.add_option("--scenario_size", scenario_size, "Scenario size");
 				app.add_option("-t,--time_step", time_step_size, "Time step size");
 				app.add_option("-a,--adaptive_time_step_factor", adaptive_time_step_factor, "How small compared to the target time step the adaptive step sizes are allowed to go");
 				app.add_option("-n,--num_steps", num_time_steps, "Number of time steps");
@@ -149,7 +185,11 @@ namespace Delta2 {
 				app.add_option("--mesh_metrics", mesh_metric, "Takes a path to a mesh and computes some metrics about it");
 				app.add_option("--geo_eps", geo_eps, "Geometry eps");
 				app.add_flag("-g,--gui", gui, "Toggle GUI on");
+				app.add_flag("--limit_per_step", limit_clusters_per_step, "Limit the number of cluster handled per step to try and help load balancing");
+				app.add_flag("--check_post_solve", check_post_solve, "Redo contact detection after contact solve to see if it was successful");
+				app.add_flag("--local_ts", local_ts, "Local time stepping");
 				app.add_option("--threads", threads, "Maximum threads");
+				app.add_option("--print_priority", print_priority, "Print priority (0-Startup, 1-Outer steps, 2-Debug");
 
 				app.add_option("-c,--cluster_sep_factor", cluster_separation_factor, "Multiply the min time-of-contact by this factor before separating clusters");
 
