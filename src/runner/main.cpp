@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
     switch (globals::opt.scenario) {
     case 0:
         {
-            scenarios::zero_g_bundle(particles, contact_force);
+            scenarios::zero_g_bundle_orig(particles, contact_force);
             break;
         }
     case 1:
@@ -92,6 +92,11 @@ int main(int argc, char *argv[]) {
     case 3:
         {
             scenarios::pairs(particles, contact_force);
+            break;
+        }
+    case 4:
+        {
+            scenarios::zero_g_bundle(particles, contact_force);
             break;
         }
     default:
