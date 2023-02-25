@@ -27,7 +27,7 @@ PDEExplicit::PDEExplicit(ContactDetectionStrategy& contact_detection,
 }
 
 double PDEExplicit::selectTimeStep(collision::Cluster& cluster) {
-    // globals::logger.printf(2, "Selecting explicit time step\n");
+    // globals::logger.printf(3, "Selecting explicit time step\n");
     double time = _time_step.selectTimeStep(cluster);
     cluster.step_size = time;
     return time;
@@ -139,9 +139,9 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
     bool is_step_intersection_resolved = false;
 
     if (failed_before_force_solve) {
-        if (cluster.step_size < 1e-8) {
-            globals::logger.printf(2, "%i: Failed before contact solve and resolving\n", cluster_id);
-            globals::logger.printf(2, "%i: Failed a: %i, failed b: %i\n", cluster_id, cluster.particles[failed_a_id].id, cluster.particles[failed_b_id].id);
+        if (cluster.step_size < 1e-4) {
+            globals::logger.printf(3, "%i: Failed before contact solve and resolving\n", cluster_id);
+            globals::logger.printf(3, "%i: Failed a: %i, failed b: %i\n", cluster_id, cluster.particles[failed_a_id].id, cluster.particles[failed_b_id].id);
 
             // {
             //     common::Viewer view;
@@ -153,13 +153,15 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
             // }
 
             collision::resolvePenetrationsPBD(cluster, false);
+            globals::logger.printf(3, "Resolved\n", cluster_id);
+
             is_step_intersection_resolved = true;
 
             // Eigen::Vector3d aT = cluster.particles[failed_a_id].future_state.getTranslation();
             // Eigen::Vector3d bT = cluster.particles[failed_b_id].future_state.getTranslation();
 
-            // globals::logger.printf(2, "bT: %f, %f, %f\n", aT.x(), aT.y(), aT.z());
-            // globals::logger.printf(2, "aT: %f, %f, %f\n", bT.x(), bT.y(), bT.z());
+            // globals::logger.printf(3, "bT: %f, %f, %f\n", aT.x(), aT.y(), aT.z());
+            // globals::logger.printf(3, "aT: %f, %f, %f\n", bT.x(), bT.y(), bT.z());
 
             // {
             //     common::Viewer view;
@@ -173,15 +175,39 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
             // throw std::runtime_error(std::to_string(cluster_id) + std::string(": Failed before contact solve on tiny timestep"));
         }
         else {
-            globals::logger.printf(2, "%i: Failed before contact solve and rolling back\n", cluster_id);
+            globals::logger.printf(3, "%i: Failed before contact solve and rolling back\n", cluster_id);
             return false;
         }
     }
 
     bool success = _contact_force.solve(cluster, hits, allow_fail);
     if (!success) {
-        globals::logger.printf(2, "%i: Failed after contact force solve\n");
-        return false;
+        if (allow_fail) {
+            globals::logger.printf(2, "%i: Failed after contact force solve\n", cluster_id);
+            if (cluster.step_size < 1e-4) {
+                // if (cluster.step_size < 1e-8) {
+                //     double last_time, current_time;
+                //     for (Particle* p : cluster.particles) {
+                //         if (!p->is_static) {
+                //             last_time = p->last_state.getTime();
+                //             current_time = p->current_state.getTime();
+                //         }
+                //     }
+                //     if (current_time - last_time < 1e-8) {
+                //         globals::logger.printf(2, "%i: Resolving post solve fail\n", cluster_id);
+                //         collision::resolvePenetrationsPBD(cluster, false);
+                //     }
+                // }
+
+                collision::resolvePenetrationsPBD(cluster, false);
+            }
+            else {
+                return false;
+            }
+        }
+        else {
+            collision::resolvePenetrationsPBD(cluster, true);
+        }
     }
     
     strategy::ContactDetectionComparison contact_detection;
@@ -246,7 +272,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
         task_group_check_last.wait();
         if (failed_at_last_after_step) {
             if (cluster.step_size < 1e-6) {
-                globals::logger.printf(2, "%i: Failed at last after contact solve on tiny timestep", cluster_id);
+                globals::logger.printf(3, "%i: Failed at last after contact solve on tiny timestep", cluster_id);
                 // common::Viewer view;
 
                 // view.addParticle(cluster.particles[failed_id_a]);
@@ -256,13 +282,13 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
 
                 // throw std::runtime_error("Failed after contact solve on tiny timestep");
             }
-            globals::logger.printf(2, "%i: Failed at last after step\n", cluster_id);
+            globals::logger.printf(3, "%i: Failed at last after step\n", cluster_id);
             return false;
         }
 
         if (failed_at_current_after_step && !is_step_intersection_resolved) {
             if (cluster.step_size < 1e-6) {
-                globals::logger.printf(2, "%i: Failed at current after contact solve on tiny timestep", cluster_id);
+                globals::logger.printf(3, "%i: Failed at current after contact solve on tiny timestep", cluster_id);
                 // common::Viewer view;
 
                 // view.addParticle(cluster.particles[failed_id_a]);
@@ -272,17 +298,17 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
 
                 // throw std::runtime_error("Failed at current after contact solve on tiny timestep");
             }
-            globals::logger.printf(2, "%i: Failed at current after step\n", cluster_id);
+            globals::logger.printf(3, "%i: Failed at current after step\n", cluster_id);
             return false;
         }
 
         if (failed_at_future_after_step) {
             if (cluster.step_size < 1e-6) {
-                globals::logger.printf(2, "%i: Failed at future (%i, %i) after contact solve on tiny timestep\n", cluster_id, cluster.particles[failed_id_a].id, cluster.particles[failed_id_b].id);
+                globals::logger.printf(3, "%i: Failed at future (%i, %i) after contact solve on tiny timestep\n", cluster_id, cluster.particles[failed_id_a].id, cluster.particles[failed_id_b].id);
                 Eigen::Vector3d aT = cluster.particles[failed_id_a].future_state.getTranslation();
                 Eigen::Vector3d bT = cluster.particles[failed_id_b].future_state.getTranslation();
 
-                globals::logger.printf(2, "%i: (%f, %f, %f), (%f, %f, %f)\n", cluster_id, aT.x(), aT.y(), aT.z(), bT.x(), bT.y(), bT.z());
+                globals::logger.printf(3, "%i: (%f, %f, %f), (%f, %f, %f)\n", cluster_id, aT.x(), aT.y(), aT.z(), bT.x(), bT.y(), bT.z());
                 // common::Viewer view;
 
                 // view.addParticleFuture(cluster.particles[failed_id_a]);
@@ -292,7 +318,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
 
                 // throw std::runtime_error("Failed future after contact solve on tiny timestep");
             }
-            globals::logger.printf(2, "%i: Failed at future after step\n", cluster_id);
+            globals::logger.printf(3, "%i: Failed at future after step\n", cluster_id);
             return false;
         }
     }
@@ -313,10 +339,10 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
             p->last_state = p->current_state;
             p->current_state = p->future_state;
             p->projectFutureState(cluster.step_size);
-            // globals::logger.printf(2, "Updating %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
+            // globals::logger.printf(3, "Updating %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
 
             assert(p->last_state.getTime() < p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
-            // globals::logger.printf(2, "Post integration state of %i: last time %f, time %f, future time %f, sleep from %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), p->sleep_candidate_time);
+            // globals::logger.printf(3, "Post integration state of %i: last time %f, time %f, future time %f, sleep from %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), p->sleep_candidate_time);
         }
     }
 

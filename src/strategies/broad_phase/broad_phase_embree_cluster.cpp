@@ -6,6 +6,7 @@
 #include "../../collision_detection/full_tree_comparison.h"
 #include "../../common/viewer.h"
 #include "../../strategies/contact_detection/contact_detection_comparison.h"
+#include "../../strategies/contact_force/resolve_penetrations_pbd.h"
 
 #include <ittnotify.h>
 // #include "tbb/task_group.h"
@@ -31,7 +32,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     }
 
     if (cluster.step_size < 1e-5) {
-        globals::logger.printf(2, "Small step size\n");
+        globals::logger.printf(3, "Small step size\n");
     }
 
     std::string step_size_string = std::to_string(cluster_id) + ": Step size: " + std::to_string(cluster.step_size) + ", " + (first_call ? "First" : "Following") + ". Cluster of " + std::to_string(cluster.particles.size());
@@ -77,7 +78,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     bool success = false;
     // for (Particle* p : cluster.particles) {
     //     if (!p->is_static) {
-    //         globals::logger.printf(2, "stepRecursive  pre: %i, last time: %f, current time: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime());
+    //         globals::logger.printf(3, "stepRecursive  pre: %i, last time: %f, current time: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime());
     //         break;
     //     }
     // }
@@ -86,9 +87,13 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     const int max_recursive_step_depth = 8;
     bool forced_advance = depth >= max_recursive_step_depth && cluster.step_size < 1e-6;
     if (forced_advance) {
-        globals::logger.printf(2, "%i: Forced advance\n", cluster_id);
+        globals::logger.printf(3, "%i: Forced advance\n", cluster_id);
+        collision::resolvePenetrationsPBD(cluster, true);
     }
     success = _local_pde.step(cluster, forced_advance);
+    if (forced_advance) {
+        collision::resolvePenetrationsPBD(cluster, true);
+    }
     __itt_task_end(globals::itt_handles.detailed_domain);
 
     strategy::ContactDetectionComparison contact_detection;
@@ -111,12 +116,15 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
 
     // for (Particle* p : cluster.particles) {
     //     if (!p->is_static) {
-    //         globals::logger.printf(2, "stepRecursive post: %i, last time: %f, current time: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime());
+    //         globals::logger.printf(3, "stepRecursive post: %i, last time: %f, current time: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime());
     //         break;
     //     }
     // }
-    if (!success) {
-        globals::logger.printf(2, "%i: Fail\n", cluster_id);
+    if (!success && !forced_advance) {
+        if (!forced_advance) {
+            globals::logger.printf(2, "%i: Failed but forced advance\n", cluster_id);
+        }
+        globals::logger.printf(3, "%i: Fail\n", cluster_id);
         // Interpolate current_new back to 50% between last_start and current_start
         // Set future_new to current_start
         // Step forward from there to the current_start (recursive call)
@@ -178,7 +186,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         while (failed_at_current) {
             c++;
             if (c > max_c) {
-                globals::logger.printf(2, "%i: Can't find valid last state\n", cluster_id);
+                globals::logger.printf(3, "%i: Can't find valid last state\n", cluster_id);
                 // #ifndef NDEBUG
                 // throw std::runtime_error("Can't find valid last state");
                 // #endif
@@ -198,7 +206,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             }
 
             cluster.min_current_time = new_min_time; // in the next stepRecursive call all the particles will get rolled back to this time
-            // globals::logger.printf(2, "Rolling back to %f\n", cluster.min_current_time);
+            // globals::logger.printf(3, "Rolling back to %f\n", cluster.min_current_time);
 
             double step_size;
             for (Particle* p : cluster.particles) {
@@ -281,7 +289,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             first_rollback = false;
 
             // if (!failed_at_current) {
-            //     globals::logger.printf(2, "Rolling back to %.4f.  First time step: %.4f, second time step: %.4f.  Original current: %.4f\n", new_min_time, step_size, second_step_size);
+            //     globals::logger.printf(3, "Rolling back to %.4f.  First time step: %.4f, second time step: %.4f.  Original current: %.4f\n", new_min_time, step_size, second_step_size);
             // }
             if (failed_at_current) {
                 second_step_size += step_size;
@@ -290,10 +298,10 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         __itt_task_end(globals::itt_handles.detailed_domain);
 
         if (rolling_back && !rolling_back_to_start) {
-            globals::logger.printf(2, "%i: Rolling back at %f. Cluster of %i\n", cluster_id, cluster.min_current_time, cluster.particles.size());
+            globals::logger.printf(3, "%i: Rolling back at %f. Cluster of %i\n", cluster_id, cluster.min_current_time, cluster.particles.size());
         }
         if (rolling_back_to_start) {
-            globals::logger.printf(2, "%i: Rolling back to last at %f. Cluster of %i\n", cluster_id, cluster.min_current_time, cluster.particles.size());
+            globals::logger.printf(3, "%i: Rolling back to last at %f. Cluster of %i\n", cluster_id, cluster.min_current_time, cluster.particles.size());
         }
 
         for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
@@ -313,10 +321,10 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
 
         // second_step_size -= cluster.step_size;
 
-        // globals::logger.printf(2, "Before after first valid\n");
+        // globals::logger.printf(3, "Before after first valid\n");
         // for (Particle* p : cluster.particles) {
         //     if (!p->is_static) {
-        //         globals::logger.printf(2, "Particle %i last: %.4f, current: %.4f, future: %.4f, cluster step: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), cluster.step_size);
+        //         globals::logger.printf(3, "Particle %i last: %.4f, current: %.4f, future: %.4f, cluster step: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), cluster.step_size);
         //     }
         // }
 
@@ -354,10 +362,10 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         }
 
         if (second_step_size > 0.0) {
-            // globals::logger.printf(2, "Before after first invalid\n");
+            // globals::logger.printf(3, "Before after first invalid\n");
             // for (Particle* p : cluster.particles) {
             //     if (!p->is_static) {
-            //         globals::logger.printf(2, "Particle %i last: %.4f, current: %.4f, future: %.4f, cluster step: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), cluster.step_size);
+            //         globals::logger.printf(3, "Particle %i last: %.4f, current: %.4f, future: %.4f, cluster step: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), cluster.step_size);
             //     }
             // }
 
@@ -400,10 +408,10 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             }
         }
 
-        // globals::logger.printf(2, "Before sub stepping\n");
+        // globals::logger.printf(3, "Before sub stepping\n");
         // for (Particle* p : cluster.particles) {
         //     if (!p->is_static) {
-        //         globals::logger.printf(2, "Particle %i last: %.4f, current: %.4f, future: %.4f, cluster step: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), cluster.step_size);
+        //         globals::logger.printf(3, "Particle %i last: %.4f, current: %.4f, future: %.4f, cluster step: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), cluster.step_size);
         //     }
         // }
 
@@ -415,7 +423,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             std::vector<collision::Cluster> sub_step_separated_clusters = {};
             if (sub_step_separated_clusters.size() > 1) {
                 tbb::task_group sub_step_task_group;
-                globals::logger.printf(2, "%i: Separating sub step clusters into %i\n", cluster_id, sub_step_separated_clusters.size());
+                globals::logger.printf(3, "%i: Separating sub step clusters into %i\n", cluster_id, sub_step_separated_clusters.size());
 
                 for (int sub_ci = 0; sub_ci < sub_step_separated_clusters.size(); sub_ci++) {
                     sub_step_task_group.run([&, sub_ci] {
@@ -466,7 +474,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             for (Particle* p : cluster.particles) {
                 if (!p->is_static) {
                     cluster.min_current_time = p->current_state.getTime();
-                    // globals::logger.printf(2, "Step 3 %i, last: %f, current: %f, future: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
+                    // globals::logger.printf(3, "Step 3 %i, last: %f, current: %f, future: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
 
                     assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
                 }
@@ -477,7 +485,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         // for (Particle* p : cluster.particles) {
         //     if (!p->is_static) {
         //         if (!(std::fabs(p->current_state.getTime() - (time + orig_step_size)) < 1e-5)) {
-        //             globals::logger.printf(2, "Particle: %i, current: %.4f, target: %.4f\n", p->id, p->current_state.getTime(), time + orig_step_size);
+        //             globals::logger.printf(3, "Particle: %i, current: %.4f, target: %.4f\n", p->id, p->current_state.getTime(), time + orig_step_size);
         //         }
         //         assert(std::fabs(p->current_state.getTime() - (time + orig_step_size)) < 1e-5);
         //     }
@@ -492,12 +500,12 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         }        
     } 
     // else {
-    //     globals::logger.printf(2, "Success\n");
+    //     globals::logger.printf(3, "Success\n");
     // }
 
     // cluster.step_size = start_step;
 
-    // globals::logger.printf(2, "Cluster step size: %f\n", cluster.step_size);
+    // globals::logger.printf(3, "Cluster step size: %f\n", cluster.step_size);
     double final_time = std::numeric_limits<double>::infinity();
     for (Particle* p : cluster.particles) {
         if (!p->is_static) {
@@ -543,7 +551,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
     __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, separate_collision_clusters_task);
     std::vector<collision::Cluster> clusters = collision::separateCollisionClusters(B, particles);
-    globals::logger.printf(2, "%i clusters found from separateCollisionClusters\n", clusters.size());
+    globals::logger.printf(3, "%i clusters found from separateCollisionClusters\n", clusters.size());
     __itt_task_end(globals::itt_handles.phases_domain);
     
     double min_final_time = std::numeric_limits<double>::infinity();
@@ -555,12 +563,12 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         }
     }
 
-    // globals::logger.printf(2, "Clusters: %i\n", clusters.size());
+    // globals::logger.printf(3, "Clusters: %i\n", clusters.size());
 
     std::mutex fine_min_final_time_lock;
     double fine_min_final_time = std::numeric_limits<double>::infinity();
 
-    // globals::logger.printf(2, "Select time step sizes\n");
+    // globals::logger.printf(3, "Select time step sizes\n");
     tbb::task_group task_group;
 
     std::vector<collision::Cluster> clusters_tmp;
@@ -574,7 +582,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
         if (cl.min_current_time > min_final_time)
         {
-            // globals::logger.printf(2, "%i skipping time step selection because min current time ahead of min final time\n", cluster_i);
+            // globals::logger.printf(3, "%i skipping time step selection because min current time ahead of min final time\n", cluster_i);
             // clusters_tmp.push_back(cl);
             // This cluster can't advance because there is another cluster that is too far behind
             continue;
@@ -582,14 +590,14 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
         if (cl.is_static)
         {
-            // globals::logger.printf(2, "%i skipping time step selection because static cluster\n", cluster_i);
+            // globals::logger.printf(3, "%i skipping time step selection because static cluster\n", cluster_i);
             // This cluster shouldn't be advanced as it's asleep or static
             // clusters_tmp.push_back(cl);
             continue;
         }
 
         if (cl.sleeping) {
-            // globals::logger.printf(2, "%i skipping time step selection because sleeping cluster\n", cluster_i);
+            // globals::logger.printf(3, "%i skipping time step selection because sleeping cluster\n", cluster_i);
             fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + _opt.time_step_size);
             // clusters_tmp.push_back(cl);
             continue;
@@ -601,7 +609,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
             // This cluster was the same as it was last iteration (and it didn't advance) so just keep the same step size recommendation.
             cl.step_size = it->step_size;
             fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + it->step_size);
-            // globals::logger.printf(2, "%i skipping time step selection because time step has already been picked for this cluster since last modification\n", cluster_i);
+            // globals::logger.printf(3, "%i skipping time step selection because time step has already been picked for this cluster since last modification\n", cluster_i);
             // clusters_tmp.push_back(cl);
             continue;
         }
@@ -634,9 +642,9 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
                 //         // clusters_tmp.push_back(sub_cl);
                 //     }
 
-                //     globals::logger.printf(2, "Selected time: %f for cluster %i\n", step, cluster_i);
+                //     globals::logger.printf(3, "Selected time: %f for cluster %i\n", step, cluster_i);
 
-                //     globals::logger.printf(2, "Splitting into %i\n", sub_clusters.size());
+                //     globals::logger.printf(3, "Splitting into %i\n", sub_clusters.size());
                 // }
             }
         });
@@ -721,7 +729,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
             if (!p->is_static) {
                 assert(p->last_state.getTime() <= p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
                 min_current = std::min(min_current, p->current_state.getTime());
-                // globals::logger.printf(2, "Particle %i last: %f, current: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime());
+                // globals::logger.printf(3, "Particle %i last: %f, current: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime());
             }
         }
         for (Particle* p : particles) {
@@ -731,17 +739,17 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         }
     }
 
-    // globals::logger.printf(2, "Advance\n");
+    // globals::logger.printf(3, "Advance\n");
     // for (int ca = 0; ca < std::min((int)can_advance.size(), num_tasks); ca++)
     for (int ca = 0; ca < cluster_limit; ca++)
     {
         int cluster_i = can_advance[ca];
         step_task_group.run([&, cluster_i] {
-            // globals::logger.printf(2, "cluster_i: %i, min_current_time: %f, step_size: %f\n", cluster_i, clusters[cluster_i].min_current_time, clusters[cluster_i].step_size);
+            // globals::logger.printf(3, "cluster_i: %i, min_current_time: %f, step_size: %f\n", cluster_i, clusters[cluster_i].min_current_time, clusters[cluster_i].step_size);
             // assert(clusters[cluster_i].min_current_time + clusters[cluster_i].step_size >= fine_min_final_time);
             // for (Particle* p : clusters[cluster_i].particles) {
             //     if (!p->is_static) {
-            //         globals::logger.printf(2, "Pre  step particle %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
+            //         globals::logger.printf(3, "Pre  step particle %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
             //     }
             // }
 
@@ -751,7 +759,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
             __itt_task_end(globals::itt_handles.phases_domain);
             // for (Particle* p : clusters[cluster_i].particles) {
             //     if (!p->is_static) {
-            //         globals::logger.printf(2, "Post step particle %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
+            //         globals::logger.printf(3, "Post step particle %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
             //     }
             // }
 
@@ -778,8 +786,8 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         //     if (!p->is_static) {
         //         assert(p->last_state.getTime() <= p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
         //         min_current = std::min(min_current, p->current_state.getTime());
-        //         // globals::logger.printf(2, "Accum min_current: %f, pid: %i\n", min_current, p->id);
-        //         // globals::logger.printf(2, "Particle %i last: %f, current: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime());
+        //         // globals::logger.printf(3, "Accum min_current: %f, pid: %i\n", min_current, p->id);
+        //         // globals::logger.printf(3, "Particle %i last: %f, current: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime());
         //     }
         // }
         if (!globals::opt.local_ts) {

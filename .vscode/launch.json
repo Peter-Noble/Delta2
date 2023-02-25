@@ -5,11 +5,11 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch",
+            "name": "(gdb) Debug",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/Delta2.debug",
-            "args": ["-f 10.0", "-t 0.1", "-c 0.75", "--gui"],
+            "args": ["-f 0", "-s 5", "-t 0.1", "--scenario_size", "1", "--print_priority", "1", "--limit_per_step", "--local_ts", "--gui"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [
@@ -39,7 +39,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/build/Delta2",
-            "args": ["-f 10.0", "-t 0.1", "-c 0.75", "--gui"],
+            "args": ["-f 20", "-s 5", "-t 0.1", "--scenario_size", "50", "--print_priority", "1", "--limit_per_step", "--local_ts", "--gui" "--geo_eps", "0.01"],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [

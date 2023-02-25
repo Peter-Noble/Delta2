@@ -93,7 +93,7 @@ void collision::separateContinuousCollisionClusters(collision::BroadPhaseCollisi
                 for (collision::ContinuousContact<double>& c : Ccs) {
                     
                 }
-                globals::logger.printf(2, "Min toc: %f\n", min_toc);
+                globals::logger.printf(3, "Min toc: %f\n", min_toc);
             }
             __itt_task_end(globals::itt_handles.detailed_domain);
         });
@@ -286,7 +286,7 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
                                             double new_step = common::lerp(c.toc * (1.0 - depth / proj_dist), c.toc, 0.75);
                                             min_scaling_seen = std::min(min_scaling_seen, new_step);
                                             if (max_time_step_for_pair * new_step < 1e-6) {
-                                                globals::logger.printf(2, "Small time step 0\n");
+                                                globals::logger.printf(3, "Small time step 0\n");
                                             }
                                         }
                                         else {
@@ -312,7 +312,7 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
                     if (!particles[b_id].is_static) {
                         step_size[b_id] = use_time_step_size;
                     }
-                    globals::logger.printf(2, "Min toc: %f\n", min_toc);
+                    globals::logger.printf(3, "Min toc: %f\n", min_toc);
                 }
                 __itt_task_end(globals::itt_handles.detailed_domain);
             }
@@ -479,7 +479,7 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
                 for (Particle* pc : clusters[cluster_i].particles) {
                     if (pc->id == p->id) {
                         found = true;
-                        // globals::logger.printf(2, "Found: %i in %i\n", p->id, cluster_i);
+                        // globals::logger.printf(3, "Found: %i in %i\n", p->id, cluster_i);
                         break;
                     }
                 }
@@ -493,7 +493,7 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             assert(false);
         }
         // else {
-        //     globals::logger.printf(2, "Skipping: %i\n", p->id);
+        //     globals::logger.printf(3, "Skipping: %i\n", p->id);
         // }
     }
 
@@ -517,7 +517,7 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
         }
     }
 
-    // globals::logger.printf(2, "%i total clusters\n", clusters.size());
+    // globals::logger.printf(3, "%i total clusters\n", clusters.size());
     return clusters;
 }
 
@@ -612,7 +612,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                                         double new_step = common::lerp(c.toc * (1.0 - depth / proj_dist), c.toc, 0.5);
                                         min_scaling_seen = std::min(min_scaling_seen, new_step);
                                         if (max_time_step_for_pair * new_step < 1e-6) {
-                                            globals::logger.printf(2, "Small time step 0\n");
+                                            globals::logger.printf(3, "Small time step 0\n");
                                         }
                                     }
                                     else {
@@ -656,7 +656,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                 b.target_toc = 1.0;
             }
 
-            // globals::logger.printf(2, "b.min_toc: %f, b.target_toc: %f\n", b.min_toc, b.target_toc);
+            // globals::logger.printf(3, "b.min_toc: %f, b.target_toc: %f\n", b.min_toc, b.target_toc);
 
             b.min_toc *= max_time_step_for_pair;
             b.target_toc *= max_time_step_for_pair;
@@ -818,7 +818,7 @@ void collision::fineWitnessCollisionClustersWithTimeStepSelection(std::vector<De
                                                 double new_step = common::lerp(c.toc * (1.0 - depth / proj_dist), c.toc, 0.75);
                                                 min_scaling_seen = std::min(min_scaling_seen, new_step);
                                                 if (max_time_step_for_pair * new_step < 1e-6) {
-                                                    globals::logger.printf(2, "Small time step 0\n");
+                                                    globals::logger.printf(3, "Small time step 0\n");
                                                 }
                                             }
                                             else {

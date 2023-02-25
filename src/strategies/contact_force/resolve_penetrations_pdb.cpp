@@ -12,6 +12,14 @@ using namespace Delta2;
 using namespace Eigen;
 
 void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool future_only) {
+    int cluster_id = -1;
+    for (Particle* p : cluster.particles) {
+        if (!p->is_static) {
+            cluster_id = p->cluster_id;
+            break;
+        }
+    }
+
     std::vector<collision::Contact<double>> hits;
 
     strategy::ContactDetectionComparison contact_detection;
@@ -20,9 +28,13 @@ void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool 
 
     double mult = 1.0;
 
+    int i = 0;
+
     while (new_full_comparison) {
+        // globals::logger.printf(3, "%i, New full comparison %i\n", cluster_id, i);
+        i++;
         new_full_comparison = false;
-        // globals::logger.printf(2, "Resolve full comparison\n");
+        // // globals::logger.printf(3, "Resolve full comparison\n");
         for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
         {
             collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
@@ -103,10 +115,12 @@ void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool 
             contacts.push_back(lc);
         }
 
+        int inner = 0;
         bool changed = true;
-        while (changed) {
+        while (changed && inner < 100) {
+            inner++;
             changed = false;
-            // globals::logger.printf(2, "Resolve inner loop\n");
+            // globals::logger.printf(3, "Resolve inner loop\n");
             for (int c = 0; c < hits.size(); c++) {
                 uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
                 uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
@@ -124,16 +138,27 @@ void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool 
                 // const double d1 = p1_B.dot(n) - p1_A.dot(n);
                 const double d1 = (p1_B - p1_A).norm();
 
-                // globals::logger.printf(2, "p1_A: (%f, %f, %f)\n", p1_A.x(), p1_A.y(), p1_A.z());
-                // globals::logger.printf(2, "p1_B: (%f, %f, %f)\n", p1_B.x(), p1_B.y(), p1_B.z());
+                // // globals::logger.printf(3, "p1_A: (%f, %f, %f)\n", p1_A.x(), p1_A.y(), p1_A.z());
+                // // globals::logger.printf(3, "p1_B: (%f, %f, %f)\n", p1_B.x(), p1_B.y(), p1_B.z());
 
-                // globals::logger.printf(2, "n: (%f, %f, %f)\n", n.x(), n.y(), n.z());
+                // // globals::logger.printf(3, "n: (%f, %f, %f)\n", n.x(), n.y(), n.z());
 
-                // globals::logger.printf(2, "d1: %f\n", d1);
+                // // globals::logger.printf(3, "d1: %f\n", d1);
 
                 if (d1 < outer) {
                     changed = true;
                     new_full_comparison = true;
+                    if (i > 100) {
+                        if (!cluster.particles[a_id].is_static) {
+                            cluster.particles[a_id].current_state.setTranslation(Eigen::Vector3d({globals::opt.rand_float(1000000), globals::opt.rand_float(1000000), globals::opt.rand_float(1000000)}));
+                            cluster.particles[a_id].future_state.setTranslation(Eigen::Vector3d({globals::opt.rand_float(1000000), globals::opt.rand_float(1000000), globals::opt.rand_float(1000000)}));
+                        }
+                        if (!cluster.particles[b_id].is_static) {
+                            cluster.particles[b_id].current_state.setTranslation(Eigen::Vector3d({globals::opt.rand_float(1000000), globals::opt.rand_float(1000000), globals::opt.rand_float(1000000)}));
+                            cluster.particles[b_id].future_state.setTranslation(Eigen::Vector3d({globals::opt.rand_float(1000000), globals::opt.rand_float(1000000), globals::opt.rand_float(1000000)}));
+                        }
+                        continue;
+                    }
 
                     const double m = contacts[c].mass_eff_normal;
 
@@ -148,11 +173,11 @@ void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool 
                     const double t = 1;
                     const double delta_impulse_offset_mag = mult * 0.5 * m * std::max(0.0, penetration_depth) / t;
 
-                    // globals::logger.printf(2, "offset delta: %f\n", delta_impulse_offset_mag);
+                    // globals::logger.printf(3, "offset delta: %f\n", delta_impulse_offset_mag);
 
                     Vector3d update_impulse_offset = correct_dir * delta_impulse_offset_mag;
 
-                    // globals::logger.printf(2, "uio: (%f, %f, %f)\n", update_impulse_offset.x(), update_impulse_offset.y(), update_impulse_offset.z());
+                    // globals::logger.printf(3, "uio: (%f, %f, %f)\n", update_impulse_offset.x(), update_impulse_offset.y(), update_impulse_offset.z());
 
                     Vector3d update_rotational_impulse_offset_A = model::calcTorque(update_impulse_offset, p1_A, hits[c].p_a->future_state.getTranslation());
                     Vector3d update_rotational_impulse_offset_B = model::calcTorque(Vector3d(-update_impulse_offset), p1_B, hits[c].p_b->future_state.getTranslation());
@@ -173,8 +198,8 @@ void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool 
 
                         // Vector3d aT = cluster.particles[a_id].future_state.getTranslation();
                         // Vector3d bT = cluster.particles[b_id].future_state.getTranslation();
-                        // globals::logger.printf(2, "pid: %i (%f, %f, %f)\n", a_id, aT.x(), aT.y(), aT.z());
-                        // globals::logger.printf(2, "pid: %i (%f, %f, %f)\n", b_id, bT.x(), bT.y(), bT.z());
+                        // // globals::logger.printf(3, "pid: %i (%f, %f, %f)\n", a_id, aT.x(), aT.y(), aT.z());
+                        // // globals::logger.printf(3, "pid: %i (%f, %f, %f)\n", b_id, bT.x(), bT.y(), bT.z());
                     }
                 }
             }
