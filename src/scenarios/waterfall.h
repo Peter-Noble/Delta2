@@ -4,6 +4,7 @@
 #include "../common/basic_utils.h"
 #include "../globals.h"
 #include "../model/particle.h"
+#include "igl/PI.h"
 
 namespace Delta2 {
     namespace scenarios {
