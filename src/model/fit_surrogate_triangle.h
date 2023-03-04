@@ -287,7 +287,9 @@ namespace Delta2 {
             }
 
             if (result_out.area() <= 0) {
+                #if !defined(NOGL)
                 debug::debugViewPoints(pts);
+                #endif
                 throw std::runtime_error("No valid surrogate triangle was found");
             }
 

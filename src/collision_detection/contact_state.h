@@ -6,7 +6,7 @@
 #include "../model/particle.h"
 #include "../model/collision_state.h"
 
-#include <bits/stdc++.h>
+// #include <bits/stdc++.h>
   
 
 namespace Delta2 {

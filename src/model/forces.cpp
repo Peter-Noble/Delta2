@@ -1,7 +1,7 @@
 #include "forces.h"
 #include "../collision_detection/contact.h"
 #include "integrate.h"
-#include <ittnotify.h>
+// #include <ittnotify.h>
 #include "particle_handler.h"
 
 using namespace Delta2;

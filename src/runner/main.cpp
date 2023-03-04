@@ -10,7 +10,7 @@
 
 #include <thread>
 // #include <CL/sycl.hpp>
-#include <ittnotify.h>
+// #include <ittnotify.h>
 
 #include "../strategies/contact_force/contact_force_local.h"
 #include "../strategies/contact_force/contact_force_iterative.h"
@@ -42,9 +42,11 @@ Delta2::common::Options globals::opt;
 Delta2::common::IttHandles globals::itt_handles;
 Delta2::common::Logger globals::logger;
 
+#if !defined(NOGL)
 void guiThread(common::AnimationViewer* view) {
     view->show();
-}   
+}  
+#endif 
 
 int main(int argc, char *argv[]) {
     globals::logger.printf(0, "Main\n");
@@ -106,6 +108,7 @@ int main(int argc, char *argv[]) {
     model::ParticleHandler ph(particles);
     ph.initLast();
 
+    #if !defined(NOGL)
     std::thread gui;
     Delta2::common::AnimationViewer view(&particles);
 
@@ -114,6 +117,7 @@ int main(int argc, char *argv[]) {
         view.recordFrame(empty);
         gui = std::thread(guiThread, &view);
     }
+    #endif
 
     // PDE.printType();
 
@@ -131,9 +135,11 @@ int main(int argc, char *argv[]) {
 
         broad_phase.step(ph);
 
+        #if !defined(NOGL)
         if (globals::opt.gui) {
             view.recordFrame(globals::contact_draws);
         }
+        #endif
 
         step++;
         if (globals::opt.final_time > 0.0) {
@@ -155,7 +161,9 @@ int main(int argc, char *argv[]) {
 
     globals::logger.printf(0, "================ Done ================\n");
 
+    #if !defined(NOGL)
     if (globals::opt.gui) {
         gui.join();
     }
+    #endif
 }

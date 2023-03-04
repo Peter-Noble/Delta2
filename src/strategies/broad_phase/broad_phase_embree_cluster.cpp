@@ -7,7 +7,7 @@
 #include "../../common/viewer.h"
 #include "../../strategies/contact_detection/contact_detection_comparison.h"
 
-#include <ittnotify.h>
+// #include <ittnotify.h>
 // #include "tbb/task_group.h"
 #include "tbb/tbb.h"
 
@@ -44,17 +44,17 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     globals::logger.printf(2, step_size_string.c_str());
     
     // assert(cluster.step_size > 0.0);
-    __itt_string_handle* step_recursive_task = __itt_string_handle_create("Step recursive task");
-    __itt_string_handle* local_pde_task = __itt_string_handle_create("Local pde step");
-    __itt_string_handle* compare_individual_pair_current_task = __itt_string_handle_create("Compare individual pair current");
-    __itt_string_handle* compare_individual_pair_last_task = __itt_string_handle_create("Compare individual pair last");
-    __itt_string_handle* roll_back_to_valid_current_state_task = __itt_string_handle_create("Roll back to valid current state");
+    // __itt_string_handle* step_recursive_task = __itt_string_handle_create("Step recursive task");
+    // __itt_string_handle* local_pde_task = __itt_string_handle_create("Local pde step");
+    // __itt_string_handle* compare_individual_pair_current_task = __itt_string_handle_create("Compare individual pair current");
+    // __itt_string_handle* compare_individual_pair_last_task = __itt_string_handle_create("Compare individual pair last");
+    // __itt_string_handle* roll_back_to_valid_current_state_task = __itt_string_handle_create("Roll back to valid current state");
 
-    __itt_string_handle* step_rec_after_first_valid_task = __itt_string_handle_create("Step rec after first valid");
-    __itt_string_handle* step_rec_after_first_valid_sep_task = __itt_string_handle_create("Step rec after first valid separated");
-    __itt_string_handle* step_rec_after_first_invalid_task = __itt_string_handle_create("Step rec after first invalid");
-    __itt_string_handle* step_rec_div_task = __itt_string_handle_create("Step rec div");
-    __itt_string_handle* step_rec_div_sep_task = __itt_string_handle_create("Step rec div separated");
+    // __itt_string_handle* step_rec_after_first_valid_task = __itt_string_handle_create("Step rec after first valid");
+    // __itt_string_handle* step_rec_after_first_valid_sep_task = __itt_string_handle_create("Step rec after first valid separated");
+    // __itt_string_handle* step_rec_after_first_invalid_task = __itt_string_handle_create("Step rec after first invalid");
+    // __itt_string_handle* step_rec_div_task = __itt_string_handle_create("Step rec div");
+    // __itt_string_handle* step_rec_div_sep_task = __itt_string_handle_create("Step rec div separated");
     
     double orig_step_size = cluster.step_size;
     double time = std::numeric_limits<double>::infinity();
@@ -71,7 +71,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
 
     double target_time = time + cluster.step_size;
 
-    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_recursive_task);
+    // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_recursive_task);
 
     double start_step = cluster.step_size;
     bool success = false;
@@ -82,14 +82,14 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     //     }
     // }
 
-    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, local_pde_task);
+    // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, local_pde_task);
     const int max_recursive_step_depth = 8;
     bool forced_advance = depth >= max_recursive_step_depth && cluster.step_size < 1e-6;
     if (forced_advance) {
         globals::logger.printf(2, "%i: Forced advance\n", cluster_id);
     }
     success = _local_pde.step(cluster, forced_advance);
-    __itt_task_end(globals::itt_handles.detailed_domain);
+    // __itt_task_end(globals::itt_handles.detailed_domain);
 
     strategy::ContactDetectionComparison contact_detection;
 
@@ -126,7 +126,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         // Step forward (recursive call)
         // Set last_final to the stored current_new and each of the particles last_time_step_size to min(last_time_step_size, step_size_start / 2.0)
         
-        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, roll_back_to_valid_current_state_task);
+        // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, roll_back_to_valid_current_state_task);
 
         bool failed_at_current = true;
         bool failed_at_last = false;
@@ -140,7 +140,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
         for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
         {
             task_group_check_last.run([&, b_i] {
-                __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_last_task);
+                // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_last_task);
                 if (!failed_at_last) {
                     collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
 
@@ -159,7 +159,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                         }
                     }
                 }
-                __itt_task_end(globals::itt_handles.detailed_domain);
+                // __itt_task_end(globals::itt_handles.detailed_domain);
             });
         }
 
@@ -227,7 +227,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
             {
                 task_group.run([&, b_i] {
-                    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_current_task);
+                    // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_current_task);
                     if (!failed_at_current) {
                         collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
 
@@ -259,7 +259,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                             }
                         }
                     }
-                    __itt_task_end(globals::itt_handles.detailed_domain);
+                    // __itt_task_end(globals::itt_handles.detailed_domain);
                 });
             }
 
@@ -287,7 +287,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                 second_step_size += step_size;
             }
         }
-        __itt_task_end(globals::itt_handles.detailed_domain);
+        // __itt_task_end(globals::itt_handles.detailed_domain);
 
         if (rolling_back && !rolling_back_to_start) {
             globals::logger.printf(2, "%i: Rolling back at %f. Cluster of %i\n", cluster_id, cluster.min_current_time, cluster.particles.size());
@@ -328,18 +328,18 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
 
             for (int sub_ci = 0; sub_ci < after_first_valid_separated_clusters.size(); sub_ci++) {
                 after_valid_task_group.run([&, sub_ci] {
-                    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_after_first_valid_sep_task);
+                    // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_after_first_valid_sep_task);
                     stepRecursive(after_first_valid_separated_clusters[sub_ci], false, depth + 1);
-                    __itt_task_end(globals::itt_handles.detailed_domain);
+                    // __itt_task_end(globals::itt_handles.detailed_domain);
                 });
             }
 
             after_valid_task_group.wait();
         }
         else {
-            __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_after_first_valid_task);
+            // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_after_first_valid_task);
             stepRecursive(cluster, false, depth + 1);
-            __itt_task_end(globals::itt_handles.detailed_domain);
+            // __itt_task_end(globals::itt_handles.detailed_domain);
         }
 
 
@@ -361,9 +361,9 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             //     }
             // }
 
-            __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_after_first_invalid_task);
+            // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_after_first_invalid_task);
             stepRecursive(cluster, false, depth + 1);
-            __itt_task_end(globals::itt_handles.detailed_domain);
+            // __itt_task_end(globals::itt_handles.detailed_domain);
             
             for (Particle* p : cluster.particles) {
                 if (!p->is_static) {
@@ -409,7 +409,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
 
         // double time = std::numeric_limits<double>::infinity();
 
-        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_div_task);
+        // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_div_task);
         for (int s = 0; s < sub_steps; s++) {
             // std::vector<collision::Cluster> sub_step_separated_clusters = separateClusterByTimestep(cluster, s * cluster.step_size);
             std::vector<collision::Cluster> sub_step_separated_clusters = {};
@@ -426,9 +426,9 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                         }
                     }
 
-                    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_div_sep_task);
+                    // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_div_sep_task);
                     stepRecursive(sub_step_separated_clusters[sub_ci], false, depth + 1);
-                    __itt_task_end(globals::itt_handles.detailed_domain);
+                    // __itt_task_end(globals::itt_handles.detailed_domain);
                 
                     for (Particle* p : sub_step_separated_clusters[sub_ci].particles) {
                         if (!p->is_static) {
@@ -472,7 +472,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                 }
             }
         }
-        __itt_task_end(globals::itt_handles.detailed_domain);
+        // __itt_task_end(globals::itt_handles.detailed_domain);
 
         // for (Particle* p : cluster.particles) {
         //     if (!p->is_static) {
@@ -514,18 +514,18 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
 
     cluster.step_size = orig_step_size;
 
-    __itt_task_end(globals::itt_handles.detailed_domain);
+    // __itt_task_end(globals::itt_handles.detailed_domain);
 }
 
 void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
-    __itt_string_handle* broad_phase_step_task = __itt_string_handle_create("Broad phase step");
-    __itt_string_handle* select_time_step_task = __itt_string_handle_create("Select time step");
-    __itt_string_handle* separate_collision_clusters_task = __itt_string_handle_create("Separate collision cluster");
-    __itt_string_handle* select_and_sort_task = __itt_string_handle_create("Select and sort clusters");
-    __itt_string_handle* outer_step_task = __itt_string_handle_create("Outer step");
-    __itt_string_handle* embree_task = __itt_string_handle_create("Embree");
+    // __itt_string_handle* broad_phase_step_task = __itt_string_handle_create("Broad phase step");
+    // __itt_string_handle* select_time_step_task = __itt_string_handle_create("Select time step");
+    // __itt_string_handle* separate_collision_clusters_task = __itt_string_handle_create("Separate collision cluster");
+    // __itt_string_handle* select_and_sort_task = __itt_string_handle_create("Select and sort clusters");
+    // __itt_string_handle* outer_step_task = __itt_string_handle_create("Outer step");
+    // __itt_string_handle* embree_task = __itt_string_handle_create("Embree");
 
-    __itt_task_begin(globals::itt_handles.step_domain, __itt_null, __itt_null, broad_phase_step_task);
+    // __itt_task_begin(globals::itt_handles.step_domain, __itt_null, __itt_null, broad_phase_step_task);
 
     for (Particle* p : particles)
     {
@@ -535,16 +535,16 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         assert(p->last_state.getTime() <= p->current_state.getTime() || p->current_state.getTime() == 0 || p->is_static);
     }
 
-    __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, embree_task);
+    // __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, embree_task);
     collision::BroadPhaseCollisions B;
     B = collision::broadPhaseEmbree(particles);
-    __itt_task_end(globals::itt_handles.phases_domain);
+    // __itt_task_end(globals::itt_handles.phases_domain);
 
 
-    __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, separate_collision_clusters_task);
+    // __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, separate_collision_clusters_task);
     std::vector<collision::Cluster> clusters = collision::separateCollisionClusters(B, particles);
     globals::logger.printf(2, "%i clusters found from separateCollisionClusters\n", clusters.size());
-    __itt_task_end(globals::itt_handles.phases_domain);
+    // __itt_task_end(globals::itt_handles.phases_domain);
     
     double min_final_time = std::numeric_limits<double>::infinity();
 
@@ -607,12 +607,12 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         }
         
         task_group.run([&, cluster_i] {  // TODO this causes segfaults when used with cluster separation for some reason
-            __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, select_time_step_task);
+            // __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, select_time_step_task);
             double step = _local_pde.selectTimeStep(clusters[cluster_i]);
             // std::vector<collision::Cluster> sub_clusters = collision::separateClusterByTimestep(clusters[cluster_i]);
             // std::vector<collision::Cluster> sub_clusters = {clusters[cluster_i]};
 
-            __itt_task_end(globals::itt_handles.phases_domain);
+            // __itt_task_end(globals::itt_handles.phases_domain);
             {
                 std::lock_guard guard(fine_min_final_time_lock);
                 fine_min_final_time = std::min(fine_min_final_time, clusters[cluster_i].min_current_time + step);
@@ -672,7 +672,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
     //    Advantage - Only clusters that can advance are advanced.
     //    Disadvantage - We have to wait for all time step selections to be done.
 
-    __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, select_and_sort_task);
+    // __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, select_and_sort_task);
 
     std::vector<int> can_advance;
 
@@ -704,7 +704,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
         });
     }
 
-    __itt_task_end(globals::itt_handles.phases_domain);
+    // __itt_task_end(globals::itt_handles.phases_domain);
 
     tbb::task_group step_task_group;
 
@@ -746,9 +746,9 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
             // }
 
 
-            __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, select_and_sort_task);
+            // __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, select_and_sort_task);
             stepRecursive(clusters[cluster_i], true);
-            __itt_task_end(globals::itt_handles.phases_domain);
+            // __itt_task_end(globals::itt_handles.phases_domain);
             // for (Particle* p : clusters[cluster_i].particles) {
             //     if (!p->is_static) {
             //         globals::logger.printf(2, "Post step particle %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
@@ -793,5 +793,5 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
     last_step_clusters.swap(clusters);
 
-    __itt_task_end(globals::itt_handles.step_domain);
+    // __itt_task_end(globals::itt_handles.step_domain);
 }

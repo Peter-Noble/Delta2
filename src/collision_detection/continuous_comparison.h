@@ -5,7 +5,7 @@
 #include "../model/collision_state.h"
 #include "contact.h"
 #include "../common/viewer.h"
-#include <ittnotify.h>
+// #include <ittnotify.h>
 
 namespace Delta2 {
     namespace collision {

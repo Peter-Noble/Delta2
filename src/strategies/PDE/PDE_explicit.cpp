@@ -34,7 +34,7 @@ double PDEExplicit::selectTimeStep(collision::Cluster& cluster) {
 }
 
 bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
-    __itt_string_handle* compare_individual_pair_task = __itt_string_handle_create("Compare individual pair");
+    // __itt_string_handle* compare_individual_pair_task = __itt_string_handle_create("Compare individual pair");
     
     int cluster_id = -1;
     for (Particle* p : cluster.particles) {
@@ -100,7 +100,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
     {
         task_group.run([&, b_i] {
             if (!failed_before_force_solve) {
-                __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_task);
+                // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_task);
                 collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
 
                 int a_id = cluster.particles.getLocalID(b.A.first); // geo id
@@ -127,7 +127,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
                     hits.push_back(c);
                 }
 
-                __itt_task_end(globals::itt_handles.detailed_domain);
+                // __itt_task_end(globals::itt_handles.detailed_domain);
             }
         });
     }
@@ -198,7 +198,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
         for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
         {
             task_group_check_last.run([&, b_i] {
-                // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_last_task);
+                // // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_last_task);
                 if (!failed_at_last_after_step && !failed_at_current_after_step && !failed_at_future_after_step) {
                     collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
 
@@ -239,7 +239,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
                         }
                     }
                 }
-                // __itt_task_end(globals::itt_handles.detailed_domain);
+                // // __itt_task_end(globals::itt_handles.detailed_domain);
             });
         }
 

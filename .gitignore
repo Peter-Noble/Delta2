@@ -58,3 +58,10 @@ bf_results/variable_s1_bf/
 .env
 
 src/strategies/broad_phase/num_threads.h
+src/embree_common/*/CMakeFiles/
+src/embree_common/CMakeFiles/
+src/embree_common/*/Makefile
+*.cmake
+*/CMakeCache.txt
+CMakeCache.txt
+src/embree_common/Makefile

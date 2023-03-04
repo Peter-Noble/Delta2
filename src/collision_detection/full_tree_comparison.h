@@ -4,7 +4,7 @@
 #include "../model/collision_state.h"
 #include "comparison_dist.h"
 #include "continuous_comparison.h"
-#include <ittnotify.h>
+// #include <ittnotify.h>
 #include "contact_state.h"
 #include "../strategies/contact_detection/contact_detection_strategy.h"
 

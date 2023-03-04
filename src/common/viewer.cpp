@@ -1,3 +1,4 @@
+#if !defined(NOGL)
 #include "viewer.h"
 #include "basic_utils.h"
 #include <chrono>
@@ -246,3 +247,4 @@ void AnimationViewer::show() {
 
     _viewer.launch(true, false, "Delta2", 0, 0);
 }
+#endif

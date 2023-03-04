@@ -1,3 +1,4 @@
+#if !defined(NOGL)
 #pragma once
 
 // #include "igl/opengl/glfw/Viewer.h"
@@ -65,3 +66,4 @@ namespace Delta2 {
         };
     }
 }
+#endif
