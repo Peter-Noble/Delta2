@@ -28,6 +28,7 @@ namespace Delta2 {
 			bool print_tree;
 			bool print_debug;
 			bool gui;
+			bool view_contacts;
 			int threads;
 			int print_priority;
 			bool limit_clusters_per_step;
@@ -59,6 +60,7 @@ namespace Delta2 {
 				print_tree = false;
 				print_debug = false;
 				gui = false;
+				view_contacts = false;
 				threads = -1;
 				limit_clusters_per_step = false;
 				check_post_solve = false;
@@ -109,6 +111,12 @@ namespace Delta2 {
 				}
 				else {
 					printf("GUI:                   false\n");
+				}
+				if (view_contacts) {
+					printf("View contacts:         true\n");
+				}
+				else {
+					printf("View contacts:         false\n");
 				}
 				if (limit_clusters_per_step) {
 					printf("Limit clusters /step   true\n");
@@ -185,6 +193,7 @@ namespace Delta2 {
 				app.add_option("--mesh_metrics", mesh_metric, "Takes a path to a mesh and computes some metrics about it");
 				app.add_option("--geo_eps", geo_eps, "Geometry eps");
 				app.add_flag("-g,--gui", gui, "Toggle GUI on");
+				app.add_flag("--gui_view_contacts", view_contacts, "Display dots on the contacts between objects");
 				app.add_flag("--limit_per_step", limit_clusters_per_step, "Limit the number of cluster handled per step to try and help load balancing");
 				app.add_flag("--check_post_solve", check_post_solve, "Redo contact detection after contact solve to see if it was successful");
 				app.add_flag("--local_ts", local_ts, "Local time stepping");

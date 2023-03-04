@@ -3,6 +3,7 @@
 #include "basic_utils.h"
 #include <chrono>
 #include <tuple>
+#include "../globals.h"
 
 using namespace Delta2::common;
 
@@ -205,38 +206,40 @@ void AnimationViewer::show() {
             V = transform(V, T);
             _viewer.data().set_mesh(V, F);
             _viewer.data().set_colors(C);
-            int num_edges = _edges[_frame].size();
-            Eigen::MatrixXd a_pts;
-            a_pts.resize(num_edges, 3);
-            Eigen::MatrixXd b_pts;
-            b_pts.resize(num_edges, 3);
-            for (int e_i = 0; e_i < num_edges; e_i++) {
-                a_pts.row(e_i) = transform(_edges[_frame][e_i].first, T);
-                b_pts.row(e_i) = transform(_edges[_frame][e_i].second, T);
+            
+            if (globals::opt.view_contacts) {
+                int num_edges = _edges[_frame].size();
+                Eigen::MatrixXd a_pts;
+                a_pts.resize(num_edges, 3);
+                Eigen::MatrixXd b_pts;
+                b_pts.resize(num_edges, 3);
+                for (int e_i = 0; e_i < num_edges; e_i++) {
+                    a_pts.row(e_i) = transform(_edges[_frame][e_i].first, T);
+                    b_pts.row(e_i) = transform(_edges[_frame][e_i].second, T);
+                }
+
+                Eigen::MatrixXd hit_normal_edges;
+                hit_normal_edges.resize(_contacts[_frame].size(), 3);
+                Eigen::MatrixXd hit_friction_edges;
+                hit_friction_edges.resize(_contacts[_frame].size(), 3);
+                Eigen::MatrixXd hit_pts;
+                hit_pts.resize(_contacts[_frame].size(), 3);
+                for (int c_i = 0; c_i < _contacts[_frame].size(); c_i++) {
+                    hit_pts.row(c_i) = transform(std::get<0>(_contacts[_frame][c_i]), T);
+                    hit_normal_edges.row(c_i) = transform(Eigen::Vector3d(std::get<0>(_contacts[_frame][c_i]) + std::get<1>(_contacts[_frame][c_i])), T);
+                    hit_friction_edges.row(c_i) = transform(Eigen::Vector3d(std::get<0>(_contacts[_frame][c_i]) + std::get<2>(_contacts[_frame][c_i])), T);
+                }
+
+                _viewer.data().clear_points();
+                _viewer.data().clear_edges();
+                _viewer.data().add_points(a_pts, Eigen::RowVector3d(1.0, 0.0, 0.0));
+                _viewer.data().add_points(b_pts, Eigen::RowVector3d(0.0, 0.0, 1.0));
+                _viewer.data().add_edges(a_pts, b_pts, Eigen::RowVector3d(1.0, 1.0, 1.0));
+
+                _viewer.data().add_points(hit_pts, Eigen::RowVector3d(1.0, 1.0, 0.0));
+                _viewer.data().add_edges(hit_pts, hit_friction_edges, Eigen::RowVector3d(0.0, 1.0, 0.0));
+                _viewer.data().add_edges(hit_pts, hit_normal_edges, Eigen::RowVector3d(0.0, 1.0, 1.0));
             }
-
-            Eigen::MatrixXd hit_normal_edges;
-            hit_normal_edges.resize(_contacts[_frame].size(), 3);
-            Eigen::MatrixXd hit_friction_edges;
-            hit_friction_edges.resize(_contacts[_frame].size(), 3);
-            Eigen::MatrixXd hit_pts;
-            hit_pts.resize(_contacts[_frame].size(), 3);
-            for (int c_i = 0; c_i < _contacts[_frame].size(); c_i++) {
-                hit_pts.row(c_i) = transform(std::get<0>(_contacts[_frame][c_i]), T);
-                hit_normal_edges.row(c_i) = transform(Eigen::Vector3d(std::get<0>(_contacts[_frame][c_i]) + std::get<1>(_contacts[_frame][c_i])), T);
-                hit_friction_edges.row(c_i) = transform(Eigen::Vector3d(std::get<0>(_contacts[_frame][c_i]) + std::get<2>(_contacts[_frame][c_i])), T);
-            }
-
-            _viewer.data().clear_points();
-            _viewer.data().clear_edges();
-            _viewer.data().add_points(a_pts, Eigen::RowVector3d(1.0, 0.0, 0.0));
-            _viewer.data().add_points(b_pts, Eigen::RowVector3d(0.0, 0.0, 1.0));
-            _viewer.data().add_edges(a_pts, b_pts, Eigen::RowVector3d(1.0, 1.0, 1.0));
-
-            _viewer.data().add_points(hit_pts, Eigen::RowVector3d(1.0, 1.0, 0.0));
-            _viewer.data().add_edges(hit_pts, hit_friction_edges, Eigen::RowVector3d(0.0, 1.0, 0.0));
-            _viewer.data().add_edges(hit_pts, hit_normal_edges, Eigen::RowVector3d(0.0, 1.0, 1.0));
-
         }
         return false;
     };

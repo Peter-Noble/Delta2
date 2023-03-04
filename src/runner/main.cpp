@@ -29,6 +29,7 @@
 #include "../scenarios/towers.h"
 #include "../scenarios/start_intersecting.h"
 #include "../scenarios/pairs.h"
+#include "../scenarios/waterfall.h"
 
 #include "../globals.h"
 
@@ -52,9 +53,11 @@ int main(int argc, char *argv[]) {
     globals::logger.printf(0, "Main\n");
     globals::itt_handles.disable_detailed_domain();
 
+    int threads = tbb::info::default_concurrency();
     if (globals::opt.threads > 0) {
-        tbb::global_control global_limit(tbb::global_control::max_allowed_parallelism, globals::opt.threads);  // TODO Does this do something?
+        threads = globals::opt.threads;
     }
+    tbb::global_control global_limit(tbb::global_control::max_allowed_parallelism, threads);  // TODO Does this do something?
 
     int opt_result = globals::opt.fromArgs(argc, argv);
     if (opt_result > 0) {
@@ -99,6 +102,11 @@ int main(int argc, char *argv[]) {
     case 4:
         {
             scenarios::zero_g_bundle(particles, contact_force);
+            break;
+        }
+    case 5:
+        {
+            scenarios::waterfall(particles, contact_force);
             break;
         }
     default:

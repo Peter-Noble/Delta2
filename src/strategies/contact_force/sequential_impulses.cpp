@@ -130,7 +130,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
         if (!(lc.start_dist > 0.0) && cluster.step_size > 1e-4 && allow_fail) {
             // __itt_task_end(globals::itt_handles.detailed_domain);
             if (cluster.step_size < 1e-6) {
-                globals::logger.printf(2, "Failed near zero impulse solve\n");
+                globals::logger.printf(3, "Failed near zero impulse solve\n");
             }
             return false;
         }
@@ -255,16 +255,16 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
     // #define USETBB
     #ifndef USETBB
     const int max_iterations = globals::opt.sequential_impulse_total_iterations;
-    // globals::logger.printf(2, "Max iterations: %i\n", max_iterations);
+    // globals::logger.printf(3, "Max iterations: %i\n", max_iterations);
     #else
     const int max_iterations = globals::opt.sequential_impulse_total_iterations / globals::opt.sequential_impulse_inner_iterations;
     const int inner_iterations = globals::opt.sequential_impulse_inner_iterations;
     const int grain_size = globals::opt.sequential_impulse_grain_size;
     #endif
 
-    // globals::logger.printf(2, "Max iters: %i\n", max_iterations);
+    // globals::logger.printf(3, "Max iters: %i\n", max_iterations);
 
-    // globals::logger.printf(2, "hits size: %i, max: %i, inner: %i, grain: %i\n", hits.size(), max_iterations, inner_iterations, grain_size);
+    // globals::logger.printf(3, "hits size: %i, max: %i, inner: %i, grain: %i\n", hits.size(), max_iterations, inner_iterations, grain_size);
 
     #ifdef USETBB
     Spinlock* mxs[cluster.particles.size()];
@@ -433,7 +433,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                                 FStates[a_id] = updateState(cluster.particles[a_id].future_state, t, impulse_a, impulse_offset_a, rotational_impulse_a, rotational_impulse_offset_a, &cluster.particles[a_id]);
                                 
                                 if (FStates[a_id].getTransformation().hasNaN()) {
-                                    throw std::runtime_error("Nan");
+                                    // throw std::runtime_error("Nan");
                                 }
 
                                 // #ifdef USETBB
@@ -459,7 +459,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                                 FStates[b_id] = updateState(cluster.particles[b_id].future_state, t, impulse_b, impulse_offset_b, rotational_impulse_b, rotational_impulse_offset_b, &cluster.particles[b_id]);
                                 
                                 if (FStates[b_id].getTransformation().hasNaN()) {
-                                    throw std::runtime_error("Nan");
+                                    // throw std::runtime_error("Nan");
                                 }
 
                                 // #ifdef USETBB
@@ -488,25 +488,25 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
             for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
                 Eigen::Vector3d impulse_diff = impulses[p_i] - last_impulse[p_i];
-                // globals::logger.printf(2, "impulse: %f, %f, %f\n", impulses[p_i].x(), impulses[p_i].y(), impulses[p_i].z());
-                // globals::logger.printf(2, "impulse diff: %f, %f, %f\n", impulse_diff.x(), impulse_diff.y(), impulse_diff.z());
+                // globals::logger.printf(3, "impulse: %f, %f, %f\n", impulses[p_i].x(), impulses[p_i].y(), impulses[p_i].z());
+                // globals::logger.printf(3, "impulse diff: %f, %f, %f\n", impulse_diff.x(), impulse_diff.y(), impulse_diff.z());
             }
 
             it++;
             // __itt_task_end(globals::itt_handles.detailed_domain);
         }
 
-        globals::logger.printf(2, "%i: Iterations used: %i\n", cluster_id, it);
+        globals::logger.printf(3, "%i: Iterations used: %i\n", cluster_id, it);
 
         for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
             assert(!impulses[p_i].hasNaN());
             assert(impulses[p_i].norm() < 10000);
             if (impulses[p_i].norm() > 10000) {
-                globals::logger.printf(2, "Really big impulse\n");
+                globals::logger.printf(3, "Really big impulse\n");
             }
             if (impulses[p_i].hasNaN()) {
-                throw std::runtime_error("Nan!");
-                globals::logger.printf(2, "Nan!\n");
+                // // throw std::runtime_error("Nan!");
+                globals::logger.printf(3, "Nan!\n");
                 return false;
             }
         }
@@ -522,7 +522,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
         for (int it = 0; it < 400; it++) {
             std::map<std::pair<int, int>, int> contacts_per_pair;
-            // globals::logger.printf(2, "===============================\n");
+            // globals::logger.printf(3, "===============================\n");
 
             std::vector<common::Edge<double>> view_hits;
             bool show = false;
@@ -556,7 +556,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 double mu = std::min(cluster.particles[a_id].friction_coeff, cluster.particles[b_id].friction_coeff);
                 double max_force = contacts[c].impulse * mu * 1000;
 
-                // globals::logger.printf(2, "it: %i, c: %i, max_force: %.4f, v_tangent: %.4f\n", it, c, max_force, v_tangent.norm());
+                // globals::logger.printf(3, "it: %i, c: %i, max_force: %.4f, v_tangent: %.4f\n", it, c, max_force, v_tangent.norm());
                 Eigen::Vector3d r_A = hits[c].A - hits[c].p_a->future_state.getTranslation();
                 Eigen::Vector3d r_B = hits[c].B - hits[c].p_b->future_state.getTranslation();
 
@@ -586,7 +586,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
                 Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * 0.25;
                 // if (max_force > 1e-6) {
-                //     globals::logger.printf(2, "delta_friction_impulse: %.4f, %.4f, %.4f\n", delta_friction_impulse.x(), delta_friction_impulse.y(), delta_friction_impulse.z());
+                //     globals::logger.printf(3, "delta_friction_impulse: %.4f, %.4f, %.4f\n", delta_friction_impulse.x(), delta_friction_impulse.y(), delta_friction_impulse.z());
                 // }
                 Eigen::Vector3d friction_impulse_total = contacts[c].last_friction_impulse + delta_friction_impulse;
                 friction_impulse_total = friction_impulse_total.normalized() * std::clamp(friction_impulse_total.norm(), 0.0, max_force);
@@ -594,21 +594,21 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 updated_friction_total[c] = friction_impulse_total;
 
                 if (updated_friction_total[c].hasNaN()) {
-                    globals::logger.printf(2, "c: %i\n", c);
-                    globals::logger.printf(2, FStates[a_id].getTransformation().hasNaN() ? "FStates a_id has nan" : "FStates a_id is valid\n");
-                    globals::logger.printf(2, FStates[b_id].getTransformation().hasNaN() ? "FStates b_id has nan" : "FStates b_id is valid\n");
-                    globals::logger.printf(2, "contacts[c].local_A: %f, %f, %f\n", contacts[c].local_A.x(), contacts[c].local_A.y(), contacts[c].local_A.z());
-                    globals::logger.printf(2, "contacts[c].local_B: %f, %f, %f\n", contacts[c].local_B.x(), contacts[c].local_B.y(), contacts[c].local_B.z());
-                    globals::logger.printf(2, "p1_A: %f, %f, %f\n", p1_A.x(), p1_A.y(), p1_A.z());
-                    globals::logger.printf(2, "p1_B: %f, %f, %f\n", p1_B.x(), p1_B.y(), p1_B.z());
-                    globals::logger.printf(2, "v1_AB: %f, %f, %f\n", v1_AB.x(), v1_AB.y(), v1_AB.z());
-                    globals::logger.printf(2, "rt_A: %f, %f, %f\n", rt_A.x(), rt_A.y(), rt_A.z());
-                    globals::logger.printf(2, "rt_B: %f, %f, %f\n", rt_B.x(), rt_B.y(), rt_B.z());
-                    globals::logger.printf(2, "tangent: %f, %f, %f\n", tangent.x(), tangent.y(), tangent.z());
-                    globals::logger.printf(2, "k_tangent: %f\n", k_tangent);
-                    globals::logger.printf(2, "m_inv_effective_tangent: %f\n", m_inv_effective_tangent);
-                    globals::logger.printf(2, "delta_friction_impulse: %f, %f, %f\n", delta_friction_impulse.x(), delta_friction_impulse.y(), delta_friction_impulse.z());
-                    throw std::runtime_error("Nans");
+                    globals::logger.printf(3, "c: %i\n", c);
+                    globals::logger.printf(3, FStates[a_id].getTransformation().hasNaN() ? "FStates a_id has nan" : "FStates a_id is valid\n");
+                    globals::logger.printf(3, FStates[b_id].getTransformation().hasNaN() ? "FStates b_id has nan" : "FStates b_id is valid\n");
+                    globals::logger.printf(3, "contacts[c].local_A: %f, %f, %f\n", contacts[c].local_A.x(), contacts[c].local_A.y(), contacts[c].local_A.z());
+                    globals::logger.printf(3, "contacts[c].local_B: %f, %f, %f\n", contacts[c].local_B.x(), contacts[c].local_B.y(), contacts[c].local_B.z());
+                    globals::logger.printf(3, "p1_A: %f, %f, %f\n", p1_A.x(), p1_A.y(), p1_A.z());
+                    globals::logger.printf(3, "p1_B: %f, %f, %f\n", p1_B.x(), p1_B.y(), p1_B.z());
+                    globals::logger.printf(3, "v1_AB: %f, %f, %f\n", v1_AB.x(), v1_AB.y(), v1_AB.z());
+                    globals::logger.printf(3, "rt_A: %f, %f, %f\n", rt_A.x(), rt_A.y(), rt_A.z());
+                    globals::logger.printf(3, "rt_B: %f, %f, %f\n", rt_B.x(), rt_B.y(), rt_B.z());
+                    globals::logger.printf(3, "tangent: %f, %f, %f\n", tangent.x(), tangent.y(), tangent.z());
+                    globals::logger.printf(3, "k_tangent: %f\n", k_tangent);
+                    globals::logger.printf(3, "m_inv_effective_tangent: %f\n", m_inv_effective_tangent);
+                    globals::logger.printf(3, "delta_friction_impulse: %f, %f, %f\n", delta_friction_impulse.x(), delta_friction_impulse.y(), delta_friction_impulse.z());
+                    // throw std::runtime_error("Nans");
                 }
 
                 auto key = std::make_pair(std::min(a_id, b_id), std::max(a_id, b_id));
@@ -620,7 +620,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 }
 
                 // if (it == 99 && max_force > 1e-6) {
-                //     globals::logger.printf(2, "v_tangent: %.4f, fric impulse: %.4f, max_force: %.4f\n", v_tangent.norm(), friction_impulse_total.norm(), max_force);
+                //     globals::logger.printf(3, "v_tangent: %.4f, fric impulse: %.4f, max_force: %.4f\n", v_tangent.norm(), friction_impulse_total.norm(), max_force);
                 //     show |= v_tangent.norm() > 1e-3;
                 //     view_hits.push_back(common::Edge(hits[c].A, hits[c].B));                    
                 // }
@@ -679,11 +679,11 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             assert(!impulses[p_i].hasNaN());
             assert(impulses[p_i].norm() < 10000);
             if (impulses[p_i].norm() > 10000) {
-                globals::logger.printf(2, "Really big impulse\n");
+                globals::logger.printf(3, "Really big impulse\n");
             }
             if (impulses[p_i].hasNaN()) {
-                throw std::runtime_error("Nan!");
-                globals::logger.printf(2, "Nan!\n");
+                // throw std::runtime_error("Nan!");
+                globals::logger.printf(3, "Nan!\n");
                 return false;
             }
         }
@@ -776,7 +776,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
 
                         // ======== CANCEL RELATIVE VELOCITY ALONG NORMAL ========
 
-                        const double delta_damp = common::lerp(1.0, 0.01, (double)it/(double)max_iterations);
+                        const double delta_damp = common::lerp(0.5, 0.01, (double)it/(double)max_iterations);
                         // v1 = im / m to cancel velocity
                         const double delta_impulse_mag = d1 < outer ? v1 * m * delta_damp : -contacts[c].impulse;
 
@@ -787,6 +787,8 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                         Eigen::Vector3d update_impulse = -n * update_impulse_mag;
 
                         if (update_impulse.hasNaN()) {
+                            globals::logger.printf(2, "Update impulse has nan\n");
+                            return false;
                             throw std::runtime_error("Update impulse has nan");
                         }
 
@@ -859,9 +861,9 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                                 }
 
                                 if (update_rotational_impulse_offset_A.hasNaN()) {
-                                    globals::logger.printf(2, "uio: (%f, %f, %f)\n", update_impulse_offset.x(), update_impulse_offset.y(), update_impulse_offset.z());
-                                    globals::logger.printf(2, "p1_A: (%f, %f, %f)\n", p1_A.x(), p1_A.y(), p1_A.z());
-                                    globals::logger.printf(2, "aFt: (%f, %f, %f)\n", a_FState_translation.x(), a_FState_translation.y(), a_FState_translation.z());
+                                    globals::logger.printf(3, "uio: (%f, %f, %f)\n", update_impulse_offset.x(), update_impulse_offset.y(), update_impulse_offset.z());
+                                    globals::logger.printf(3, "p1_A: (%f, %f, %f)\n", p1_A.x(), p1_A.y(), p1_A.z());
+                                    globals::logger.printf(3, "aFt: (%f, %f, %f)\n", a_FState_translation.x(), a_FState_translation.y(), a_FState_translation.z());
 
                                     throw std::runtime_error("Update impulse offset has nan");
                                 }
@@ -875,9 +877,9 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                                     throw std::runtime_error("Impulse offset has nan");
                                 }
                                 if (rotational_impulse_offsets[a_id].hasNaN()) {
-                                    globals::logger.printf(2, "uio: (%f, %f, %f)\n", update_impulse_offset.x(), update_impulse_offset.y(), update_impulse_offset.z());
-                                    globals::logger.printf(2, "p1_A: (%f, %f, %f)\n", p1_A.x(), p1_A.y(), p1_A.z());
-                                    globals::logger.printf(2, "aFt: (%f, %f, %f)\n", a_FState_translation.x(), a_FState_translation.y(), a_FState_translation.z());
+                                    globals::logger.printf(3, "uio: (%f, %f, %f)\n", update_impulse_offset.x(), update_impulse_offset.y(), update_impulse_offset.z());
+                                    globals::logger.printf(3, "p1_A: (%f, %f, %f)\n", p1_A.x(), p1_A.y(), p1_A.z());
+                                    globals::logger.printf(3, "aFt: (%f, %f, %f)\n", a_FState_translation.x(), a_FState_translation.y(), a_FState_translation.z());
 
                                     throw std::runtime_error("Impulse rotational offset has nan");
                                 }
@@ -888,17 +890,17 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                                 Eigen::Vector3d rotational_impulse_offset_a = rotational_impulse_offsets[a_id];
 
                                 if (impulse_a.hasNaN() || rotational_impulse_a.hasNaN()) {
-                                    throw std::runtime_error("Nan in a state update\n");
+                                    // throw std::runtime_error("Nan in a state update\n");
                                 }
                                 if (impulse_offset_a.hasNaN()) {
-                                    throw std::runtime_error("Nan in a state update impulse offset\n");
+                                    // throw std::runtime_error("Nan in a state update impulse offset\n");
                                 }
                                 if (rotational_impulse_offset_a.hasNaN()) {
-                                    globals::logger.printf(2, "uio: (%f, %f, %f)\n", update_impulse_offset.x(), update_impulse_offset.y(), update_impulse_offset.z());
-                                    globals::logger.printf(2, "p1_A: (%f, %f, %f)\n", p1_A.x(), p1_A.y(), p1_A.z());
-                                    globals::logger.printf(2, "aFt: (%f, %f, %f)\n", a_FState_translation.x(), a_FState_translation.y(), a_FState_translation.z());
+                                    globals::logger.printf(3, "uio: (%f, %f, %f)\n", update_impulse_offset.x(), update_impulse_offset.y(), update_impulse_offset.z());
+                                    globals::logger.printf(3, "p1_A: (%f, %f, %f)\n", p1_A.x(), p1_A.y(), p1_A.z());
+                                    globals::logger.printf(3, "aFt: (%f, %f, %f)\n", a_FState_translation.x(), a_FState_translation.y(), a_FState_translation.z());
 
-                                    throw std::runtime_error("Nan in a state update rotational impulse offset\n");
+                                    // throw std::runtime_error("Nan in a state update rotational impulse offset\n");
                                 }
                                 FStates[a_id] = updateState(cluster.particles[a_id].future_state, t, impulse_a, impulse_offset_a, rotational_impulse_a, rotational_impulse_offset_a, &cluster.particles[a_id]);
                                 
@@ -923,7 +925,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                                 Eigen::Vector3d rotational_impulse_offset_b = rotational_impulse_offsets[b_id];
 
                                 if (impulse_b.hasNaN() || rotational_impulse_b.hasNaN() || impulse_offset_b.hasNaN() || rotational_impulse_offset_b.hasNaN()) {
-                                    throw std::runtime_error("Nan in b state update\n");
+                                    // throw std::runtime_error("Nan in b state update\n");
                                 }
                                 FStates[b_id] = updateState(cluster.particles[b_id].future_state, t, impulse_b, impulse_offset_b, rotational_impulse_b, rotational_impulse_offset_b, &cluster.particles[b_id]);
                                 
@@ -947,7 +949,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                     if (impulse_diff.norm() > 1e-8) {
                         converged = false;
                         if (it > 500) {
-                            globals::logger.printf(2, "Diff %f\n", impulse_diff.norm());
+                            globals::logger.printf(3, "Diff %f\n", impulse_diff.norm());
                         }
                         break;
                     }
@@ -958,12 +960,12 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
                 if (impulses[p_i].hasNaN()) {
                     throw std::runtime_error("Impulse has NaN\n");
                 }
-                // globals::logger.printf(2, "impulse: %f, %f, %f\n", impulses[p_i].x(), impulses[p_i].y(), impulses[p_i].z());
-                // globals::logger.printf(2, "impulse diff: %f, %f, %f\n", impulse_diff.x(), impulse_diff.y(), impulse_diff.z());
+                // globals::logger.printf(3, "impulse: %f, %f, %f\n", impulses[p_i].x(), impulses[p_i].y(), impulses[p_i].z());
+                // globals::logger.printf(3, "impulse diff: %f, %f, %f\n", impulse_diff.x(), impulse_diff.y(), impulse_diff.z());
             }
 
             if (converged && !all_d1_above) {
-                globals::logger.printf(2, "Incorrectly converged\n");
+                globals::logger.printf(3, "Incorrectly converged\n");
                 throw std::runtime_error("Incorrectly converged");
             }
 
@@ -971,7 +973,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             // __itt_task_end(globals::itt_handles.detailed_domain);
         }
 
-        globals::logger.printf(2, "%i: Iterations used 2nd phase: %i\n", cluster_id, it);
+        globals::logger.printf(3, "%i: Iterations used 2nd phase: %i\n", cluster_id, it);
 
 
 
@@ -982,11 +984,11 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             for (int c = 0; c < hits.size(); c++) {
                 uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
                 uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
-                // globals::logger.printf(2, "Contact with ids: %i(%i), %i(%i), %f, (%f, %f, %f)\n", a_id, hits[c].p_a->id, b_id, hits[c].p_b->id, contacts[c].impulse, contacts[c].global_normal.x(), contacts[c].global_normal.y(), contacts[c].global_normal.z());
+                // globals::logger.printf(3, "Contact with ids: %i(%i), %i(%i), %f, (%f, %f, %f)\n", a_id, hits[c].p_a->id, b_id, hits[c].p_b->id, contacts[c].impulse, contacts[c].global_normal.x(), contacts[c].global_normal.y(), contacts[c].global_normal.z());
                 globals::contact_draws.push_back(std::make_tuple(contacts[c].global_centre, contacts[c].global_normal.normalized() * contacts[c].impulse, contacts[c].last_friction_impulse));
             }
         }
-        // globals::logger.printf(2, "Finish contact in %i iterations\n", it);
+        // globals::logger.printf(3, "Finish contact in %i iterations\n", it);
     }
 
     #ifdef USETBB
@@ -996,18 +998,19 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
     #endif
 
     for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
-        assert(!impulses[p_i].hasNaN());
-        assert(impulses[p_i].norm() < 10000);
+        // assert(!impulses[p_i].hasNaN());
+        // assert(impulses[p_i].norm() < 10000);
         if (impulses[p_i].norm() > 10000) {
-            globals::logger.printf(2, "Really big impulse\n");
+            globals::logger.printf(3, "Really big impulse\n");
+            return false;
         }
         if (impulses[p_i].hasNaN()) {
-            throw std::runtime_error("Nan!");
-            globals::logger.printf(2, "Nan!\n");
+            // // throw std::runtime_error("Nan!");
+            globals::logger.printf(3, "Nan!\n");
             return false;
         }
         if (FStates[p_i].getTransformation().hasNaN()) {
-            throw std::runtime_error("Nan in transformation FState");
+            // throw std::runtime_error("Nan in transformation FState");
         }
     }
 

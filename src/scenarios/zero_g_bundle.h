@@ -156,13 +156,14 @@ namespace Delta2 {
             }
 
             const double offset = 26;
+            const double x_offset = (double)scenario_size / 2.0 * offset;
 
             for (int x = 0; x < scenario_size; x++) {
                 double separation = globals::opt.rand_float(1.0);
 
                 {
                     auto& p = particles.emplace_back(M2, 1.0, 10.0, 0.25);
-                    p.current_state.setTranslation({x * offset, 0, 0});
+                    p.current_state.setTranslation({x * offset - x_offset, 0, 0});
                     p.current_state.setVelocity({separation, 0, 0});
                 }
 
@@ -171,7 +172,7 @@ namespace Delta2 {
                         for (int z = 0; z < 4; z++) {
                             separation = globals::opt.rand_float(2.0);  
                             auto& p = particles.emplace_back(M1, 1.0, 10.0, 0.25);
-                            p.current_state.setTranslation({x * offset + 5 + 5 * i, -4 + y * 1.5, -4 + z * 1.5});
+                            p.current_state.setTranslation({x * offset + 5 + 5 * i - x_offset, -4 + y * 2, -4 + z * 2});
                             p.current_state.setVelocity({-separation, 0, 0});
                         }
                     }
@@ -180,49 +181,49 @@ namespace Delta2 {
                 {
                     separation = globals::opt.rand_float(4.0) - 2.0;
                     auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-                    p.current_state.setTranslation({x * offset + 2, 7, 0});
+                    p.current_state.setTranslation({x * offset + 2 - x_offset, 7, 0});
                     p.current_state.setVelocity({separation, 0, 0});
                 }
                 {
                     separation = globals::opt.rand_float(4.0) - 2.0;
                     auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-                    p.current_state.setTranslation({x * offset + 2, -7, 0});
+                    p.current_state.setTranslation({x * offset + 2 - x_offset, -7, 0});
                     p.current_state.setVelocity({separation, 0, 0});
                 }
                 {
                     separation = globals::opt.rand_float(4.0) - 2.0;
                     auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-                    p.current_state.setTranslation({x * offset + 2, 0, 7});
+                    p.current_state.setTranslation({x * offset + 2 - x_offset, 0, 7});
                     p.current_state.setVelocity({separation, 0, 0});
                 }
                 {
                     separation = globals::opt.rand_float(4.0) - 2.0;
                     auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-                    p.current_state.setTranslation({x * offset + 2, 0, -7});
+                    p.current_state.setTranslation({x * offset + 2 - x_offset, 0, -7});
                     p.current_state.setVelocity({separation, 0, 0});
                 }
                 {
                     separation = globals::opt.rand_float(4.0) - 2.0;
                     auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-                    p.current_state.setTranslation({x * offset + 2, +5, +5});
+                    p.current_state.setTranslation({x * offset + 2 - x_offset, +5, +5});
                     p.current_state.setVelocity({separation, 0, 0});
                 }
                 {
                     separation = globals::opt.rand_float(4.0) - 2.0;
                     auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-                    p.current_state.setTranslation({x * offset + 2, +5, -5});
+                    p.current_state.setTranslation({x * offset + 2 - x_offset, +5, -5});
                     p.current_state.setVelocity({separation, 0, 0});
                 }
                 {
                     separation = globals::opt.rand_float(4.0) - 2.0;
                     auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-                    p.current_state.setTranslation({x * offset + 2, -5, +5});
+                    p.current_state.setTranslation({x * offset + 2 - x_offset, -5, +5});
                     p.current_state.setVelocity({separation, 0, 0});
                 }
                 {
                     separation = globals::opt.rand_float(4.0) - 2.0;
                     auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
-                    p.current_state.setTranslation({x * offset + 2, -5, -5});
+                    p.current_state.setTranslation({x * offset + 2 - x_offset, -5, -5});
                     p.current_state.setVelocity({separation, 0, 0});
                 }
             }
