@@ -16,7 +16,7 @@ test_dep = $(test_obj:.o=.d)
 all_dep = $(dep) $(test_dep)
 clean_dep = $(clean_obj:.o=.d)
 
-is_hamilton = 1
+is_hamilton = 0
 
 ifeq ($(is_hamilton), 1)
 	ifeq ($(CC), $(filter $(CC),icx dpcpp))
@@ -31,6 +31,10 @@ ifeq ($(is_hamilton), 1)
 		VFLAGS = -fopenmp
 	endif
 	DEFINES = -DTASKING_TBB -DNOGL
+
+	INCLUDE = -I/home/wxmv95/eigen -I/home/wxmv95/simde -I/home/wxmv95/embree-3.13.2.x86_64.linux/include/embree3 -I/home/wxmv95/embree-3.13.2.x86_64.linux/include -I/home/wxmv95/Catch2/single_include -I/home/wxmv95/libigl/include -I/usr/include -I/opt/intel/oneapi/tbb/latest/include -I/home/wxmv95/CGAL-5.5.1/include $(VINCLUDE)
+	LIBS = -L/home/wxmv95/embree-3.13.2.x86_64.linux/lib -lgmp -lstdc++ -lm -ldl -ltbb
+	LIBNAMES = /home/wxmv95/embree-3.13.2.x86_64.linux/lib/libembree3.so.3 $(VLIBNAMES)
 else
 	ifeq ($(CC), $(filter $(CC),icx dpcpp))
 		VINCLUDE = -I/home/peter/Documents/tetgen1.6.0 -I/home/peter/Documents/glad/include
@@ -44,6 +48,10 @@ else
 		VFLAGS = -fopenmp
 	endif
 	DEFINES = -DTASKING_TBB
+
+	INCLUDE = -I/home/peter/Documents/eigen -I/opt/intel/oneapi/vtune/latest/include -I/home/peter/Documents/simde -I/home/peter/Documents/embree-3.13.2.x86_64.linux/include/embree3 -I/home/peter/Documents/embree-3.13.2.x86_64.linux/include -I/home/peter/Documents/Catch2/single_include -I/home/peter/Documents/libigl/include -I/usr/include -I/opt/intel/oneapi/tbb/latest/include $(VINCLUDE)
+	LIBS = -L/home/peter/Documents/embree-3.13.2.x86_64.linux/lib -lgmp -lstdc++ -lm -ldl -ltbb
+	LIBNAMES = /opt/intel/oneapi/vtune/latest/sdk/lib64/libittnotify.a /home/peter/Documents/embree-3.13.2.x86_64.linux/lib/libembree3.so.3 /usr/lib/x86_64-linux-gnu/libglfw.so.3.3 $(VLIBNAMES)
 endif
 
 CFLAGS = -std=c++17 -DCGAL_DISABLE_ROUNDING_MATH_CHECK $(VCFLAGS)
@@ -56,10 +64,6 @@ FLAGS = -march=native -g $(VFLAGS)
 #-I/ddn/home/wxmv95/catch2 -I/ddn/apps/Cluster-Apps/likwid/5.0.1/include/ 
 # -I/home/wxmv95/likwid-5.2.0/src/includes
 # -L/home/wxmv95/likwid-5.2.0
-
-INCLUDE = -I/home/wxmv95/eigen -I/home/wxmv95/simde -I/home/wxmv95/embree-3.13.2.x86_64.linux/include/embree3 -I/home/wxmv95/embree-3.13.2.x86_64.linux/include -I/home/wxmv95/Catch2/single_include -I/home/wxmv95/libigl/include -I/usr/include -I/opt/intel/oneapi/tbb/latest/include -I/home/wxmv95/CGAL-5.5.1/include $(VINCLUDE)
-LIBS = -L/home/wxmv95/embree-3.13.2.x86_64.linux/lib -lgmp -lstdc++ -lm -ldl -ltbb
-LIBNAMES = /home/wxmv95/embree-3.13.2.x86_64.linux/lib/libembree3.so.3 $(VLIBNAMES)
 
 release: mainrelease
 debug: maindebug
