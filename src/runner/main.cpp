@@ -30,6 +30,7 @@
 #include "../scenarios/start_intersecting.h"
 #include "../scenarios/pairs.h"
 #include "../scenarios/waterfall.h"
+#include "../scenarios/fast_moving.h"
 
 #include "../globals.h"
 
@@ -107,6 +108,11 @@ int main(int argc, char *argv[]) {
     case 5:
         {
             scenarios::waterfall(particles, contact_force);
+            break;
+        }
+    case 6:
+        {
+            scenarios::fast_moving(particles, contact_force);
             break;
         }
     default:

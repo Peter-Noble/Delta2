@@ -122,7 +122,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     // }
     if (!success && !forced_advance) {
         if (!forced_advance) {
-            globals::logger.printf(2, "%i: Failed but forced advance\n", cluster_id);
+            globals::logger.printf(2, "%i: Failed but didn't force advance\n", cluster_id);
         }
         globals::logger.printf(3, "%i: Fail\n", cluster_id);
         // Interpolate current_new back to 50% between last_start and current_start
@@ -551,7 +551,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
     // __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, separate_collision_clusters_task);
     std::vector<collision::Cluster> clusters = collision::separateCollisionClusters(B, particles);
-    globals::logger.printf(3, "%i clusters found from separateCollisionClusters\n", clusters.size());
+    // globals::logger.printf(3, "%i clusters found from separateCollisionClusters\n", clusters.size());
     // __itt_task_end(globals::itt_handles.phases_domain);
     
     double min_final_time = std::numeric_limits<double>::infinity();
@@ -577,12 +577,26 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
     int total_clusters = clusters.size();
     for (int cluster_i = 0; cluster_i < total_clusters; cluster_i++)
     {
+        // globals::logger.printf(3, "Considering cluster %i\n", cluster_i);
         collision::Cluster& cl = clusters[cluster_i];
         // clusters.pop_back();
 
+        auto it = std::find_if(last_step_clusters.begin(), last_step_clusters.end(), [&cl](const collision::Cluster& last) {return !last.hasAdvanced(cl);});        
+        if (it != last_step_clusters.end()) {
+            // This cluster was the same as it was last iteration (and it didn't advance) so just keep the same step size recommendation.
+            if (cl.step_size >= 0) {
+                // If step_size has been set to -1 then this cluster has been seen but not advanced before
+                cl.step_size = it->step_size;
+                fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + it->step_size);
+                // globals::logger.printf(1, "%i skipping time step selection because time step has already been picked for this cluster since last modification\n", cluster_i);
+                // clusters_tmp.push_back(cl);
+                continue;
+            }
+        }
+
         if (cl.min_current_time > min_final_time)
         {
-            // globals::logger.printf(3, "%i skipping time step selection because min current time ahead of min final time\n", cluster_i);
+            // globals::logger.printf(1, "%i skipping time step selection because min current time ahead of min final time\n", cluster_i);
             // clusters_tmp.push_back(cl);
             // This cluster can't advance because there is another cluster that is too far behind
             continue;
@@ -590,33 +604,34 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
         if (cl.is_static)
         {
-            // globals::logger.printf(3, "%i skipping time step selection because static cluster\n", cluster_i);
+            // globals::logger.printf(1, "%i skipping time step selection because static cluster\n", cluster_i);
             // This cluster shouldn't be advanced as it's asleep or static
             // clusters_tmp.push_back(cl);
             continue;
         }
 
         if (cl.sleeping) {
-            // globals::logger.printf(3, "%i skipping time step selection because sleeping cluster\n", cluster_i);
+            // globals::logger.printf(1, "%i skipping time step selection because sleeping cluster\n", cluster_i);
             fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + _opt.time_step_size);
-            // clusters_tmp.push_back(cl);
-            continue;
-        }
-
-        // TODO can this test ever pass?  Does the first check for min_current_time > min_final_time catch this?
-        auto it = std::find_if(last_step_clusters.begin(), last_step_clusters.end(), [&cl](const collision::Cluster& last) {return !last.hasAdvanced(cl);});        
-        if (it != last_step_clusters.end()) {
-            // This cluster was the same as it was last iteration (and it didn't advance) so just keep the same step size recommendation.
-            cl.step_size = it->step_size;
-            fine_min_final_time = std::min(fine_min_final_time, cl.min_current_time + it->step_size);
-            // globals::logger.printf(3, "%i skipping time step selection because time step has already been picked for this cluster since last modification\n", cluster_i);
+            cl.step_size = _opt.time_step_size;
             // clusters_tmp.push_back(cl);
             continue;
         }
         
         task_group.run([&, cluster_i] {  // TODO this causes segfaults when used with cluster separation for some reason
             // __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, select_time_step_task);
-            double step = _local_pde.selectTimeStep(clusters[cluster_i]);
+            collision::Cluster& cluster = clusters[cluster_i];
+
+            double step = _local_pde.selectTimeStep(cluster);
+
+            std::string step_size_string = "Selected time step size: " + std::to_string(step) + "for cluster of " + std::to_string(cluster.particles.size());
+            step_size_string += ". {";
+            for (Particle* p : cluster.particles) {
+                step_size_string += std::to_string(p->id) + ", ";
+            }
+            step_size_string += "}\n";
+
+            globals::logger.printf(2, step_size_string.c_str());
             // std::vector<collision::Cluster> sub_clusters = collision::separateClusterByTimestep(clusters[cluster_i]);
             // std::vector<collision::Cluster> sub_clusters = {clusters[cluster_i]};
 
@@ -625,6 +640,8 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
                 std::lock_guard guard(fine_min_final_time_lock);
                 fine_min_final_time = std::min(fine_min_final_time, clusters[cluster_i].min_current_time + step);
 
+                // globals::logger.printf(1, "fine_min_final_time: %f\n", fine_min_final_time);
+                // globals::logger.printf(1, "Selected time: %f for cluster %i\n", step, cluster_i);
 
                 // if (sub_clusters.size() > 1) {
                 //     int up_to_cluster = clusters.size();
@@ -641,8 +658,6 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
                 //         // }
                 //         // clusters_tmp.push_back(sub_cl);
                 //     }
-
-                //     globals::logger.printf(3, "Selected time: %f for cluster %i\n", step, cluster_i);
 
                 //     globals::logger.printf(3, "Splitting into %i\n", sub_clusters.size());
                 // }
@@ -745,23 +760,23 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
     {
         int cluster_i = can_advance[ca];
         step_task_group.run([&, cluster_i] {
-            // globals::logger.printf(3, "cluster_i: %i, min_current_time: %f, step_size: %f\n", cluster_i, clusters[cluster_i].min_current_time, clusters[cluster_i].step_size);
-            // assert(clusters[cluster_i].min_current_time + clusters[cluster_i].step_size >= fine_min_final_time);
-            // for (Particle* p : clusters[cluster_i].particles) {
-            //     if (!p->is_static) {
-            //         globals::logger.printf(3, "Pre  step particle %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
-            //     }
-            // }
+            // globals::logger.printf(1, "cluster_i: %i, min_current_time: %f, step_size: %f\n", cluster_i, clusters[cluster_i].min_current_time, clusters[cluster_i].step_size);
+            assert(clusters[cluster_i].min_current_time + clusters[cluster_i].step_size >= fine_min_final_time);
+            for (Particle* p : clusters[cluster_i].particles) {
+                if (!p->is_static) {
+                    // globals::logger.printf(1, "Pre  step particle %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
+                }
+            }
 
 
             // __itt_task_begin(globals::itt_handles.phases_domain, __itt_null, __itt_null, select_and_sort_task);
             stepRecursive(clusters[cluster_i], true);
             // __itt_task_end(globals::itt_handles.phases_domain);
-            // for (Particle* p : clusters[cluster_i].particles) {
-            //     if (!p->is_static) {
-            //         globals::logger.printf(3, "Post step particle %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
-            //     }
-            // }
+            for (Particle* p : clusters[cluster_i].particles) {
+                if (!p->is_static) {
+                    // globals::logger.printf(1, "Post step particle %i last: %.4f, current: %.4f, future: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
+                }
+            }
 
             for (Particle* p : clusters[cluster_i].particles) {
                 if (!p->is_static) {
@@ -796,6 +811,16 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
                     throw std::runtime_error("Time is different but no local ts");
                 }
             }
+        }
+    }
+
+    for (int cluster_i = total_clusters - 1; cluster_i >= 0; cluster_i--)
+    {
+        collision::Cluster& cl = clusters[cluster_i];
+
+        if (cl.min_current_time > min_final_time || cl.is_static || cl.sleeping) {
+            // Remove this cluster in the next cache (stops clusters that haven't had a time step selected from being used)
+            clusters.erase(clusters.begin() + cluster_i);
         }
     }
 

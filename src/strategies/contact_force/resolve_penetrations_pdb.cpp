@@ -149,6 +149,7 @@ void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool 
                     changed = true;
                     new_full_comparison = true;
                     if (i > 100) {
+                        globals::logger.printf(3, "Can't fix positions so scattering\n");
                         if (!cluster.particles[a_id].is_static) {
                             cluster.particles[a_id].current_state.setTranslation(Eigen::Vector3d({globals::opt.rand_float(1000000), globals::opt.rand_float(1000000), globals::opt.rand_float(1000000)}));
                             cluster.particles[a_id].future_state.setTranslation(Eigen::Vector3d({globals::opt.rand_float(1000000), globals::opt.rand_float(1000000), globals::opt.rand_float(1000000)}));

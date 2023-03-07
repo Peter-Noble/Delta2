@@ -93,7 +93,7 @@ void collision::separateContinuousCollisionClusters(collision::BroadPhaseCollisi
                 for (collision::ContinuousContact<double>& c : Ccs) {
                     
                 }
-                globals::logger.printf(3, "Min toc: %f\n", min_toc);
+                // globals::logger.printf(3, "Min toc: %f\n", min_toc);
             }
             // __itt_task_end(globals::itt_handles.detailed_domain);
         });
@@ -569,6 +569,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                 double min_scaling_seen = 1.0;
                 double min_toc = 1.0;
                 for (collision::ContinuousContact<double>& c : Ccs) {
+                    // globals::logger.printf(3, "(%i, %i) toc %f\n", b.A.first, b.B.first, c.toc);
                     Eigen::Vector3d hit_normal = (c.A - c.B);
 
                     double interaction_dist = c.eps_a + c.eps_b;
@@ -635,6 +636,8 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                 }
                 b.target_toc = std::min(b.target_toc, (float)min_scaling_seen);
 
+                // globals::logger.printf(1, "min toc: %f, target toc: %f\n", b.min_toc, b.target_toc);
+
                 if (std::isinf(b.min_toc)) {
                     // None of the continuous contacts set the min_toc so it can advance all the way.
                     b.min_toc = 1.0;
@@ -688,15 +691,16 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
         }
 
         if (cluster.step_size < 0.0) {
-            cluster.step_size = step_size[a_id];
+            cluster.step_size = b.target_toc;
         }
         else {
-            cluster.step_size = std::min(cluster.step_size, step_size[id]);
+            cluster.step_size = std::min(cluster.step_size, (double)b.target_toc);
         }
     }
     if (cluster.step_size < 0.0) {
         cluster.step_size = (cluster.particles[0]).last_time_step_size;
     }
+    // globals::logger.printf(1, "Cluster time step: %f\n", cluster.step_size);
 }
 
 
