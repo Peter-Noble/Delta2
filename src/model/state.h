@@ -26,6 +26,8 @@ namespace Delta2 {
             bool isStationary() const;
 
             void applyDelta(double t, Eigen::Vector3d F, Eigen::Vector3d T, double mass, const Eigen::Matrix3d& inverse_inertia);
+
+            std::string serialise();
         private:
             double _time;
 

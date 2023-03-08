@@ -23,6 +23,8 @@ namespace Delta2 {
 
             const Eigen::MatrixXd& getVertices();
             const Eigen::MatrixXi& getFaces();
+
+            const std::string serialise();
         private:
             model::SurrogateTree _surrogate;
 

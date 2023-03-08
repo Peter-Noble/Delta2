@@ -146,3 +146,13 @@ void State::applyDelta(double t, Eigen::Vector3d force, Eigen::Vector3d torque, 
 
     setRotation(rotation);
 }
+
+std::string State::serialise() {
+    std::stringstream result;
+    result << _time << "\n";
+    result << _rotation << "\n";
+    result << _angular_momentum << "\n";
+    result << _translation << "\n";
+    result << _velocity << "\n";
+    return result.str();
+}

@@ -22,6 +22,7 @@
 #include "../strategies/contact_detection_continuous/contact_detection_continuous_comparison.h"
 #include "../strategies/PDE/PDE_explicit.h"
 #include "../strategies/broad_phase/broad_phase_embree_cluster.h"
+#include "../common/export_d2.h"
 
 #include "../strategies/contact_force/resolve_penetrations_pbd.h"
 
@@ -133,6 +134,8 @@ int main(int argc, char *argv[]) {
     }
     #endif
 
+    Delta2::D2Writer export_writer(particles);
+
     // PDE.printType();
 
     time_step.init(ph);
@@ -141,6 +144,11 @@ int main(int argc, char *argv[]) {
     int step = 0;
     while (cont) {
         globals::logger.printf(1, "Step: %i\n", step);
+
+        if (globals::opt.export_result) {
+            export_writer.capture(particles);
+        }
+
         // std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> view_draws;
         {
             std::lock_guard draws_lock(globals::contact_draws_lock);
@@ -171,6 +179,11 @@ int main(int argc, char *argv[]) {
             cont = step < globals::opt.num_time_steps;
         }
         
+    }
+
+    if (globals::opt.export_result) {
+        export_writer.capture(particles);
+        export_writer.write(particles, 30, "./export/export.d2");
     }
 
     globals::logger.printf(0, "================ Done ================\n");

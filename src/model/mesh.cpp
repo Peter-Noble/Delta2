@@ -174,3 +174,10 @@ const Eigen::MatrixXd& MeshData::getVertices() {
 const Eigen::MatrixXi& MeshData::getFaces() {
     return _faces;
 }
+
+const std::string MeshData::serialise() {
+    std::stringstream result;
+    result << "V\n" << getVertices();
+    result << "F\n" << getFaces();
+    return result.str();
+}

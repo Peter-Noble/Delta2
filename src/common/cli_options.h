@@ -185,7 +185,7 @@ namespace Delta2 {
 				app.add_option("-a,--adaptive_time_step_factor", adaptive_time_step_factor, "How small compared to the target time step the adaptive step sizes are allowed to go");
 				app.add_option("-n,--num_steps", num_time_steps, "Number of time steps");
 				app.add_option("-f,--final_time", final_time, "Simulate up until this time");
-				app.add_flag("-e,--export", export_result, "Export to VTK (Not implemented)");
+				app.add_flag("-e,--export", export_result, "Export to d2 (custom) file");
 				app.add_flag("-p,--print_tree", print_tree, "Print the surrogate tree as a Python compatible string (Not implememted)");
 				app.add_flag("-d,--print_debug", print_debug, "Print iteration debug information");
 				app.add_flag("-i,--print_iteration_count", print_iteration_count, "Print the number of iterations at each depth");
