@@ -1,11 +1,15 @@
 #include "export_d2.h"
 
+#include "../globals.h"
+
 #include <iostream>
 #include <fstream>
 using namespace std;
 
 Delta2::D2Writer::D2Writer(std::vector<Delta2::Particle>& particles) {
-    
+    for (Delta2::Particle& p: particles) {
+        states.push_back({});
+    }
 }
 
 void Delta2::D2Writer::capture(std::vector<Delta2::Particle>& particles) {
@@ -31,6 +35,11 @@ void Delta2::D2Writer::write(std::vector<Delta2::Particle>& particles, int frame
 
     ofstream file;
     file.open(file_name);
+    if (!file.is_open()) {
+        Delta2::globals::logger.printf(1, "Error opening file\n");
+        return;
+    }
+
     file << "Meshes:\n";
     for (int m_i = 0; m_i < mesh_types.size(); m_i++) {
         std::shared_ptr<Delta2::MeshData> m = mesh_types[m_i];
@@ -60,18 +69,20 @@ void Delta2::D2Writer::write(std::vector<Delta2::Particle>& particles, int frame
         current_capture.push_back(0);
     }
     while (!reached_end) {
-        file << "t " << time << "\n";
         for (int p_i = 0; p_i < particles.size(); p_i++) {
-            while (states[p_i][current_capture[p_i]].getTime() <= time) {
-                current_capture[p_i]++;
-                if (current_capture[p_i] >= states[p_i].size()) {
-                    reached_end = true;
-                    break;
+            if (!particles[p_i].is_static) {
+                while (states[p_i][current_capture[p_i]].getTime() <= time) {
+                    current_capture[p_i]++;
+                    if (current_capture[p_i] >= states[p_i].size()) {
+                        reached_end = true;
+                        break;
+                    }
                 }
             }
         }
 
         if (!reached_end) {
+            file << "t " << time << "\n";
             for (int p_i = 0; p_i < particles.size(); p_i++) {
                 file << "p " << p_i << "\n";
                 file << states[p_i][current_capture[p_i]].interpolate(states[p_i][current_capture[p_i]-1], time).serialise();
@@ -81,4 +92,7 @@ void Delta2::D2Writer::write(std::vector<Delta2::Particle>& particles, int frame
 
         time += 1.0 / (double)frame_rate;
     }
+
+    file.flush();
+    file.close();
 }

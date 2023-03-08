@@ -183,7 +183,9 @@ int main(int argc, char *argv[]) {
 
     if (globals::opt.export_result) {
         export_writer.capture(particles);
-        export_writer.write(particles, 30, "./export/export.d2");
+        std::string export_path = std::string(std::getenv("EXPORT_DIR"))+"/export.d2";
+        Delta2::globals::logger.printf(1, "Exporting to %s\n", export_path.c_str());
+        export_writer.write(particles, 30, export_path);
     }
 
     globals::logger.printf(0, "================ Done ================\n");

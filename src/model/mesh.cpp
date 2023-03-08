@@ -177,7 +177,7 @@ const Eigen::MatrixXi& MeshData::getFaces() {
 
 const std::string MeshData::serialise() {
     std::stringstream result;
-    result << "V\n" << getVertices();
-    result << "F\n" << getFaces();
+    result << "V\n" << getVertices() << "\n";
+    result << "F\n" << getFaces() << "\n";
     return result.str();
 }
