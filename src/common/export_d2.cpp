@@ -15,11 +15,19 @@ Delta2::D2Writer::D2Writer(std::vector<Delta2::Particle>& particles) {
 void Delta2::D2Writer::capture(std::vector<Delta2::Particle>& particles) {
     for (int p_i = 0; p_i < particles.size(); p_i++) {
         Delta2::Particle& p = particles[p_i];
-        states[p_i].push_back(p.last_state);
+
+        if (states[p_i].size() > 0) {
+            if (p.last_state.getTime() > states[p_i][states[p_i].size()-1].getTime()) {
+                states[p_i].push_back(p.last_state);
+            }
+        } else {
+            states[p_i].push_back(p.last_state);
+        }
     }
 }
 
 void Delta2::D2Writer::write(std::vector<Delta2::Particle>& particles, int frame_rate, std::string file_name) {
+    Delta2::globals::logger.printf(1, "Writing d2 file\n");
     for (int p_i = 0; p_i < particles.size(); p_i++) {
         Delta2::Particle& p = particles[p_i];
         states[p_i].push_back(p.current_state);
@@ -46,7 +54,7 @@ void Delta2::D2Writer::write(std::vector<Delta2::Particle>& particles, int frame
         file << "m " << m_i << "\n";
         file << m->serialise();
     }
-    file << "Particles:\n";
+    file << "\nParticles:\n";
     // For each particle write it's mesh reference 
     for (int p_i = 0; p_i < particles.size(); p_i++) {
         Delta2::Particle& p = particles[p_i];
@@ -62,11 +70,13 @@ void Delta2::D2Writer::write(std::vector<Delta2::Particle>& particles, int frame
         file << mesh_ref << "\n";
     }
 
+    Delta2::globals::logger.printf(2, "Writing frames\n");
+
     float time = 0.0;
     bool reached_end = false;
     std::vector<int> current_capture;  // points to the stored state one after the current export time
     for (Delta2::Particle& p: particles) {
-        current_capture.push_back(0);
+        current_capture.push_back(1);
     }
     while (!reached_end) {
         for (int p_i = 0; p_i < particles.size(); p_i++) {

@@ -1,5 +1,6 @@
 #include "state.h"
 #include "../common/utils.h"
+#include "../globals.h"
 
 using namespace Delta2;
 using namespace Eigen;
@@ -150,9 +151,10 @@ void State::applyDelta(double t, Eigen::Vector3d force, Eigen::Vector3d torque, 
 std::string State::serialise() {
     std::stringstream result;
     result << _time << "\n";
-    result << _rotation << "\n";
-    result << _angular_momentum << "\n";
-    result << _translation << "\n";
-    result << _velocity << "\n";
+    Eigen::Vector3d r = _rotation.toRotationMatrix().eulerAngles(0, 1, 2);
+    result << r.x() << " " << r.y() << " " << r.z() << " " << "\n";
+    // result << _angular_momentum.x() << " " << _angular_momentum.y() << " " << _angular_momentum.z() << "\n";
+    result << _translation.x() << " " << _translation.y() << " " << _translation.z() << "\n";
+    // result << _velocity.x() << " " << _velocity.y() << " " << _velocity.z() << "\n";
     return result.str();
 }

@@ -146,7 +146,9 @@ int main(int argc, char *argv[]) {
         globals::logger.printf(1, "Step: %i\n", step);
 
         if (globals::opt.export_result) {
+            Delta2::globals::logger.printf(2, "Starting capture\n");
             export_writer.capture(particles);
+            Delta2::globals::logger.printf(2, "Done capture\n");
         }
 
         // std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> view_draws;
@@ -182,6 +184,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (globals::opt.export_result) {
+        Delta2::globals::logger.printf(2, "Start final write\n");
         export_writer.capture(particles);
         std::string export_path = std::string(std::getenv("EXPORT_DIR"))+"/export.d2";
         Delta2::globals::logger.printf(1, "Exporting to %s\n", export_path.c_str());
