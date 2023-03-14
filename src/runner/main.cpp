@@ -19,6 +19,7 @@
 #include "../strategies/friction/friction_iterative.h"
 #include "../strategies/time_step_size/time_step_selection_dynamic_continuous.h"
 #include "../strategies/contact_detection/contact_detection_comparison.h"
+#include "../strategies/contact_detection/contact_detection_hybrid.h"
 #include "../strategies/contact_detection_continuous/contact_detection_continuous_comparison.h"
 #include "../strategies/PDE/PDE_explicit.h"
 #include "../strategies/broad_phase/broad_phase_embree_cluster.h"
@@ -72,7 +73,8 @@ int main(int argc, char *argv[]) {
     strategy::SequentialImpulses contact_force(friction, globals::opt);
     strategy::ContactDetectionContinuousComparison contact_detection_continuous;
     strategy::TimeStepSelectionDynamicContinuous time_step(contact_detection_continuous, globals::opt);
-    strategy::ContactDetectionComparison contact_detection;
+    // strategy::ContactDetectionComparison contact_detection;
+    strategy::ContactDetectionHybrid contact_detection;
     strategy::PDEExplicit PDE(contact_detection, contact_force, friction, time_step, globals::opt);
     strategy::BroadPhaseEmbreeCluster broad_phase(PDE, globals::opt);
 

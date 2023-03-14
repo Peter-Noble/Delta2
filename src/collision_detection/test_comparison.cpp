@@ -14,12 +14,14 @@ TEMPLATE_TEST_CASE("Triangle-triangle comparison vert-face", "[grp_collision_det
     Eigen::Vector<TestType, 3> p_out;
     Eigen::Vector<TestType, 3> q_out;
 
-    Eigen::Vector<TestType, 3> a_rot({0.5235, 0.3491, 0.0});
+    // Eigen::Vector<TestType, 3> a_rot({0.5235, 0.3491, 0.0}); // Has a problem with rotation order
+    Eigen::Quaternion<TestType> a_rot({0.951261, 0.254839, 0.1677497, -0.0449395});
     Eigen::Vector<TestType, 3> a_pos({0.0, 1.0, 1.2651});
     Eigen::Matrix<TestType, 4, 4> a_t = Delta2::common::transformationMatrix(a_rot, a_pos);
     Delta2::common::Triangle<TestType> A = tri1.transformed(a_t);
 
-    Eigen::Vector<TestType, 3> b_rot({-0.1745, 0.0, 0.0873});
+    // Eigen::Vector<TestType, 3> b_rot({-0.1745, 0.0, 0.0873});
+    Eigen::Quaternion<TestType> b_rot({0.9952, -0.087056, 0.0038, 0.04347});
     Eigen::Vector<TestType, 3> b_pos({0.0, 0.0, 0.0});
     Eigen::Matrix<TestType, 4, 4> b_t = Delta2::common::transformationMatrix(b_rot, b_pos);
     Delta2::common::Triangle<TestType> B = tri1.transformed(b_t);
@@ -42,12 +44,14 @@ TEMPLATE_TEST_CASE("Triangle-triangle comparison edge-edge", "[grp_collision_det
     Eigen::Vector<TestType, 3> p_out;
     Eigen::Vector<TestType, 3> q_out;
 
-    Eigen::Vector<TestType, 3> a_rot({1.323341, 0.301492, 0.887539});
+    // Eigen::Vector<TestType, 3> a_rot({1.323341, 0.301492, 0.887539});
+    Eigen::Quaternion<TestType> a_rot({0.744, 0.498, 0.368, 0.252});
     Eigen::Vector<TestType, 3> a_pos({-1.0284, -1.0942, 1.1695});
     Eigen::Matrix<TestType, 4, 4> a_t = Delta2::common::transformationMatrix(a_rot, a_pos);
     Delta2::common::Triangle<TestType> A = tri1.transformed(a_t);
 
-    Eigen::Vector<TestType, 3> b_rot({-0.1745, 0.0, 0.0873});
+    // Eigen::Vector<TestType, 3> b_rot({-0.1745, 0.0, 0.0873});
+    Eigen::Quaternion<TestType> b_rot({0.9952, -0.087056, -0.0038, 0.04347});
     Eigen::Vector<TestType, 3> b_pos({0.0, 0.0, 0.0});
     Eigen::Matrix<TestType, 4, 4> b_t = Delta2::common::transformationMatrix(b_rot, b_pos);
     Delta2::common::Triangle<TestType> B = tri1.transformed(b_t);
@@ -70,12 +74,14 @@ TEMPLATE_TEST_CASE("Triangle-triangle comparison intersecting", "[grp_collision_
     Eigen::Vector<TestType, 3> p_out;
     Eigen::Vector<TestType, 3> q_out;
 
-    Eigen::Vector<TestType, 3> a_rot({1.323341, 0.301492, 0.887539});
+    // Eigen::Vector<TestType, 3> a_rot({1.323341, 0.301492, 0.887539});
+    Eigen::Quaternion<TestType> a_rot({0.744, 0.498, 0.368, 0.252});
     Eigen::Vector<TestType, 3> a_pos({0.052572, -0.153374, 1.0443});
     Eigen::Matrix<TestType, 4, 4> a_t = Delta2::common::transformationMatrix(a_rot, a_pos);
     Delta2::common::Triangle<TestType> A = tri1.transformed(a_t);
 
-    Eigen::Vector<TestType, 3> b_rot({-0.1745, 0.0, 0.0873});
+    // Eigen::Vector<TestType, 3> b_rot({-0.1745, 0.0, 0.0873});
+    Eigen::Quaternion<TestType> b_rot({0.9952, -0.087056, -0.0038, 0.04347});
     Eigen::Vector<TestType, 3> b_pos({0.0, 0.0, 0.0});
     Eigen::Matrix<TestType, 4, 4> b_t = Delta2::common::transformationMatrix(b_rot, b_pos);
     Delta2::common::Triangle<TestType> B = tri1.transformed(b_t);
@@ -106,7 +112,7 @@ TEST_CASE("Triangle-Triangle comparison bucket", "[grp_collision_detection][comp
 
     std::shared_ptr<Delta2::MeshData> m_surface(new Delta2::MeshData(V, F, opt, true));
     Delta2::Particle p_a(m_surface, 1.0, 1.0, 0.01);
-    p_a.future_state.setTranslation({0.0, 0.0, 1.0});
+    p_a.future_state.setTranslation(Eigen::Vector3d({0.0, 0.0, 1.0}) + m_surface->init_centre_of_mass_offset);
     p_a.is_static = true;
 
     Delta2::common::plane(1.0, V, F);

@@ -12,12 +12,14 @@ TEST_CASE("Triangle-triangle fast vert-face", "[grp_collision_detection][fast]")
     Eigen::Vector3f p_out;
     Eigen::Vector3f q_out;
 
-    Eigen::Vector3f a_rot({0.5235, 0.3491, 0.0});
+    // Eigen::Vector3f a_rot({0.5235, 0.3491, 0.0}); // Has a problem with rotation order
+    Eigen::Quaternionf a_rot({0.951261, 0.254839, 0.1677497, -0.0449395});
     Eigen::Vector3f a_pos({0.0, 1.0, 1.2651});
     Eigen::Matrix4f a_t = Delta2::common::transformationMatrix(a_rot, a_pos);
     Delta2::common::Triangle<float> A = tri1.transformed(a_t);
 
-    Eigen::Vector3f b_rot({-0.1745, 0.0, 0.0873});
+    // Eigen::Vector3f b_rot({-0.1745, 0.0, 0.0873});
+    Eigen::Quaternionf b_rot({0.9952, -0.087056, 0.0038, 0.04347});
     Eigen::Vector3f b_pos({0.0, 0.0, 0.0});
     Eigen::Matrix4f b_t = Delta2::common::transformationMatrix(b_rot, b_pos);
     Delta2::common::Triangle<float> B = tri1.transformed(b_t);
@@ -40,12 +42,16 @@ TEST_CASE("Triangle-triangle fast edge-edge", "[grp_collision_detection][fast]")
     Eigen::Vector3f p_out;
     Eigen::Vector3f q_out;
 
-    Eigen::Vector3f a_rot({1.323341, 0.301492, 0.887539});
+    // Eigen::Vector3f a_rot({1.323341, 0.301492, 0.887539});
+    // Eigen::Quaternionf a_rot({0.664849, 0.59949, -0.153807, 0.418234});
+    Eigen::Quaternionf a_rot({0.744, 0.498, 0.368, 0.252});
     Eigen::Vector3f a_pos({-1.0284, -1.0942, 1.1695});
     Eigen::Matrix4f a_t = Delta2::common::transformationMatrix(a_rot, a_pos);
     Delta2::common::Triangle<float> A = tri1.transformed(a_t);
 
-    Eigen::Vector3f b_rot({-0.1745, 0.0, 0.0873});
+    // Eigen::Vector3f b_rot({-0.1745, 0.0, 0.0873});
+    // Eigen::Quaternionf b_rot({0.9952, -0.087056, 0.0038, 0.04347});
+    Eigen::Quaternionf b_rot({0.9952, -0.087056, -0.0038, 0.04347});
     Eigen::Vector3f b_pos({0.0, 0.0, 0.0});
     Eigen::Matrix4f b_t = Delta2::common::transformationMatrix(b_rot, b_pos);
     Delta2::common::Triangle<float> B = tri1.transformed(b_t);
@@ -68,12 +74,14 @@ TEMPLATE_TEST_CASE("Triangle-triangle fast intersecting", "[grp_collision_detect
     Eigen::Vector3f p_out;
     Eigen::Vector3f q_out;
 
-    Eigen::Vector3f a_rot({1.323341, 0.301492, 0.887539});
+    // Eigen::Vector3f a_rot({1.323341, 0.301492, 0.887539});
+    Eigen::Quaternionf a_rot({0.744, 0.498, 0.368, 0.252});
     Eigen::Vector3f a_pos({0.052572, -0.153374, 1.0443});
     Eigen::Matrix4f a_t = Delta2::common::transformationMatrix(a_rot, a_pos);
     Delta2::common::Triangle<float> A = tri1.transformed(a_t);
 
-    Eigen::Vector3f b_rot({-0.1745, 0.0, 0.0873});
+    // Eigen::Vector3f b_rot({-0.1745, 0.0, 0.0873});
+    Eigen::Quaternionf b_rot({0.9952, -0.087056, -0.0038, 0.04347});
     Eigen::Vector3f b_pos({0.0, 0.0, 0.0});
     Eigen::Matrix4f b_t = Delta2::common::transformationMatrix(b_rot, b_pos);
     Delta2::common::Triangle<float> B = tri1.transformed(b_t);

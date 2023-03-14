@@ -8,7 +8,7 @@ TEST_CASE("Broad phase Embree stationary", "[grp_collision_detection][broad_phas
 
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
-    Delta2::common::cube(V, F);
+    Delta2::common::cube(1, V, F);
 
     Delta2::common::Options opt;
 
@@ -32,7 +32,7 @@ TEST_CASE("Broad phase Embree moving", "[grp_collision_detection][broad_phase]")
 
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
-    Delta2::common::cube(V, F);
+    Delta2::common::cube(1, V, F);
 
     Delta2::common::Options opt;
 
@@ -68,7 +68,7 @@ TEST_CASE("Broad phase Embree static", "[grp_collision_detection][broad_phase]")
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
 
-    Delta2::common::cube(V, F);
+    Delta2::common::cube(1, V, F);
     std::shared_ptr<Delta2::MeshData> m_cube(new Delta2::MeshData(V, F, opt));
 
     Delta2::common::plane(10, V, F);

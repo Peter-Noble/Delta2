@@ -87,5 +87,17 @@ namespace Delta2 {
                 {1, 2, 3}
             });
         }
+        void triangle(Delta2::common::Triangle<double>& t, Eigen::MatrixXd& V, Eigen::MatrixXi& F) {
+            V.resize(3, 3);
+            F.resize(1, 3);
+            V = Eigen::MatrixXd({
+                { t.A.x(), t.A.y(), t.A.z() },
+                { t.B.x(), t.B.y(), t.B.z() },
+                { t.C.x(), t.C.y(), t.C.z() }
+            });
+            F = Eigen::MatrixXi({
+                {0, 2, 1}
+            });
+        }
     }
 }

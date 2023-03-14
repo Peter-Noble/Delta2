@@ -25,6 +25,8 @@ namespace Delta2 {
             const Eigen::MatrixXi& getFaces();
 
             const std::string serialise();
+
+            Eigen::Vector3d init_centre_of_mass_offset;
         private:
             model::SurrogateTree _surrogate;
 

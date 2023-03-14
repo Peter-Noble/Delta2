@@ -8,7 +8,7 @@ TEST_CASE("Particle creation", "[grp_model][particle]") {
 
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
-    Delta2::common::cube(V, F);
+    Delta2::common::cube(1, V, F);
 
     std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
     Delta2::Particle A(M, 1.0, 1.0, 0.01);
@@ -24,7 +24,7 @@ TEST_CASE("Particle point velocity", "[grp_model][particle]") {
 
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
-    Delta2::common::cube(V, F);
+    Delta2::common::cube(1, V, F);
 
     std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, opt));
     Delta2::Particle A(M, 1.0, 1.0, 0.01);

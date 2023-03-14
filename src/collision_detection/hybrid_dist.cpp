@@ -498,13 +498,48 @@ void penalty_sympy_1_to_1_times_n(std::vector<common::Triangle<float>>& As, std:
 
 namespace Delta2 {
     namespace collision {
-        void sympy_bucket_deferred(
-            std::vector<DeferredCompare>& bucket_pairs,
+		std::vector<std::tuple<float, Eigen::Vector3f, Eigen::Vector3f>> _hybridDists(
+			std::vector<Delta2::common::Triangle<float>>& As,
+			std::vector<Delta2::common::Triangle<float>>& Bs,
+			std::vector<float>& max_error)
+		{
+            const int batch_size = As.size();
+
+			std::vector<std::tuple<float, Eigen::Vector3f, Eigen::Vector3f>> result;
+			result.resize(batch_size);
+
+            std::vector<Eigen::Vector3d> Ps, Qs;
+            Ps.resize(batch_size);
+            Qs.resize(batch_size);
+            std::vector<bool> failed;
+            failed.resize(batch_size);
+
+            bool done = false;
+
+            int d = 0;
+            int i = 0;
+
+			penalty_sympy_1_to_1_times_n(As, Bs, Ps, Qs, max_error, failed);
+
+			for (int i = 0; i < As.size(); i++) {
+				if (failed[i]) {
+					auto [dist, P, Q] = _comparisonDist(As[i], Bs[i]);
+					result[i] = {(P-Q).norm(), P, Q};
+				}
+				else {
+					result[i] = {(Ps[i] - Qs[i]).norm(), Ps[i].cast<float>(), Qs[i].cast<float>()};
+				}
+			}
+			return result;
+		}
+
+        void findContactsBucketHybridDeferred(
+            const std::vector<DeferredCompare>& bucket_pairs,
             Particle& particle_a,
             Particle& particle_b,
             Eigen::Matrix4d a_trans,
             Eigen::Matrix4d b_trans,
-            std::vector<Contact<float>>& hits,
+            std::vector<Contact<double>>& hits,
 			std::vector<int>& pair_used_out)
         {
             if (bucket_pairs.size() == 0) {
@@ -512,20 +547,15 @@ namespace Delta2 {
             }
 
             pair_used_out.reserve(bucket_pairs.size());
-            pair_used_out.clear();
+            // pair_used_out.clear();
 
             int batch_size = 256;
 
-            std::vector<Eigen::Vector3d> Ps, Qs;
-            Ps.resize(batch_size);
-            Qs.resize(batch_size);
             std::vector<bool> failed;
             failed.resize(batch_size);
             std::vector<float> max_error;
             max_error.resize(batch_size);
-            // for (int i = 0; i < batch_size; i++) {
-            //     max_error[i] = search_dist;
-            // }
+
             std::vector<float> a_epss;
             a_epss.resize(batch_size);
             std::vector<float> b_epss;
@@ -548,9 +578,9 @@ namespace Delta2 {
             int a = 0;
             int b = 0;
 
+			int last_pair = 0;
+
             while (!done) {
-                // int a_child = bucket_pairs[d].a.children[a];
-                // int b_child = bucket_pairs[d].b.children[b];
                 common::Triangle<double> a_tri = particle_a.mesh->getSurrogateTree().getBucket(bucket_pairs[d].a.bucket_id)->getTriangle(a);
                 common::Triangle<double> b_tri = particle_b.mesh->getSurrogateTree().getBucket(bucket_pairs[d].b.bucket_id)->getTriangle(b);
 
@@ -571,7 +601,7 @@ namespace Delta2 {
 					b_epss[i] = b_eps;
 					a_inner_epss[i] = a_inner_eps;
 					b_inner_epss[i] = b_inner_eps;
-					max_error[i] = a_eps + b_eps;
+					max_error[i] = a_eps + b_eps + particle_a.geo_eps + particle_b.geo_eps;
 					from_pair[i] = d;
 
                     b++;
@@ -605,43 +635,22 @@ namespace Delta2 {
                     Bs.resize(i);
                 }
 
-                penalty_sympy_1_to_1_times_n(As, Bs, Ps, Qs, max_error, failed);
-                // ttd_penatly_total += As.size();
-
-                // std::vector<common::Triangle<float>> As_failed, Bs_failed;
-
-				int last_pair = 0;
+				std::vector<std::tuple<float, Eigen::Vector3f, Eigen::Vector3f>> hybrid_result = _hybridDists(As, Bs, max_error);
 
                 for (int i = 0; i < As.size(); i++) {
 					while (from_pair[i] > last_pair) {
 						pair_used_out[last_pair] = hits.size();
 						last_pair++;
 					}
-                    if (failed[i]) {
-                        auto [dist, P, Q] = _comparisonDist(As[i], Bs[i]);
-						if ((P - Q).norm() < a_eps + b_eps) {
-							Contact<float> ci(Ps[i].cast<float>(), Qs[i].cast<float>(), a_epss[i], b_epss[i], a_inner_epss[i], b_inner_epss[i], particle_a, particle_b);
-							hits.push_back(ci);
-						}
-                        // As_failed.push_back(As[i]);
-                        // Bs_failed.push_back(Bs[i]);
-                    }
-                    else if ((Ps[i] - Qs[i]).norm() < a_eps + b_eps) {
-                        Contact<float> ci(Ps[i].cast<float>(), Qs[i].cast<float>(), a_epss[i], b_epss[i], a_inner_epss[i], b_inner_epss[i], particle_a, particle_b);
-                        hits.push_back(ci);
-                    }
+
+					auto [dist, P, Q] = hybrid_result[i];
+					if ((P - Q).norm() < particle_a.geo_eps + a_epss[i] + particle_b.geo_eps + b_epss[i]) {
+						Contact<double> ci(P.cast<double>(), Q.cast<double>(), particle_a.geo_eps + a_epss[i], particle_b.geo_eps + b_epss[i], a_inner_epss[i], b_inner_epss[i], particle_a, particle_b);
+						hits.push_back(ci);
+					}
                 }
-
-                // std::vector<std::tuple<float, Eigen::Vector3d, Eigen::Vector3d>> result = fast_1_to_1_times_n(As_failed, Bs_failed);
-                // // ttd_total += As_failed.size();
-
-                // for (auto& r : result) {
-                //     if (std::sqrt(std::get<0>(r)) < a_eps + b_eps) {
-                //         Contact ci(std::get<1>(r), std::get<2>(r), a_eps, b_eps, a_eps, b_eps, particle_a, particle_b);
-                //         hits.push_back(ci);
-                //     }
-                // }
             }
+			pair_used_out[last_pair] = hits.size();
         }
     }
 }

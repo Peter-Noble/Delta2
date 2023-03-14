@@ -21,8 +21,8 @@ namespace Delta2 {
             std::vector<Contact<real>> hits;
             while (!dc.empty()) {
                 hits.clear();
-                // findContactsBucketComparison<branching, real>(dc, a, b, hits, num_hits);
-                bucket_comparison.findContactsBucketComparison(dc, a, b, hits, num_hits);
+                // findContactsBucket<branching, real>(dc, a, b, hits, num_hits);
+                bucket_comparison.findContactsBucket(dc, a, b, hits, num_hits);
                 int last_hit_num = 0;
                 for (int i = 0; i < dc.size(); i++) {
                     if (num_hits[i] > last_hit_num) {
@@ -77,8 +77,8 @@ namespace Delta2 {
             std::vector<Contact<real>> hits;
             while (!dc.empty()) {
                 hits.clear();
-                // findContactsBucketComparison<branching, real>(dc, a, b, hits, num_hits);
-                bucket_comparison.findContactsBucketComparisonCurrent(dc, a, b, hits, num_hits);
+                // findContactsBucket<branching, real>(dc, a, b, hits, num_hits);
+                bucket_comparison.findContactsBucketCurrent(dc, a, b, hits, num_hits);
                 int last_hit_num = 0;
                 for (int i = 0; i < dc.size(); i++) {
                     if (num_hits[i] > last_hit_num) {
@@ -133,8 +133,8 @@ namespace Delta2 {
             std::vector<Contact<real>> hits;
             while (!dc.empty()) {
                 hits.clear();
-                // findContactsBucketComparison<branching, real>(dc, a, b, hits, num_hits);
-                bucket_comparison.findContactsBucketComparisonLast(dc, a, b, hits, num_hits);
+                // findContactsBucket<branching, real>(dc, a, b, hits, num_hits);
+                bucket_comparison.findContactsBucketLast(dc, a, b, hits, num_hits);
                 int last_hit_num = 0;
                 for (int i = 0; i < dc.size(); i++) {
                     if (num_hits[i] > last_hit_num) {

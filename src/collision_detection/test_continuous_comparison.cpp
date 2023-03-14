@@ -170,18 +170,26 @@ TEMPLATE_TEST_CASE("Edge edge Newton-Raphson intersect", "[grp_collision_detecti
     Eigen::Vector<TestType, 3> Q;
     TestType toc;
     
-    Eigen::Matrix<TestType, 4, 4> a_T_start = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(66.2817), Delta2::common::degToRad(-45.7037), Delta2::common::degToRad(-111.169)}), Eigen::Vector<TestType, 3>({0, 0, 0}));
-    Eigen::Matrix<TestType, 4, 4> a_T_end = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(66.2817), Delta2::common::degToRad(-45.7037), Delta2::common::degToRad(-111.169)}), Eigen::Vector<TestType, 3>({0, 0, 0.7}));
+    // Eigen::Quaternion<TestType> a_rot({0.261, 0.553, 0.232, -0.757});
+    Eigen::Quaternion<TestType> a_rot({0.611, 0.016, -0.599, -0.517});
+    // Eigen::Matrix<TestType, 4, 4> a_T_start = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(66.2817), Delta2::common::degToRad(-45.7037), Delta2::common::degToRad(-111.169)}), Eigen::Vector<TestType, 3>({0, 0, 0}));
+    Eigen::Matrix<TestType, 4, 4> a_T_start = Delta2::common::transformationMatrix(a_rot, Eigen::Vector<TestType, 3>({0, 0, 0}));
+    // Eigen::Matrix<TestType, 4, 4> a_T_end = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(66.2817), Delta2::common::degToRad(-45.7037), Delta2::common::degToRad(-111.169)}), Eigen::Vector<TestType, 3>({0, 0, 0.5}));
+    Eigen::Matrix<TestType, 4, 4> a_T_end = Delta2::common::transformationMatrix(a_rot, Eigen::Vector<TestType, 3>({0, 0, 0.7}));
     
-    Eigen::Matrix<TestType, 4, 4> b_T_start = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(261.326), Delta2::common::degToRad(52.4147), Delta2::common::degToRad(-101.34)}), Eigen::Vector<TestType, 3>({0, 0, 1.3}));
-    Eigen::Matrix<TestType, 4, 4> b_T_end = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(261.326), Delta2::common::degToRad(52.4147), Delta2::common::degToRad(-101.34)}), Eigen::Vector<TestType, 3>({0, 0, 0.5}));
-    
+    // Eigen::Quaternion<TestType> b_rot({-0.111, 0.654, 0.344, 0.665});
+    Eigen::Quaternion<TestType> b_rot({-0.630, 0.209, -0.709, 0.240});
+    // Eigen::Matrix<TestType, 4, 4> b_T_start = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(261.326), Delta2::common::degToRad(52.4147), Delta2::common::degToRad(-101.34)}), Eigen::Vector<TestType, 3>({0, 0, 1.3}));
+    Eigen::Matrix<TestType, 4, 4> b_T_start = Delta2::common::transformationMatrix(b_rot, Eigen::Vector<TestType, 3>({0, 0, 1.3}));
+    // Eigen::Matrix<TestType, 4, 4> b_T_end = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(261.326), Delta2::common::degToRad(52.4147), Delta2::common::degToRad(-101.34)}), Eigen::Vector<TestType, 3>({0, 0, 0.7}));
+    Eigen::Matrix<TestType, 4, 4> b_T_end = Delta2::common::transformationMatrix(b_rot, Eigen::Vector<TestType, 3>({0, 0, 0.5}));
+
     Delta2::common::Triangle<TestType> a_start = tri1.transformed(a_T_start);
     Delta2::common::Triangle<TestType> a_end = tri1.transformed(a_T_end);
     Delta2::common::Triangle<TestType> b_start = tri1.transformed(b_T_start);
     Delta2::common::Triangle<TestType> b_end = tri1.transformed(b_T_end);
 
-    TestType dist = Delta2::collision::edgeEdgeCCD(a_start.AB(), a_end.AB(), b_start.AB(), b_end.AB(), 10000.0, P, Q, toc);
+    TestType dist = Delta2::collision::edgeEdgeCCD<TestType>(a_start.AB(), a_end.AB(), b_start.AB(), b_end.AB(), 10000.0, P, Q, toc);
 
     REQUIRE( toc == Approx(0.87).margin(0.01) );
     REQUIRE_THAT( P, VectorEqual(Eigen::Vector<TestType, 3>({0.0, 0.0, 0.6})).margin(0.01) );
@@ -199,18 +207,26 @@ TEMPLATE_TEST_CASE("Edge edge Newton-Raphson no intersect", "[grp_collision_dete
     Eigen::Vector<TestType, 3> Q;
     TestType toc;
     
-    Eigen::Matrix<TestType, 4, 4> a_T_start = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(66.2817), Delta2::common::degToRad(-45.7037), Delta2::common::degToRad(-111.169)}), Eigen::Vector<TestType, 3>({0, 0, 0}));
-    Eigen::Matrix<TestType, 4, 4> a_T_end = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(66.2817), Delta2::common::degToRad(-45.7037), Delta2::common::degToRad(-111.169)}), Eigen::Vector<TestType, 3>({0, 0, 0.5}));
+    // Eigen::Quaternion<TestType> a_rot({0.261, 0.553, 0.232, -0.757});
+    Eigen::Quaternion<TestType> a_rot({0.611, 0.016, -0.599, -0.517});
+    // Eigen::Matrix<TestType, 4, 4> a_T_start = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(66.2817), Delta2::common::degToRad(-45.7037), Delta2::common::degToRad(-111.169)}), Eigen::Vector<TestType, 3>({0, 0, 0}));
+    Eigen::Matrix<TestType, 4, 4> a_T_start = Delta2::common::transformationMatrix(a_rot, Eigen::Vector<TestType, 3>({0, 0, 0}));
+    // Eigen::Matrix<TestType, 4, 4> a_T_end = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(66.2817), Delta2::common::degToRad(-45.7037), Delta2::common::degToRad(-111.169)}), Eigen::Vector<TestType, 3>({0, 0, 0.5}));
+    Eigen::Matrix<TestType, 4, 4> a_T_end = Delta2::common::transformationMatrix(a_rot, Eigen::Vector<TestType, 3>({0, 0, 0.5}));
     
-    Eigen::Matrix<TestType, 4, 4> b_T_start = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(261.326), Delta2::common::degToRad(52.4147), Delta2::common::degToRad(-101.34)}), Eigen::Vector<TestType, 3>({0, 0, 1.3}));
-    Eigen::Matrix<TestType, 4, 4> b_T_end = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(261.326), Delta2::common::degToRad(52.4147), Delta2::common::degToRad(-101.34)}), Eigen::Vector<TestType, 3>({0, 0, 0.7}));
+    // Eigen::Quaternion<TestType> b_rot({-0.111, 0.654, 0.344, 0.665});
+    Eigen::Quaternion<TestType> b_rot({-0.630, 0.209, -0.709, 0.240});
+    // Eigen::Matrix<TestType, 4, 4> b_T_start = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(261.326), Delta2::common::degToRad(52.4147), Delta2::common::degToRad(-101.34)}), Eigen::Vector<TestType, 3>({0, 0, 1.3}));
+    Eigen::Matrix<TestType, 4, 4> b_T_start = Delta2::common::transformationMatrix(b_rot, Eigen::Vector<TestType, 3>({0, 0, 1.3}));
+    // Eigen::Matrix<TestType, 4, 4> b_T_end = Delta2::common::transformationMatrix(Eigen::Vector<TestType, 3>({Delta2::common::degToRad(261.326), Delta2::common::degToRad(52.4147), Delta2::common::degToRad(-101.34)}), Eigen::Vector<TestType, 3>({0, 0, 0.7}));
+    Eigen::Matrix<TestType, 4, 4> b_T_end = Delta2::common::transformationMatrix(b_rot, Eigen::Vector<TestType, 3>({0, 0, 0.7}));
     
     Delta2::common::Triangle<TestType> a_start = tri1.transformed(a_T_start);
     Delta2::common::Triangle<TestType> a_end = tri1.transformed(a_T_end);
     Delta2::common::Triangle<TestType> b_start = tri1.transformed(b_T_start);
     Delta2::common::Triangle<TestType> b_end = tri1.transformed(b_T_end);
 
-    TestType dist = Delta2::collision::edgeEdgeCCD(a_start.AB(), a_end.AB(), b_start.AB(), b_end.AB(), 100000, P, Q, toc);
+    TestType dist = Delta2::collision::edgeEdgeCCD<TestType>(a_start.AB(), a_end.AB(), b_start.AB(), b_end.AB(), 100000, P, Q, toc);
 
     REQUIRE( toc == Approx(1.0).margin(0.02) );
     REQUIRE_THAT( P, VectorEqual(Eigen::Vector<TestType, 3>({0.0, 0.0, 0.5})).margin(0.1) );
@@ -238,8 +254,8 @@ TEST_CASE("Continuous bucket", "[grp_collision_detection][continuous_comparison]
 
     std::shared_ptr<Delta2::MeshData> m_surface(new Delta2::MeshData(V, F, opt, true));
     Delta2::Particle p_a(m_surface, 1.0, 1.0, 0.01);
-    p_a.current_state.setTranslation({0.0, 0.0, 1.0});
-    p_a.future_state.setTranslation({0.0, 0.0, 1.0});
+    p_a.current_state.setTranslation(Eigen::Vector3d({0.0, 0.0, 1.0}) + m_surface->init_centre_of_mass_offset);
+    p_a.future_state.setTranslation(Eigen::Vector3d({0.0, 0.0, 1.0}) + m_surface->init_centre_of_mass_offset);
     p_a.is_static = true;
 
     Delta2::common::plane(1.0, V, F);

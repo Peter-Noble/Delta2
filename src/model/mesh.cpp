@@ -6,21 +6,22 @@
 #include "igl/volume.h"
 #include "inertia.h"
 
+#include "../common/viewer.h"
+
 using namespace Delta2;
 
 MeshData::MeshData(std::string path, common::Options& opt, bool isSurface) {
     bool result = igl::readOBJ(path, _vertices, _faces);
-    _surrogate = model::SurrogateTree(_vertices.template cast<double>(), _faces, opt);
     initBoudingData();
     if (isSurface) {
         initInertiaDataSurface(0.01);
     } else {
         initInertiaDataVolume();
     }
+    _surrogate = model::SurrogateTree(_vertices.template cast<double>(), _faces, opt);
 }
 
 MeshData::MeshData(Eigen::MatrixXd V, Eigen::MatrixXi F, common::Options& opt, bool isSurface) {
-    _surrogate = model::SurrogateTree(V.template cast<double>(), F, opt);
     _vertices = V;
     _faces = F;
     initBoudingData();
@@ -29,6 +30,7 @@ MeshData::MeshData(Eigen::MatrixXd V, Eigen::MatrixXi F, common::Options& opt, b
     } else {
         initInertiaDataVolume();
     }
+    _surrogate = model::SurrogateTree(_vertices.template cast<double>(), _faces, opt);
 }
 
 Eigen::Matrix3d MeshData::getUnitInertiaTensor() {
@@ -78,6 +80,7 @@ void MeshData::initInertiaDataVolume() {
 
     _vertices.rowwise() -= centre_of_mass.transpose();
     tet_vertices.rowwise() -= centre_of_mass.transpose(); // TODO do we really need this or just use _vertices?
+    init_centre_of_mass_offset = centre_of_mass;
 
     _unit_inertia_tensor.setZero();
     for (int t = 0; t < tet_tets.rows(); t++) {
@@ -111,6 +114,7 @@ void MeshData::initInertiaDataSurface(double thickness) {
     }
 
     _vertices.rowwise() -= centre_of_mass.transpose() / _volume;
+    init_centre_of_mass_offset = centre_of_mass / _volume;
 
     _unit_inertia_tensor.setZero();
     for (int f = 0; f < _faces.rows(); f++) {

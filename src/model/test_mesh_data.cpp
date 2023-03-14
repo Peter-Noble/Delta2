@@ -10,7 +10,7 @@ TEST_CASE("Inertia matrix", "[grp_model][mesh_data]") {
 
     Eigen::Matrix3d I, I_true;
 
-    Delta2::common::cube(V, F);
+    Delta2::common::cube(1, V, F);
     Delta2::MeshData M(V, F, opt);
 
     I = M.getUnitInertiaTensor();

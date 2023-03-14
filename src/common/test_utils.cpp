@@ -2,6 +2,7 @@
 #include "../testing/unit_test.h"
 #include "../testing/approx_matrix.h"
 #include "../testing/approx_vector.h"
+#include "../common/triangle.h"
 #include "utils.h"
 
 TEMPLATE_TEST_CASE("lerp", "[grp_common][basic_utils]", float, double) {
@@ -47,7 +48,8 @@ TEMPLATE_TEST_CASE("transformationMatrix rotation", "[grp_common][basic_utils]",
 }
 
 TEMPLATE_TEST_CASE("transformationMatrix rotation 2", "[grp_common][basic_utils]", float, double) {
-    Eigen::Vector<TestType, 3> a_rot({0.5235, 0.3491, 0.0});
+    // Eigen::Vector<TestType, 3> a_rot({0.5235, 0.3491, 0.0}); // Has a problem with rotation order
+    Eigen::Quaternion<TestType> a_rot({0.951261, 0.254839, 0.1677497, -0.0449395});
     Eigen::Vector<TestType, 3> a_pos({0.0, 1.0, 1.2651});
     Eigen::Matrix<TestType, 4, 4> a_t = Delta2::common::transformationMatrix(a_rot, a_pos);
 
@@ -66,7 +68,8 @@ TEMPLATE_TEST_CASE("transformationMatrix rotation 2", "[grp_common][basic_utils]
 }
 
 TEMPLATE_TEST_CASE("transformationMatrix", "[grp_common][basic_utils]", float, double) {
-    Eigen::Vector<TestType, 3> a_rot({0.5235, 0.3491, 0.0});
+    // Eigen::Vector<TestType, 3> a_rot({0.5235, 0.3491, 0.0}); // Has a problem with rotation order
+    Eigen::Quaternion<TestType> a_rot({0.951261, 0.254839, 0.1677497, -0.0449395});
     Eigen::Vector<TestType, 3> a_pos({0.0, 1.0, 1.2651});
     Eigen::Matrix<TestType, 4, 4> a_t = Delta2::common::transformationMatrix(a_rot, a_pos);
 
