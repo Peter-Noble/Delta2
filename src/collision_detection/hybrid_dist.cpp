@@ -522,7 +522,7 @@ namespace Delta2 {
 			penalty_sympy_1_to_1_times_n(As, Bs, Ps, Qs, max_error, failed);
 
 			for (int i = 0; i < As.size(); i++) {
-				if (failed[i]) {
+				if (failed[i] || true) {
 					auto [dist, P, Q] = _comparisonDist(As[i], Bs[i]);
 					result[i] = {(P-Q).norm(), P, Q};
 				}
@@ -546,8 +546,14 @@ namespace Delta2 {
                 return;
             }
 
+			findContactsBucketComparison<8, double>(bucket_pairs, particle_a, particle_b, a_trans, b_trans, hits, pair_used_out);
+			return;
+
+			std::vector<Contact<double>> hits_truth;
+			std::vector<int> pair_used_out_truth;
+			findContactsBucketComparison<8, double>(bucket_pairs, particle_a, particle_b, a_trans, b_trans, hits_truth, pair_used_out_truth);
+
             pair_used_out.reserve(bucket_pairs.size());
-            // pair_used_out.clear();
 
             int batch_size = 256;
 
@@ -651,6 +657,13 @@ namespace Delta2 {
                 }
             }
 			pair_used_out[last_pair] = hits.size();
+
+			bool match = hits.size() == hits_truth.size();
+			match &= pair_used_out.size() == pair_used_out_truth.size();
+
+			if (!match) {
+				throw std::runtime_error("Hybrid got the wrong result");
+			}
         }
     }
 }

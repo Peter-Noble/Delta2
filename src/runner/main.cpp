@@ -33,6 +33,7 @@
 #include "../scenarios/pairs.h"
 #include "../scenarios/waterfall.h"
 #include "../scenarios/fast_moving.h"
+#include "../scenarios/sliding.h"
 
 #include "../globals.h"
 
@@ -118,6 +119,11 @@ int main(int argc, char *argv[]) {
             scenarios::fast_moving(particles, contact_force);
             break;
         }
+    case 7:
+        {
+            scenarios::sliding(particles, contact_force);
+            break;
+        }
     default:
         throw std::runtime_error("No scenario given");
     }
@@ -183,6 +189,13 @@ int main(int argc, char *argv[]) {
             cont = step < globals::opt.num_time_steps;
         }
         
+        for (Particle& p: particles) {
+            if (!p.is_static) {
+                if (p.current_state.getTranslation().z() < 1.0) {
+                    throw std::runtime_error("Through ground");
+                }
+            }
+        }
     }
 
     if (globals::opt.export_result) {
