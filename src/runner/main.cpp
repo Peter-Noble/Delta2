@@ -67,6 +67,10 @@ int main(int argc, char *argv[]) {
     if (opt_result > 0) {
         return opt_result;
     }
+    
+    if (std::getenv("EXPORT_DIR") == nullptr) {
+        throw std::runtime_error("EXPORT_DIR environment variable not set");
+    }
 
     globals::logger.priority = globals::opt.print_priority;
     
