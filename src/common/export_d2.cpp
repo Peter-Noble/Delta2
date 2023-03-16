@@ -78,7 +78,7 @@ void Delta2::D2Writer::write(std::vector<Delta2::Particle>& particles, int frame
     for (Delta2::Particle& p: particles) {
         current_capture.push_back(1);
     }
-    while (!reached_end) {
+    while (!reached_end && (globals::opt.final_time < 0.0 || time <= globals::opt.final_time)) {
         for (int p_i = 0; p_i < particles.size(); p_i++) {
             if (!particles[p_i].is_static) {
                 while (states[p_i][current_capture[p_i]].getTime() <= time) {
