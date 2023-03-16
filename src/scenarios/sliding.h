@@ -13,7 +13,7 @@ namespace Delta2 {
             Eigen::MatrixXi F;
             
             {
-                Delta2::common::plane(1, V, F);
+                Delta2::common::plane(10, V, F);
                 std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, globals::opt, true));
                 auto& p = particles.emplace_back(M, 1.0, 1.0, 0.25);
                 p.is_static = true;
