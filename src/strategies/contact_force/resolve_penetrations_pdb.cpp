@@ -31,10 +31,10 @@ void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool 
     int i = 0;
 
     while (new_full_comparison) {
-        // globals::logger.printf(3, "%i, New full comparison %i\n", cluster_id, i);
+        globals::logger.printf(3, "%i, New full comparison %i\n", cluster_id, i);
         i++;
         new_full_comparison = false;
-        // // globals::logger.printf(3, "Resolve full comparison\n");
+        // globals::logger.printf(3, "Resolve full comparison\n");
         for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
         {
             collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
@@ -138,12 +138,12 @@ void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool 
                 // const double d1 = p1_B.dot(n) - p1_A.dot(n);
                 const double d1 = (p1_B - p1_A).norm();
 
-                // // globals::logger.printf(3, "p1_A: (%f, %f, %f)\n", p1_A.x(), p1_A.y(), p1_A.z());
-                // // globals::logger.printf(3, "p1_B: (%f, %f, %f)\n", p1_B.x(), p1_B.y(), p1_B.z());
+                // globals::logger.printf(3, "p1_A: (%f, %f, %f)\n", p1_A.x(), p1_A.y(), p1_A.z());
+                // globals::logger.printf(3, "p1_B: (%f, %f, %f)\n", p1_B.x(), p1_B.y(), p1_B.z());
 
-                // // globals::logger.printf(3, "n: (%f, %f, %f)\n", n.x(), n.y(), n.z());
+                // globals::logger.printf(3, "n: (%f, %f, %f)\n", n.x(), n.y(), n.z());
 
-                // // globals::logger.printf(3, "d1: %f\n", d1);
+                // globals::logger.printf(3, "d1: %f\n", d1);
 
                 if (d1 < outer) {
                     changed = true;
@@ -176,31 +176,45 @@ void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool 
 
                     // globals::logger.printf(3, "offset delta: %f\n", delta_impulse_offset_mag);
 
-                    Vector3d update_impulse_offset = correct_dir * delta_impulse_offset_mag;
+                    Vector3d update_impulse_offset = n * delta_impulse_offset_mag;
 
                     // globals::logger.printf(3, "uio: (%f, %f, %f)\n", update_impulse_offset.x(), update_impulse_offset.y(), update_impulse_offset.z());
 
-                    Vector3d update_rotational_impulse_offset_A = model::calcTorque(update_impulse_offset, p1_A, hits[c].p_a->future_state.getTranslation());
-                    Vector3d update_rotational_impulse_offset_B = model::calcTorque(Vector3d(-update_impulse_offset), p1_B, hits[c].p_b->future_state.getTranslation());
+                    Vector3d update_rotational_impulse_offset_A = model::calcTorque(Vector3d(-update_impulse_offset), p1_A, hits[c].p_a->future_state.getTranslation());
+                    Vector3d update_rotational_impulse_offset_B = model::calcTorque(update_impulse_offset, p1_B, hits[c].p_b->future_state.getTranslation());
 
                     if (!cluster.particles[a_id].is_static)
                     {
+                        Vector3d aT = cluster.particles[a_id].future_state.getTranslation();
+                        // globals::logger.printf(3, "pid pre: %i (%f, %f, %f)\n", a_id, aT.x(), aT.y(), aT.z());
+
                         Vector3d zero = Vector3d::Zero();
-                        cluster.particles[a_id].future_state = updateState(cluster.particles[a_id].future_state, t, zero, update_impulse_offset, zero, update_rotational_impulse_offset_A, &cluster.particles[a_id]);
-                        cluster.particles[b_id].future_state = updateState(cluster.particles[b_id].future_state, t, zero, -update_impulse_offset, zero, update_rotational_impulse_offset_B, &cluster.particles[b_id]);
+                        cluster.particles[a_id].future_state = updateState(cluster.particles[a_id].future_state, t, zero, -update_impulse_offset, zero, update_rotational_impulse_offset_A, &cluster.particles[a_id]);
 
                         if (!future_only) {
                             cluster.particles[a_id].current_state = updateState(cluster.particles[a_id].current_state, t/2, zero, update_impulse_offset, zero, update_rotational_impulse_offset_A, &cluster.particles[a_id]);
-                            cluster.particles[b_id].current_state = updateState(cluster.particles[b_id].current_state, t/2, zero, -update_impulse_offset, zero, update_rotational_impulse_offset_B, &cluster.particles[b_id]);
-
                             cluster.particles[a_id].last_state = updateState(cluster.particles[a_id].last_state, t/4, zero, update_impulse_offset, zero, update_rotational_impulse_offset_A, &cluster.particles[a_id]);
+                        }
+
+                        aT = cluster.particles[a_id].future_state.getTranslation();
+                        // globals::logger.printf(3, "pid post: %i (%f, %f, %f)\n", a_id, aT.x(), aT.y(), aT.z());
+                    }
+
+                    if (!cluster.particles[b_id].is_static)
+                    {
+                        Vector3d bT = cluster.particles[b_id].future_state.getTranslation();
+                        // globals::logger.printf(3, "pid pre: %i (%f, %f, %f)\n", b_id, bT.x(), bT.y(), bT.z());
+
+                        Vector3d zero = Vector3d::Zero();
+                        cluster.particles[b_id].future_state = updateState(cluster.particles[b_id].future_state, t, zero, update_impulse_offset, zero, update_rotational_impulse_offset_B, &cluster.particles[b_id]);
+
+                        if (!future_only) {
+                            cluster.particles[b_id].current_state = updateState(cluster.particles[b_id].current_state, t/2, zero, -update_impulse_offset, zero, update_rotational_impulse_offset_B, &cluster.particles[b_id]);
                             cluster.particles[b_id].last_state = updateState(cluster.particles[b_id].last_state, t/4, zero, -update_impulse_offset, zero, update_rotational_impulse_offset_B, &cluster.particles[b_id]);
                         }
 
-                        // Vector3d aT = cluster.particles[a_id].future_state.getTranslation();
-                        // Vector3d bT = cluster.particles[b_id].future_state.getTranslation();
-                        // // globals::logger.printf(3, "pid: %i (%f, %f, %f)\n", a_id, aT.x(), aT.y(), aT.z());
-                        // // globals::logger.printf(3, "pid: %i (%f, %f, %f)\n", b_id, bT.x(), bT.y(), bT.z());
+                        bT = cluster.particles[b_id].future_state.getTranslation();
+                        // globals::logger.printf(3, "pid post: %i (%f, %f, %f)\n", b_id, bT.x(), bT.y(), bT.z());
                     }
                 }
             }
