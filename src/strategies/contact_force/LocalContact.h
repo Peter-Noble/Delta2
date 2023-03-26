@@ -20,5 +20,8 @@ namespace Delta2 {
         Eigen::Vector3d last_friction_impulse;
         Eigen::Vector3d last_friction_rotational_impulse_A;
         Eigen::Vector3d last_friction_rotational_impulse_B;
+        Eigen::Vector3d last_friction_impulse_fd;
+        Eigen::Vector3d last_friction_rotational_impulse_A_fd;
+        Eigen::Vector3d last_friction_rotational_impulse_B_fd;
     };
 }

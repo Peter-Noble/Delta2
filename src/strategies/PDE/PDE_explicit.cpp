@@ -184,7 +184,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
     if (!success) {
         if (allow_fail) {
             globals::logger.printf(2, "%i: Failed after contact force solve\n", cluster_id);
-            if (cluster.step_size < 1e-4) {
+            if (cluster.step_size < 1e-8) {
                 // if (cluster.step_size < 1e-8) {
                 //     double last_time, current_time;
                 //     for (Particle* p : cluster.particles) {
@@ -207,6 +207,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
         }
         else {
             collision::resolvePenetrationsPBD(cluster, true);
+            // return false;
         }
     }
     

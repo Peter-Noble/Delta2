@@ -83,6 +83,7 @@ Eigen::Vector3d State::pointVelocity(const Eigen::Vector3d& pt, const State& fut
 // pt is in global space
 Eigen::Vector3d State::pointVelocity(const Eigen::Vector3d& pt, const Eigen::Matrix3d& inv_inertia) const {
     Eigen::Vector3d w = inv_inertia * getAngularMomentum();
+    // globals::logger.printf(2, "w: %f, %f, %f\n", w.x(), w.y(), w.z());
     return getVelocity() + w.cross(pt - getTranslation());
 }
 

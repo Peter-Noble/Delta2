@@ -630,6 +630,26 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                                 else {
                                     b.min_toc = c.toc;
                                 }
+
+                                double tangent_vel = std::sqrt(rel_vel.norm()*rel_vel.norm() - proj_vel*proj_vel);
+                                double tangent_dist = tangent_vel * max_time_step_for_pair;
+                                // globals::logger.printf(2, "td/i: %f\n", tangent_dist/interaction_dist);
+                                // globals::logger.printf(2, "tv/i: %f\n", tangent_vel/interaction_dist);
+                                
+                                // const float pass_through = 0.1; // when tangent_dist == interaction_dist then new_step == pass_through
+                                // float shift = 1/(1/pass_through - 1);
+                                // // Passes through:
+                                // //      (0, 1) ie no tangent velocity => don't shrink
+                                // //      (interaction_dist, pass_through)
+                                // //      (>iteraction_dist, <pass_through)
+                                // double new_step = std::max(1e-6, shift * interaction_dist / (tangent_dist + shift * interaction_dist));
+                                // min_scaling_seen = std::min(min_scaling_seen, new_step);
+                                const double d = 0.1; // Constant to control how quickly timestep size decreases with tangental velocity
+                                double new_step = (d * interaction_dist) / (tangent_dist + d * interaction_dist); // Passes through (0,1) ie. no tangental velocity => no timestep reduction here
+                                min_scaling_seen = std::min(min_scaling_seen, new_step);
+                                if (max_time_step_for_pair * new_step < 1e-6) {
+                                    globals::logger.printf(3, "Small time step tangent 0\n");
+                                }
                             }
                         }
                     }
