@@ -20,6 +20,14 @@ void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool 
         }
     }
 
+    globals::logger.printf(2, "%i: Resolving penetrations\n", cluster_id);
+
+    // common::Viewer view;
+    // for (Particle* p : cluster.particles) {
+    //     view.addParticleInterval(*p);
+    // }
+    // view.show();
+
     std::vector<collision::Contact<double>> hits;
 
     strategy::ContactDetectionComparison contact_detection;
@@ -125,16 +133,29 @@ void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool 
                 uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
                 uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
 
-                Vector3d n = contacts[c].global_normal.normalized();
-                if (n.hasNaN() || n.norm() < 1e-8) {
-                    n = (hits[c].p_b->future_state.getTranslation() - hits[c].p_a->future_state.getTranslation()).normalized();
-                }
-
                 const double outer_search = hits[c].eps_a + hits[c].eps_b;
                 const double outer = 1e-4;
 
                 Vector3d p1_A = common::transform(contacts[c].local_A, cluster.particles[a_id].future_state.getTransformation());
                 Vector3d p1_B = common::transform(contacts[c].local_B, cluster.particles[b_id].future_state.getTransformation());
+
+                Vector3d n = contacts[c].global_normal.normalized();
+                if (n.hasNaN() || n.norm() < 1e-8) {
+                    // n = (hits[c].p_b->future_state.getTranslation() - hits[c].p_a->future_state.getTranslation()).normalized();
+
+                    Eigen::Matrix3d a_inverse_inertia_matrix = hits[c].p_a->getInverseInertiaMatrix();
+                    Eigen::Matrix3d b_inverse_inertia_matrix = hits[c].p_b->getInverseInertiaMatrix();
+                    Eigen::Vector3d v1_A = cluster.particles[a_id].future_state.pointVelocity(p1_A, a_inverse_inertia_matrix);
+                    Eigen::Vector3d v1_B = cluster.particles[b_id].future_state.pointVelocity(p1_B, b_inverse_inertia_matrix);
+
+                    if ((v1_A - v1_B).norm() > 1e-8) {
+                        n = (v1_A - v1_B).normalized();
+                    }
+                    else {
+                        n = (hits[c].p_b->future_state.getTranslation() - hits[c].p_a->future_state.getTranslation()).normalized();
+                    }
+                }
+
                 // const double d1 = p1_B.dot(n) - p1_A.dot(n);
                 const double d1 = (p1_B - p1_A).norm();
 
@@ -149,7 +170,7 @@ void Delta2::collision::resolvePenetrationsPBD(collision::Cluster cluster, bool 
                     changed = true;
                     new_full_comparison = true;
                     if (i > 100) {
-                        globals::logger.printf(3, "Can't fix positions so scattering\n");
+                        globals::logger.printf(2, "Can't fix positions so scattering\n");
                         if (!cluster.particles[a_id].is_static) {
                             cluster.particles[a_id].current_state.setTranslation(Eigen::Vector3d({globals::opt.rand_float(1000000), globals::opt.rand_float(1000000), globals::opt.rand_float(1000000)}));
                             cluster.particles[a_id].future_state.setTranslation(Eigen::Vector3d({globals::opt.rand_float(1000000), globals::opt.rand_float(1000000), globals::opt.rand_float(1000000)}));
