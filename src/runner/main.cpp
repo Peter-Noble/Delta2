@@ -27,13 +27,7 @@
 
 #include "../strategies/contact_force/resolve_penetrations_pbd.h"
 
-#include "../scenarios/zero_g_bundle.h"
-#include "../scenarios/towers.h"
-#include "../scenarios/start_intersecting.h"
-#include "../scenarios/pairs.h"
-#include "../scenarios/waterfall.h"
-#include "../scenarios/fast_moving.h"
-#include "../scenarios/sliding.h"
+#include "../scenarios/scenarios.h"
 
 #include "../globals.h"
 
@@ -78,59 +72,14 @@ int main(int argc, char *argv[]) {
     strategy::SequentialImpulses contact_force(friction, globals::opt);
     strategy::ContactDetectionContinuousComparison contact_detection_continuous;
     strategy::TimeStepSelectionDynamicContinuous time_step(contact_detection_continuous, globals::opt);
-    // strategy::ContactDetectionComparison contact_detection;
-    strategy::ContactDetectionHybrid contact_detection;
+    strategy::ContactDetectionComparison contact_detection;
+    // strategy::ContactDetectionHybrid contact_detection;
     strategy::PDEExplicit PDE(contact_detection, contact_force, friction, time_step, globals::opt);
     strategy::BroadPhaseEmbreeCluster broad_phase(PDE, globals::opt);
 
     std::vector<Delta2::Particle> particles;
 
-    int scenario = 0;
-
-    switch (globals::opt.scenario) {
-    case 0:
-        {
-            scenarios::zero_g_bundle_orig(particles, contact_force);
-            break;
-        }
-    case 1:
-        {
-            scenarios::towers(particles, contact_force);
-            break;
-        }
-    case 2:
-        {
-            scenarios::start_intersecting(particles, contact_force);
-            break;
-        }
-    case 3:
-        {
-            scenarios::pairs(particles, contact_force);
-            break;
-        }
-    case 4:
-        {
-            scenarios::zero_g_bundle(particles, contact_force);
-            break;
-        }
-    case 5:
-        {
-            scenarios::waterfall(particles, contact_force);
-            break;
-        }
-    case 6:
-        {
-            scenarios::fast_moving(particles, contact_force);
-            break;
-        }
-    case 7:
-        {
-            scenarios::sliding(particles, contact_force);
-            break;
-        }
-    default:
-        throw std::runtime_error("No scenario given");
-    }
+    scenarios::make_scenario(particles, contact_force);
 
     model::ParticleHandler ph(particles);
     ph.initLast();
@@ -148,8 +97,6 @@ int main(int argc, char *argv[]) {
 
     Delta2::D2Writer export_writer(particles);
 
-    // PDE.printType();
-
     time_step.init(ph);
 
     bool cont = globals::opt.final_time > 0.0 || (globals::opt.final_time < 0.0 && globals::opt.num_time_steps > 0);
@@ -163,12 +110,17 @@ int main(int argc, char *argv[]) {
             Delta2::globals::logger.printf(2, "Done capture\n");
         }
 
-        // std::vector<std::pair<Eigen::Vector3d, Eigen::Vector3d>> view_draws;
         {
             std::lock_guard draws_lock(globals::contact_draws_lock);
             globals::contact_draws.clear();
         }
 
+        for (Particle& p : particles) {
+            const double energy_damp = 0.9;
+            double damp_fac = std::pow(energy_damp, p.current_state.getTime() - p.last_state.getTime());
+            p.current_state.setVelocity(p.current_state.getVelocity() * damp_fac);
+            p.current_state.setAngular(p.current_state.getAngularMomentum() * damp_fac);
+        }
         broad_phase.step(ph);
 
         #if !defined(NOGL)
@@ -191,14 +143,6 @@ int main(int argc, char *argv[]) {
         }
         else {
             cont = step < globals::opt.num_time_steps;
-        }
-        
-        for (Particle& p: particles) {
-            if (!p.is_static) {
-                if (p.current_state.getTranslation().z() < 1.0) {
-                    throw std::runtime_error("Through ground");
-                }
-            }
         }
     }
 

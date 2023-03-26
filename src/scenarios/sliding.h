@@ -21,7 +21,7 @@ namespace Delta2 {
 
             Delta2::common::cube(1.0, V, F);
             std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, globals::opt));
-            auto& p = particles.emplace_back(M, 2700.0, 1.0, 0.25);  // heavy cube (Aluminium)
+            auto& p = particles.emplace_back(M, 1.0, 1.0, 0.25);  // heavy cube (Aluminium) 2700
             p.current_state.setTranslation({0, 0, 1.025});
             p.current_state.setVelocity({1, 0, 0});
         }
