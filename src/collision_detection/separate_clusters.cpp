@@ -572,7 +572,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                     // globals::logger.printf(3, "(%i, %i) toc %f\n", b.A.first, b.B.first, c.toc);
                     Eigen::Vector3d hit_normal = (c.A - c.B);
 
-                    double interaction_dist = c.eps_a + c.eps_b;
+                    double interaction_dist = (c.eps_a + c.eps_b) * 0.25;
 
                     Eigen::Vector<double, 3> a_vel = c.p_a->futurePointVelocity(c.A);
                     Eigen::Vector<double, 3> b_vel = c.p_b->futurePointVelocity(c.B);
@@ -591,6 +591,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                             b.min_toc = std::min((float)toc_start_contact, b.min_toc);
                             // double toc_start_contact = std::max(0.0, 1.0 - (rel_vel.norm() * max_time_step_for_pair) / interaction_dist);
                             double new_step = common::lerp(toc_start_contact, c.toc, 0.75);
+                            globals::logger.printf(4, "A new_step: %f\n", new_step);
                             min_scaling_seen = std::min(min_scaling_seen, new_step);
                             // This is only correct if the velocity is perpendicular to the face tangent. Otherwise it's an underestimate of the toc (which is safe).
                             // min_scaling_seen = std::min(min_scaling_seen, c.toc * 0.9);
@@ -601,54 +602,59 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                                 // min_toc = std::min(min_toc, c.toc);
                                 // End point is inside range (since it's moving towards each other) => compute start point
                                 double proj_vel = -(hit_normal.normalized().dot(rel_vel)); // +ve
-                                double depth = interaction_dist - hit_normal.norm();
+                                double depth = std::max(0.0, interaction_dist - hit_normal.norm());
                                 double proj_dist = proj_vel * c.toc * max_time_step_for_pair;
-                                if (proj_dist > 1e-6) {
-                                    if (depth < proj_dist) {
-                                        // This is the first frame penetrating this eps boundry
-                                        assert((2.0 - depth / proj_dist) / 2.0 <= 1.0);
+                                if (hit_normal.norm() - proj_dist < interaction_dist) {
+                                    if (proj_dist > 1e-6) {
+                                        if (depth < proj_dist) {
+                                            // This is the first frame penetrating this eps boundry
+                                            assert((2.0 - depth / proj_dist) / 2.0 <= 1.0);
 
-                                        b.min_toc = std::min(b.min_toc, (float)std::max(0.0, c.toc * (1.0 - depth / proj_dist)));
+                                            b.min_toc = std::min(b.min_toc, (float)std::max(0.0, c.toc * (1.0 - depth / proj_dist)));
 
-                                        double new_step = common::lerp(c.toc * (1.0 - depth / proj_dist), c.toc, 0.5);
-                                        min_scaling_seen = std::min(min_scaling_seen, new_step);
-                                        if (max_time_step_for_pair * new_step < 1e-6) {
-                                            globals::logger.printf(3, "Small time step 0\n");
+                                            double new_step = common::lerp(c.toc * (1.0 - depth / proj_dist), c.toc, 0.5);
+                                            globals::logger.printf(4, "B new_step: %f\n", new_step);
+                                            min_scaling_seen = std::min(min_scaling_seen, new_step);
+                                            if (max_time_step_for_pair * new_step < 1e-6) {
+                                                globals::logger.printf(3, "Small time step 0\n");
+                                            }
+                                        }
+                                        else {
+                                            // The contact point was already inside the eps boundry at the start of the timestep
+                                            b.min_toc = 0.0;
+
+                                            double future_point = c.toc + (1.0 - c.toc) * interaction_dist / (proj_vel * max_time_step_for_pair);
+
+                                            double new_step = common::lerp(c.toc, std::min(future_point, 1.0), 0.8);
+
+                                            globals::logger.printf(4, "C new_step: %f\n", new_step);
+                                            min_scaling_seen = std::min(min_scaling_seen, new_step);
                                         }
                                     }
                                     else {
-                                        // The contact point was already inside the eps boundry at the start of the timestep
-                                        b.min_toc = 0.0;
-
-                                        double future_point = c.toc + (1.0 - c.toc) * interaction_dist / (proj_vel * max_time_step_for_pair);
-
-                                        double new_step = common::lerp(c.toc, std::min(future_point, 1.0), 0.8);
-
-                                        min_scaling_seen = std::min(min_scaling_seen, new_step);
+                                        b.min_toc = c.toc;
                                     }
-                                }
-                                else {
-                                    b.min_toc = c.toc;
-                                }
 
-                                double tangent_vel = std::sqrt(rel_vel.norm()*rel_vel.norm() - proj_vel*proj_vel);
-                                double tangent_dist = tangent_vel * max_time_step_for_pair;
-                                // globals::logger.printf(2, "td/i: %f\n", tangent_dist/interaction_dist);
-                                // globals::logger.printf(2, "tv/i: %f\n", tangent_vel/interaction_dist);
-                                
-                                // const float pass_through = 0.1; // when tangent_dist == interaction_dist then new_step == pass_through
-                                // float shift = 1/(1/pass_through - 1);
-                                // // Passes through:
-                                // //      (0, 1) ie no tangent velocity => don't shrink
-                                // //      (interaction_dist, pass_through)
-                                // //      (>iteraction_dist, <pass_through)
-                                // double new_step = std::max(1e-6, shift * interaction_dist / (tangent_dist + shift * interaction_dist));
-                                // min_scaling_seen = std::min(min_scaling_seen, new_step);
-                                const double d = 0.1; // Constant to control how quickly timestep size decreases with tangental velocity
-                                double new_step = (d * interaction_dist) / (tangent_dist + d * interaction_dist); // Passes through (0,1) ie. no tangental velocity => no timestep reduction here
-                                min_scaling_seen = std::min(min_scaling_seen, new_step);
-                                if (max_time_step_for_pair * new_step < 1e-6) {
-                                    globals::logger.printf(3, "Small time step tangent 0\n");
+                                    double tangent_vel = std::sqrt(rel_vel.norm()*rel_vel.norm() - proj_vel*proj_vel);
+                                    double tangent_dist = tangent_vel * max_time_step_for_pair;
+                                    // globals::logger.printf(2, "td/i: %f\n", tangent_dist/interaction_dist);
+                                    // globals::logger.printf(2, "tv/i: %f\n", tangent_vel/interaction_dist);
+                                    
+                                    // const float pass_through = 0.1; // when tangent_dist == interaction_dist then new_step == pass_through
+                                    // float shift = 1/(1/pass_through - 1);
+                                    // // Passes through:
+                                    // //      (0, 1) ie no tangent velocity => don't shrink
+                                    // //      (interaction_dist, pass_through)
+                                    // //      (>iteraction_dist, <pass_through)
+                                    // double new_step = std::max(1e-6, shift * interaction_dist / (tangent_dist + shift * interaction_dist));
+                                    // min_scaling_seen = std::min(min_scaling_seen, new_step);
+                                    const double d = 0.2; // Constant to control how quickly timestep size decreases with tangental velocity
+                                    double new_step = (d * interaction_dist) / (tangent_dist + d * interaction_dist); // Passes through (0,1) ie. no tangental velocity => no timestep reduction here
+                                    globals::logger.printf(4, "D new_step: %f\n", new_step);
+                                    min_scaling_seen = std::min(min_scaling_seen, new_step);
+                                    if (max_time_step_for_pair * new_step < 1e-6) {
+                                        globals::logger.printf(3, "Small time step tangent 0\n");
+                                    }
                                 }
                             }
                         }
