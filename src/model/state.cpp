@@ -100,7 +100,7 @@ State State::extrapolate(double t, Eigen::Matrix3d inv_inertia) {
     Eigen::Matrix3d Iinv = R * inv_inertia * R.transpose();
     Eigen::Vector3d omega = Iinv * _angular_momentum;
     Eigen::Quaterniond rot_delta = Delta2::common::exp(0.5 * omega * t);
-    result.setRotation(_rotation * rot_delta);
+    result.setRotation(rot_delta * _rotation);
     result.setAngular(getAngularMomentum());
     return result;
 }
