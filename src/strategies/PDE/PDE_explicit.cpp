@@ -114,7 +114,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
 
                 for (collision::Contact<double> &c : Cs)
                 {
-                    if ((c.A - c.B).norm() < 1e-4) {
+                    if ((c.A - c.B).norm() < 1e-8) {
                         failed_before_force_solve = true;
                         failed_a_id = a_id;
                         failed_b_id = b_id;
@@ -139,7 +139,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
     bool is_step_intersection_resolved = false;
 
     if (failed_before_force_solve) {
-        if (cluster.step_size < 1e-4) {
+        if (cluster.step_size < 1e-8) {
             globals::logger.printf(3, "%i: Failed before contact solve and resolving\n", cluster_id);
             globals::logger.printf(3, "%i: Failed a: %i, failed b: %i\n", cluster_id, cluster.particles[failed_a_id].id, cluster.particles[failed_b_id].id);
 
