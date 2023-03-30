@@ -625,7 +625,7 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
             double step = _local_pde.selectTimeStep(cluster);
 
-            std::string step_size_string = "Selected time step size: " + std::to_string(step) + "for cluster of " + std::to_string(cluster.particles.size());
+            std::string step_size_string = "Selected time step size: " + std::to_string(step) + " for cluster of " + std::to_string(cluster.particles.size());
             step_size_string += ". {";
             for (Particle* p : cluster.particles) {
                 step_size_string += std::to_string(p->id) + ", ";
