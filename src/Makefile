@@ -55,7 +55,7 @@ else
 endif
 
 CFLAGS = -std=c++17 -DCGAL_DISABLE_ROUNDING_MATH_CHECK $(VCFLAGS)
-FLAGS = -march=native -g $(VFLAGS)
+FLAGS = -march=native $(VFLAGS)
 
 #  -fsanitize=memory -fno-optimize-sibling-calls
 
@@ -107,15 +107,15 @@ endif
 	$(CC) $(CFLAGS) $(FLAGS) $(DEFINES) $(INCLUDE) $< -MM -MT $(@:.d=.o) >$@
 
 %.o.release: %.cpp
-	$(CC) $(CFLAGS) -O3 $(FLAGS) $(DEFINES) -DNDEBUG $(INCLUDE) -o $@ -c $<
+	$(CC) $(CFLAGS) -O3 -g $(FLAGS) $(DEFINES) -DNDEBUG $(INCLUDE) -o $@ -c $<
 
 %.o: %.cpp
-	$(CC) $(CFLAGS) -O0 $(FLAGS) $(DEFINES) $(INCLUDE) -o $@ -c $<
+	$(CC) $(CFLAGS) -O0 -g $(FLAGS) $(DEFINES) $(INCLUDE) -o $@ -c $<
 
 .PHONY: cleandebug
 cleandebug:
 	rm -f $(all_obj) ../build/Delta2.debug ./runner/main.o
-	
+
 .PHONY: cleanrelease
 cleanrelease:
 	rm -f $(release_obj) ../build/Delta2 ./runner/main.o.release
