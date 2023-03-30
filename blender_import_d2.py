@@ -123,9 +123,9 @@ while i < len(lines):
             i += 1
 
             print(lines[i])
-            rrotation = re.match("([ |\-]?[0-9]+(?:\.[0-9]+)?(?:e[-|+]?[0-9]+)?) ([ |\-]?[0-9]+(?:\.[0-9]+)?(?:e[-|+]?[0-9]+)?) ([ |\-]?[0-9]+(?:\.[0-9]+)?(?:e[-|+]?[0-9]+)?)$", lines[i])
+            rrotation = re.match("([ |\-]?[0-9]+(?:\.[0-9]+)?(?:e[-|+]?[0-9]+)?) ([ |\-]?[0-9]+(?:\.[0-9]+)?(?:e[-|+]?[0-9]+)?) ([ |\-]?[0-9]+(?:\.[0-9]+)?(?:e[-|+]?[0-9]+)?) ([ |\-]?[0-9]+(?:\.[0-9]+)?(?:e[-|+]?[0-9]+)?)$", lines[i])
             assert(rrotation)
-            rotation = [float(rrotation.group(1)), float(rrotation.group(2)), float(rrotation.group(3))]
+            rotation = [float(rrotation.group(1)), float(rrotation.group(2)), float(rrotation.group(3)), float(rrotation.group(4))]
             i += 1
             
             # print(lines[i])
@@ -169,8 +169,9 @@ for i, p in enumerate(particles):
     
     for s in p.states:
         b_particles[-1].location = s.translation
-        b_particles[-1].rotation_mode = 'ZYX'
-        b_particles[-1].rotation_euler = s.rotation
+        """b_particles[-1].rotation_mode = 'ZYX'"""
+        b_particles[-1].rotation_mode = 'QUATERNION'
+        b_particles[-1].rotation_quaternion = s.rotation
         frame = round(s.time * bpy.data.scenes["Scene"].render.fps) + 1
         b_particles[-1].keyframe_insert(data_path="location", frame=frame)
         b_particles[-1].keyframe_insert(data_path="rotation_euler", frame=frame)
