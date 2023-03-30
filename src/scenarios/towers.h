@@ -19,7 +19,7 @@ namespace Delta2 {
             const double spacing_x = 8.0;
             const int max_y = 4;
             const double spacing_y = 30.0;
-            const int max_i = 16;
+            const int max_i = 20;
             const int tilt_offset = 3;
             
             {
