@@ -69,7 +69,7 @@ namespace Delta2 {
 				print_priority = 0;
 
 				sequential_impulse_total_iterations = 1000;
-				sequential_impulse_inner_iterations = 20;
+				sequential_impulse_inner_iterations = 2;
 				sequential_impulse_grain_size = 1000;
 
 				cluster_separation_factor = 0.75;

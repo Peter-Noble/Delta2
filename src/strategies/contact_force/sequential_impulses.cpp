@@ -153,10 +153,6 @@ std::vector<LocalContact> create_local_contacts(std::vector<collision::Contact<d
         lc.last_friction_rotational_impulse_A = { 0.0, 0.0, 0.0 };
         lc.last_friction_rotational_impulse_B = { 0.0, 0.0, 0.0 };
 
-        lc.last_friction_impulse_fd = { 0.0, 0.0, 0.0 };
-        lc.last_friction_rotational_impulse_A_fd = { 0.0, 0.0, 0.0 };
-        lc.last_friction_rotational_impulse_B_fd = { 0.0, 0.0, 0.0 };
-
         contacts.push_back(lc);
     }
     return contacts;
@@ -198,7 +194,7 @@ bool solve_contacts(collision::Cluster& cluster,
         }
     }
 
-    std::map<std::pair<int, int>, std::pair<int, Eigen::Vector3d>> contacts_per_pair_first;
+    std::map<std::pair<int, int>, std::pair<int, Eigen::Vector3d>> average_contact_per_pair_first;
 
     const int max_iterations = globals::opt.sequential_impulse_total_iterations;
     const double t = cluster.step_size;
@@ -206,16 +202,9 @@ bool solve_contacts(collision::Cluster& cluster,
     bool all_d1_above = true;
     bool converged = false;
     int it = 0;
-    // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_impulse_impulses_task);
     while (!converged && it < max_iterations) {
         converged = true;
         all_d1_above = true;
-        if (it < max_iterations - 1) {
-            // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_impulse_iteration_task);
-        }
-        else {
-            // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_impulse_last_iteration_task);
-        }
         std::vector<Eigen::Vector3d> last_impulse;
         for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
             last_impulse.push_back(impulses[p_i]);
@@ -228,36 +217,15 @@ bool solve_contacts(collision::Cluster& cluster,
             uint32_t lower_id = std::min(a_id, b_id);
             uint32_t upper_id = std::max(a_id, b_id);
 
-            Eigen::Matrix4d a_FState_transformation;
-            Eigen::Matrix4d b_FState_transformation;
-            Eigen::Matrix3d a_inverse_inertia_matrix;
-            Eigen::Matrix3d b_inverse_inertia_matrix;
-            Eigen::Vector3d a_FState_translation;
-            Eigen::Vector3d b_FState_translation;
-            
-            {
-                // #ifdef USETBB
-                // // particle_access_lock.lock();
-                // mxs[lower_id]->lock();
-                // mxs[upper_id]->lock();
-                // #endif
-
-                a_FState_transformation = FStates[a_id].getTransformation();
-                b_FState_transformation = FStates[b_id].getTransformation();
-                a_inverse_inertia_matrix = hits[c].p_a->getInverseInertiaMatrix();
-                b_inverse_inertia_matrix = hits[c].p_b->getInverseInertiaMatrix();
-                a_FState_translation = FStates[a_id].getTranslation();
-                b_FState_translation = FStates[b_id].getTranslation();
-
-                // #ifdef USETBB
-                // mxs[lower_id]->unlock();
-                // mxs[upper_id]->unlock();
-                // // particle_access_lock.unlock();
-                // #endif
-            }
+            Eigen::Matrix4d a_FState_transformation = FStates[a_id].getTransformation();
+            Eigen::Matrix4d b_FState_transformation = FStates[b_id].getTransformation();
+            Eigen::Matrix3d a_inverse_inertia_matrix = hits[c].p_a->getInverseInertiaMatrix();
+            Eigen::Matrix3d b_inverse_inertia_matrix = hits[c].p_b->getInverseInertiaMatrix();
+            Eigen::Vector3d a_FState_translation = FStates[a_id].getTranslation();
+            Eigen::Vector3d b_FState_translation = FStates[b_id].getTranslation();
 
             Eigen::Vector3d n = contacts[c].global_normal.normalized();
-            if (n.hasNaN()) {
+            if (contacts[c].global_normal.norm() < 1e-12) {
                 n = (b_FState_translation - a_FState_translation).normalized();
             }
 
@@ -270,9 +238,26 @@ bool solve_contacts(collision::Cluster& cluster,
 
             all_d1_above &= d1 > 0.0;
 
+            // double t0 = cluster.particles[a_id].current_state.getTime();
+            // double t1 = FStates[a_id].getTime();
+            // double ts = t1 - t0;
+
+            // State FState_extrapolate_A = FStates[a_id].extrapolate(ts, hits[c].p_a->getInverseInertiaMatrix());
+            // State FState_extrapolate_B = FStates[b_id].extrapolate(ts, hits[c].p_b->getInverseInertiaMatrix());
+
+            // Eigen::Vector3d pf_A = common::transform(contacts[c].local_A, FState_extrapolate_A.getTransformation());
+            // Eigen::Vector3d pf_B = common::transform(contacts[c].local_B, FState_extrapolate_B.getTransformation());
+
+            // Eigen::Vector3d v1_A_ext = FStates[a_id].pointVelocity(p1_A, FState_extrapolate_A);
+            // Eigen::Vector3d v1_B_ext = FStates[b_id].pointVelocity(p1_B, FState_extrapolate_B);
+
             Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, a_inverse_inertia_matrix);
             Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, b_inverse_inertia_matrix);
+            
             const double v1 = v1_A.dot(n) - v1_B.dot(n);
+
+            // Eigen::Vector3d v1_AB_ext = v1_A_ext - v1_B_ext;
+            // const double v1 = v1_A_ext.dot(n) - v1_B_ext.dot(n);
 
             const double m = contacts[c].mass_eff_normal;
 
@@ -290,37 +275,31 @@ bool solve_contacts(collision::Cluster& cluster,
 
             auto key = std::make_pair(std::min(a_id, b_id), std::max(a_id, b_id));
             if (it > 0) {
-                if (contacts_per_pair_first.find(key) == contacts_per_pair_first.end()) {
+                if (average_contact_per_pair_first.find(key) == average_contact_per_pair_first.end()) {
                     // globals::logger.printf(3, "Searching pair %i, %i\n", key.first, key.second);
                     throw std::runtime_error("Key pair not found");
                 }
-                Eigen::Vector3d average = contacts_per_pair_first[key].second / contacts_per_pair_first[key].first;
-                // globals::logger.printf(3, "Contact %i Average: %f, %f, %f\n", c, average.x(), average.y(), average.z());
+                Eigen::Vector3d average = average_contact_per_pair_first[key].second / average_contact_per_pair_first[key].first;
                 total_impulse = common::lerp(average, total_impulse, std::min(1.0, std::min(1.0, 2.0*(double)it/(double)max_iterations)));
-                total_impulse = n.dot(total_impulse) * n;  // Keep direction of impulse
-                // globals::logger.printf(3, "Contact %i total_impulse: %f, %f, %f, lerp: %f\n", c, total_impulse.x(), total_impulse.y(), total_impulse.z(), std::min(1.0, std::min(1.0, 2.0*(double)it/(double)max_iterations)));
+                total_impulse = d1 < outer ? n.dot(total_impulse) * n : Eigen::Vector3d({0, 0, 0});  // Keep direction of impulse
             }
             else {
-                if (contacts_per_pair_first.find(key) != contacts_per_pair_first.end()) {
-                    contacts_per_pair_first[key].first++;
-                    contacts_per_pair_first[key].second += n * last_impulse_mag;
+                if (average_contact_per_pair_first.find(key) != average_contact_per_pair_first.end()) {
+                    average_contact_per_pair_first[key].first++;
+                    average_contact_per_pair_first[key].second += n * last_impulse_mag;
                 }
                 else {
-                    // globals::logger.printf(3, "Adding new pair %i, %i\n", key.first, key.second);
-                    contacts_per_pair_first[key] = std::make_pair(1, n * last_impulse_mag);
+                    average_contact_per_pair_first[key] = std::make_pair(1, n * last_impulse_mag);
                 }
-                // globals::logger.printf(3, "per pair total: %f, %f, %f\n", contacts_per_pair_first[key].second.x(), contacts_per_pair_first[key].second.y(), contacts_per_pair_first[key].second.z());
             }
             
             contacts[c].impulse = std::max(total_impulse.dot(n), 0.0);
 
             const double update_impulse_mag = contacts[c].impulse - last_impulse_mag;
-            // const double update_impulse_mag = total_impulse.dot(n) - last_impulse_mag;
 
             Eigen::Vector3d update_impulse = n * update_impulse_mag;
-            contacts_per_pair_first[key].second += update_impulse;
+            average_contact_per_pair_first[key].second += update_impulse;
 
-            // globals::logger.printf(3, "update_impulse_mag * 1000: %f\n", update_impulse_mag * 1000);
             if (std::abs(update_impulse_mag) > 1e-8) {
                 converged = false;
             }
@@ -390,7 +369,7 @@ bool solve_contacts(collision::Cluster& cluster,
                     FStates[a_id] = updateState(cluster.particles[a_id].future_state, t, impulse_a, impulse_offset_a, rotational_impulse_a, rotational_impulse_offset_a, &cluster.particles[a_id]);
                     
                     if (FStates[a_id].getTransformation().hasNaN()) {
-                        // throw std::runtime_error("Nan");
+                        throw std::runtime_error("Nan");
                     }
 
                     // #ifdef USETBB
@@ -416,7 +395,7 @@ bool solve_contacts(collision::Cluster& cluster,
                     FStates[b_id] = updateState(cluster.particles[b_id].future_state, t, impulse_b, impulse_offset_b, rotational_impulse_b, rotational_impulse_offset_b, &cluster.particles[b_id]);
                     
                     if (FStates[b_id].getTransformation().hasNaN()) {
-                        // throw std::runtime_error("Nan");
+                        throw std::runtime_error("Nan");
                     }
 
                     // #ifdef USETBB
@@ -481,22 +460,16 @@ bool solve_friction(collision::Cluster& cluster,
 
     std::vector<Eigen::Vector3d> tangents;
 
-    double unsolved_velocity_total = 0.0;
-    double last_velocity_total = 0.0;
-
-    std::map<std::pair<int, int>, std::pair<int, Eigen::Vector3d>> contacts_per_pair;
+    std::map<std::pair<int, int>, std::pair<int, Eigen::Vector3d>> average_contact_per_pair;
     
     std::vector<Eigen::Vector3d> updated_friction_total;
-    std::vector<Eigen::Vector3d> updated_friction_total_fd;
     for (int c = 0; c < hits.size(); c++) {
         updated_friction_total.push_back({0, 0, 0});
-        updated_friction_total_fd.push_back({0, 0, 0});
     }
 
     bool converged = false;
     int it = 0;
     while (!converged && it < max_iterations || it < 10) {
-        last_velocity_total = 0.0;
         converged = true;
 
         for (int c = 0; c < hits.size(); c++) {
@@ -515,52 +488,46 @@ bool solve_friction(collision::Cluster& cluster,
             double t1 = FStates[a_id].getTime();
             double ts = t1 - t0;
 
+            State FState_extrapolate_A = FStates[a_id].extrapolate(ts, hits[c].p_a->getInverseInertiaMatrix());
+            State FState_extrapolate_B = FStates[b_id].extrapolate(ts, hits[c].p_b->getInverseInertiaMatrix());
+
             Eigen::Vector3d p0_A = common::transform(contacts[c].local_A, cluster.particles[a_id].current_state.getTransformation());
             Eigen::Vector3d p0_B = common::transform(contacts[c].local_B, cluster.particles[b_id].current_state.getTransformation());
 
             Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
             Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
 
-            Eigen::Vector3d v1_A_fd = (p1_A - p0_A) / ts;
-            Eigen::Vector3d v1_B_fd = (p1_B - p0_B) / ts;
-
             Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
             Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
-
-            // globals::logger.printf(4, "ts: %f\n", ts);
-            // globals::logger.printf(4, "v1_A_fd: (%f, %f, %f) v1_A: (%f, %f, %f)\n", v1_A_fd.x(), v1_A_fd.y(), v1_A_fd.z(), v1_A.x(), v1_A.y(), v1_A.z());
-            // globals::logger.printf(4, "v1_B_fd: (%f, %f, %f) v1_B: (%f, %f, %f)\n", v1_B_fd.x(), v1_B_fd.y(), v1_B_fd.z(), v1_B.x(), v1_B.y(), v1_B.z());
-
             Eigen::Vector3d v1_AB = v1_A - v1_B;
-            Eigen::Vector3d v1_AB_fd = v1_A_fd - v1_B_fd;
-
             Eigen::Vector3d v_tangent_pt = v1_AB - v1_AB.dot(n) * n;
-            Eigen::Vector3d v_tangent_fd = v1_AB_fd - v1_AB_fd.dot(n) * n;
+            
+            // Could alternatively be used to compute the velocity at this point as the finite difference between this point now and at the last time step
+            // Eigen::Vector3d v1_A_fd = (p1_A - p0_A) / ts;
+            // Eigen::Vector3d v1_B_fd = (p1_B - p0_B) / ts;
+            // Eigen::Vector3d v1_AB_fd = v1_A_fd - v1_B_fd;
+            // Eigen::Vector3d v_tangent_fd = v1_AB_fd - v1_AB_fd.dot(n) * n;
+
+            // A third alternative.  Project the state out into the future and take a finite difference with that.
+            // Eigen::Vector3d v1_A_ext = FStates[a_id].pointVelocity(p1_A, FState_extrapolate_A);
+            // Eigen::Vector3d v1_B_ext = FStates[b_id].pointVelocity(p1_B, FState_extrapolate_B);
+            // Eigen::Vector3d v1_AB_ext = v1_A_ext - v1_B_ext;
+            // Eigen::Vector3d v_tangent_ext = v1_AB_ext - v1_AB_ext.dot(n) * n;
 
             Eigen::Vector3d v_tangent = v_tangent_pt;
             Eigen::Vector3d tangent = v_tangent.normalized();
 
-            last_velocity_total += v_tangent_fd.norm();
             if (it == 0) {
-                unsolved_velocity_total += v_tangent_fd.norm();
-            //     globals::logger.printf(2, "v_tangent_fd norm: (%f), %f, %f, %f\n", v_tangent_fd.norm(), v_tangent_fd.x(), v_tangent_fd.y(), v_tangent_fd.z());
-            //     Eigen::Vector3d tangent = v_tangent_fd.normalized();
-            //     tangents.push_back(tangent);
+                globals::logger.printf(3, "%i: %i v_tangent: %f, %f, %f (normal %f, tangent %f)\n", cluster_id, c, v_tangent.x(), v_tangent.y(), v_tangent.z(), contacts[c].impulse, contacts[c].last_friction_impulse.norm());
+                globals::logger.printf(3, "%i: %i v1_AB: %f, %f, %f first friction\n", cluster_id, c, v1_AB.x(), v1_AB.y(), v1_AB.z());
+                globals::logger.printf(3, "%i: %i n: %f, %f, %f first friction\n", cluster_id, c, n.x(), n.y(), n.z());
             }
-            // Eigen::Vector3d tangent = tangents[c];
-
-            // v_tangent = v_tangent.dot(tangents[c]) * tangents[c];
-            // v_tangent_fd = v_tangent_fd.dot(tangents[c]) * tangents[c];
-
-            // globals::logger.printf(4, "v_tangent: %f, %f, %f, v_tangent_fd: %f, %f, %f\n", v_tangent.x(), v_tangent.y(), v_tangent.z(), v_tangent_fd.x(), v_tangent_fd.y(), v_tangent_fd.z());
-
+            
             double mu = std::min(cluster.particles[a_id].friction_coeff, cluster.particles[b_id].friction_coeff);
-            double max_impulse = contacts[c].impulse * mu;
+            double max_impulse = (contacts[c].impulse + contacts[c].impulse_offset) * mu;
 
-            // globals::logger.printf(3, "it: %i, c: %i, max_impulse: %.4f, v_tangent: %.4f\n", it, c, max_impulse, v_tangent.norm());
             Eigen::Vector3d r_A = hits[c].A - hits[c].p_a->future_state.getTranslation();
             Eigen::Vector3d r_B = hits[c].B - hits[c].p_b->future_state.getTranslation();
-
 
             Eigen::Vector3d rt_A = r_A.cross(tangent);
             Eigen::Vector3d rt_B = r_B.cross(tangent);
@@ -586,32 +553,22 @@ bool solve_friction(collision::Cluster& cluster,
 
             const double friction_damp = common::lerp(0.1, 0.01, (double)it/(double)max_iterations);
             Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * friction_damp;
-            Eigen::Vector3d delta_friction_impulse_fd = -v_tangent_fd * m_inv_effective_tangent * friction_damp;
+            // Eigen::Vector3d delta_friction_impulse_fd = -v_tangent_fd * m_inv_effective_tangent * friction_damp;
 
-            // globals::logger.printf(4, "max_impulse: %f, delta_friction_impulse: %.4f, %.4f, %.4f\n", max_impulse, delta_friction_impulse.x(), delta_friction_impulse.y(), delta_friction_impulse.z());
-
-            // double zero_bias = common::lerp(max_impulse * 0.1, 0.0, std::min(1.0, (double)it/10.0));
-            double zero_bias = 0.0;
             Eigen::Vector3d friction_impulse_total = contacts[c].last_friction_impulse + delta_friction_impulse;
             Eigen::Vector3d friction_impulse_total_pre_avg = friction_impulse_total;
 
             if (it > 0) {
                 auto key = std::make_pair(std::min(a_id, b_id), std::max(a_id, b_id));
-                Eigen::Vector3d average = contacts_per_pair[key].second / contacts_per_pair[key].first;
+                Eigen::Vector3d average = average_contact_per_pair[key].second / average_contact_per_pair[key].first;
                 friction_impulse_total = common::lerp(average, friction_impulse_total, std::min(1.0, std::min(1.0, 2.0*(double)it/(double)max_iterations)));
                 friction_impulse_total = -tangent * std::max(0.0, (-tangent).dot(friction_impulse_total));
             }
-            friction_impulse_total = friction_impulse_total_pre_avg.normalized() * std::clamp(friction_impulse_total.norm() - zero_bias, 0.0, max_impulse);
+            friction_impulse_total = friction_impulse_total_pre_avg.normalized() * std::clamp(friction_impulse_total.norm(), 0.0, max_impulse);
 
             updated_friction_total[c] = friction_impulse_total;
 
-            Eigen::Vector3d friction_impulse_total_fd = contacts[c].last_friction_impulse_fd + delta_friction_impulse_fd;
-            friction_impulse_total_fd = friction_impulse_total_fd.normalized() * std::clamp(friction_impulse_total_fd.norm(), 0.0, max_impulse);
-
-            updated_friction_total_fd[c] = friction_impulse_total_fd;
-
-            // globals::logger.printf(4, "lfi: %f, %f, %f, uft: %f, %f, %f\n", contacts[c].last_friction_impulse.x(), contacts[c].last_friction_impulse.y(), contacts[c].last_friction_impulse.z(), updated_friction_total[c].x(), updated_friction_total[c].y(), updated_friction_total[c].z());
-            if ((contacts[c].last_friction_impulse - updated_friction_total[c]).norm() > 1e-8) {  // TODO This was originally 1e-8
+            if ((contacts[c].last_friction_impulse - updated_friction_total[c]).norm() > 1e-8) {
                 converged = false;
             }
 
@@ -635,54 +592,45 @@ bool solve_friction(collision::Cluster& cluster,
             }
         }
 
-        contacts_per_pair.clear();
+        average_contact_per_pair.clear();
 
         for (int c = 0; c < hits.size(); c++) {
             uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
             uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
             auto key = std::make_pair(std::min(a_id, b_id), std::max(a_id, b_id));
 
-            if (contacts_per_pair.find(key) != contacts_per_pair.end()) {
-                // globals::logger.printf(2, "Adding new pair %i, %i\n", key.first, key.second);
-                contacts_per_pair[key].first++;
-                contacts_per_pair[key].second += updated_friction_total[c];
+            if (average_contact_per_pair.find(key) != average_contact_per_pair.end()) {
+                average_contact_per_pair[key].first++;
+                average_contact_per_pair[key].second += updated_friction_total[c];
             }
             else {
-                contacts_per_pair[key] = std::make_pair(1, updated_friction_total[c]);
+                average_contact_per_pair[key] = std::make_pair(1, updated_friction_total[c]);
             }
 
             Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
             Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
 
-            Eigen::Vector3d update_friction_impulse = (updated_friction_total[c] - contacts[c].last_friction_impulse) / contacts_per_pair[key].first;
+            Eigen::Vector3d update_friction_impulse = (updated_friction_total[c] - contacts[c].last_friction_impulse) / average_contact_per_pair[key].first;
             contacts[c].last_friction_impulse = updated_friction_total[c];
             impulses[a_id] += update_friction_impulse;
             impulses[b_id] -= update_friction_impulse;
 
-            Eigen::Vector3d update_friction_impulse_fd = (updated_friction_total_fd[c] - contacts[c].last_friction_impulse_fd) / contacts_per_pair[key].first;
-            contacts[c].last_friction_impulse_fd = updated_friction_total_fd[c];
-            impulse_offsets[a_id] += update_friction_impulse_fd;
-            impulse_offsets[b_id] -= update_friction_impulse_fd;
+            // impulse_offsets[a_id] += update_friction_impulse;
+            // impulse_offsets[b_id] -= update_friction_impulse;
 
             Eigen::Vector3d rotational_impulse_friction_A = model::calcTorque(contacts[c].last_friction_impulse, p1_A, FStates[a_id].getTranslation());
             Eigen::Vector3d rotational_impulse_friction_B = model::calcTorque(Eigen::Vector3d(-contacts[c].last_friction_impulse), p1_B, FStates[b_id].getTranslation());
 
             rotational_impulses[a_id] -= contacts[c].last_friction_rotational_impulse_A;
             rotational_impulses[b_id] -= contacts[c].last_friction_rotational_impulse_B;
+            // rotational_impulse_offsets[a_id] -= contacts[c].last_friction_rotational_impulse_A;
+            // rotational_impulse_offsets[b_id] -= contacts[c].last_friction_rotational_impulse_B;
             contacts[c].last_friction_rotational_impulse_A = rotational_impulse_friction_A;
             contacts[c].last_friction_rotational_impulse_B = rotational_impulse_friction_B;
             rotational_impulses[a_id] += contacts[c].last_friction_rotational_impulse_A;
             rotational_impulses[b_id] += contacts[c].last_friction_rotational_impulse_B;
-
-            Eigen::Vector3d rotational_impulse_friction_A_fd = model::calcTorque(contacts[c].last_friction_impulse_fd, p1_A, FStates[a_id].getTranslation());
-            Eigen::Vector3d rotational_impulse_friction_B_fd = model::calcTorque(Eigen::Vector3d(-contacts[c].last_friction_impulse_fd), p1_B, FStates[b_id].getTranslation());
-
-            rotational_impulse_offsets[a_id] -= contacts[c].last_friction_rotational_impulse_A_fd;
-            rotational_impulse_offsets[b_id] -= contacts[c].last_friction_rotational_impulse_B_fd;
-            contacts[c].last_friction_rotational_impulse_A_fd = rotational_impulse_friction_A_fd;
-            contacts[c].last_friction_rotational_impulse_B_fd = rotational_impulse_friction_B_fd;
-            rotational_impulse_offsets[a_id] += contacts[c].last_friction_rotational_impulse_A_fd;
-            rotational_impulse_offsets[b_id] += contacts[c].last_friction_rotational_impulse_B_fd;
+            // rotational_impulse_offsets[a_id] += contacts[c].last_friction_rotational_impulse_A;
+            // rotational_impulse_offsets[b_id] += contacts[c].last_friction_rotational_impulse_B;
         }
 
         // ======== INTEGRATE ========
@@ -690,21 +638,53 @@ bool solve_friction(collision::Cluster& cluster,
         it++;
     }
 
+    // if (it == max_iterations) {
+    //     return false;  // TODO this used to cause some very odd errors in the tiny_tower scenario. Still the case?
+    // }
+
+    for (int c = 0; c < hits.size(); c++) {
+        uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
+        uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
+
+        Eigen::Vector3d n = contacts[c].global_normal.normalized();
+
+        Eigen::Vector3d p0_A = common::transform(contacts[c].local_A, cluster.particles[a_id].current_state.getTransformation());
+        Eigen::Vector3d p0_B = common::transform(contacts[c].local_B, cluster.particles[b_id].current_state.getTransformation());
+        
+        Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
+        Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
+
+        double t0 = cluster.particles[a_id].current_state.getTime();
+        double t1 = FStates[a_id].getTime();
+        double ts = t1 - t0;
+
+        Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
+        Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
+        Eigen::Vector3d v1_AB = v1_A - v1_B;
+        
+        Eigen::Vector3d v1_A_fd = (p1_A - p0_A) / ts;
+        Eigen::Vector3d v1_B_fd = (p1_B - p0_B) / ts;
+        Eigen::Vector3d v1_AB_fd = v1_A_fd - v1_B_fd;
+
+        Eigen::Vector3d v_tangent_pt = v1_AB - v1_AB.dot(n) * n;
+        Eigen::Vector3d v_tangent_fd = v1_AB_fd - v1_AB_fd.dot(n) * n;
+
+        Eigen::Vector3d v_tangent = v_tangent_pt;
+        Eigen::Vector3d tangent = v_tangent.normalized();
+
+        globals::logger.printf(4, "%i: %i v_tangent: %f, %f, %f, (normal %f, tangent %f)\n", cluster_id, c, v_tangent.x(), v_tangent.y(), v_tangent.z(), contacts[c].impulse, contacts[c].last_friction_impulse.norm());
+        globals::logger.printf(4, "%i: %i v1_AB: %f, %f, %f last friction\n", cluster_id, c, v1_AB.x(), v1_AB.y(), v1_AB.z());
+    }
+
     for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
         assert(!impulses[p_i].hasNaN());
-        // assert(impulses[p_i].norm() < 10000);
-        // if (impulses[p_i].norm() > 10000) {
-        //     globals::logger.printf(3, "Really big impulse\n");
-        // }
         if (impulses[p_i].hasNaN()) {
-            // throw std::runtime_error("Nan!");
             globals::logger.printf(3, "Nan!\n");
             return false;
         }
     }
     
     globals::logger.printf(3, "%i: Iterations used friction phase: %i\n", cluster_id, it);
-    globals::logger.printf(3, "Initial velocity lose: %f, end velocity lose: %f\n", unsolved_velocity_total, last_velocity_total);
 
     for (int c = 0; c < hits.size(); c++) {
         globals::logger.printf(3, "Contact %i last_impulse_friction: %f, %f, %f (%f)\n", c, contacts[c].last_friction_impulse.x(), contacts[c].last_friction_impulse.y(), contacts[c].last_friction_impulse.z(), contacts[c].last_friction_impulse.norm());
@@ -767,6 +747,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
         if (!cluster.particles[p_i].is_static) {
             Eigen::Vector3d velocity = FStates[p_i].getVelocity();
             globals::logger.printf(3, "Pre solve velocity for %i: %f, %f, %f\n", p_i, velocity.x(), velocity.y(), velocity.z());
+            globals::logger.printf(3, "impulses[p_i] %f, %f %f\n", impulses[p_i].x(), impulses[p_i].y(), impulses[p_i].z());
         }
     }
 
@@ -784,27 +765,112 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
             }
         }   
 
-        if (!solve_friction(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates)) return false;
+        for (int c = 0; c < hits.size(); c++) {
+            uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
+            uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
+            
+            Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
+            Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
 
-        for (int p = 0; p < cluster.particles.size(); p++) {
-            if (!cluster.particles[p].is_static) {
-                Eigen::Vector3d impulse = impulses[p];
-                Eigen::Vector3d rotational_impulse = rotational_impulses[p];
-                globals::logger.printf(3, "pf Impulse: %f, %f, %f\n", impulse.x(), impulse.y(), impulse.z());
-                globals::logger.printf(3, "pf rotational_impulse: %f, %f, %f\n", rotational_impulse.x(), rotational_impulse.y(), rotational_impulse.z());
-                globals::logger.printf(3, "pf Velocity %f, %f, %f\n", FStates[p].getVelocity().x(), FStates[p].getVelocity().y(), FStates[p].getVelocity().z());
-            }
+            Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
+            Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
+
+            Eigen::Vector3d v1_AB = v1_A - v1_B;
+
+            globals::logger.printf(3, "%i v1_AB: %f, %f, %f post 1st contact solve\n", c, v1_AB.x(), v1_AB.y(), v1_AB.z());
         }
 
-        if (!solve_contacts(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates)) return false;
-        
-        for (int p = 0; p < cluster.particles.size(); p++) {
-            if (!cluster.particles[p].is_static) {
-                Eigen::Vector3d impulse = impulses[p];
-                Eigen::Vector3d rotational_impulse = rotational_impulses[p];
-                globals::logger.printf(3, "p2 Impulse: %f, %f, %f\n", impulse.x(), impulse.y(), impulse.z());
-                globals::logger.printf(3, "p2 rotational_impulse: %f, %f, %f\n", rotational_impulse.x(), rotational_impulse.y(), rotational_impulse.z());
-                globals::logger.printf(3, "p2 Velocity %f, %f, %f\n", FStates[p].getVelocity().x(), FStates[p].getVelocity().y(), FStates[p].getVelocity().z());
+        for (int inner = 0; inner < globals::opt.sequential_impulse_inner_iterations; inner++) {
+            if (!solve_friction(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates)) return false;
+
+            for (int p = 0; p < cluster.particles.size(); p++) {
+                if (!cluster.particles[p].is_static) {
+                    Eigen::Vector3d impulse = impulses[p];
+                    Eigen::Vector3d rotational_impulse = rotational_impulses[p];
+                    globals::logger.printf(3, "pf Impulse: %f, %f, %f\n", impulse.x(), impulse.y(), impulse.z());
+                    globals::logger.printf(3, "pf rotational_impulse: %f, %f, %f\n", rotational_impulse.x(), rotational_impulse.y(), rotational_impulse.z());
+                    globals::logger.printf(3, "pf Velocity %f, %f, %f\n", FStates[p].getVelocity().x(), FStates[p].getVelocity().y(), FStates[p].getVelocity().z());
+                }
+            }
+
+            for (int c = 0; c < hits.size(); c++) {
+                uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
+                uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
+
+                Eigen::Vector3d p0_A = common::transform(contacts[c].local_A, cluster.particles[a_id].current_state.getTransformation());
+                Eigen::Vector3d p0_B = common::transform(contacts[c].local_B, cluster.particles[b_id].current_state.getTransformation());
+                
+                Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
+                Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
+
+                double t0 = cluster.particles[a_id].current_state.getTime();
+                double t1 = FStates[a_id].getTime();
+                double ts = t1 - t0;
+                
+                Eigen::Vector3d v1_A_fd = (p1_A - p0_A) / ts;
+                Eigen::Vector3d v1_B_fd = (p1_B - p0_B) / ts;
+
+                Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
+                Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
+
+                // globals::logger.printf(4, "ts: %f\n", ts);
+                // globals::logger.printf(4, "v1_A_fd: (%f, %f, %f) v1_A: (%f, %f, %f)\n", v1_A_fd.x(), v1_A_fd.y(), v1_A_fd.z(), v1_A.x(), v1_A.y(), v1_A.z());
+                // globals::logger.printf(4, "v1_B_fd: (%f, %f, %f) v1_B: (%f, %f, %f)\n", v1_B_fd.x(), v1_B_fd.y(), v1_B_fd.z(), v1_B.x(), v1_B.y(), v1_B.z());
+
+                Eigen::Vector3d v1_AB = v1_A - v1_B;
+                Eigen::Vector3d v1_AB_fd = v1_A_fd - v1_B_fd;
+                
+                Eigen::Vector3d n = contacts[c].global_normal.normalized();
+
+                Eigen::Vector3d v_tangent_pt = v1_AB - v1_AB.dot(n) * n;
+                Eigen::Vector3d v_tangent_fd = v1_AB_fd - v1_AB_fd.dot(n) * n;
+
+                Eigen::Vector3d v_tangent = v_tangent_pt;
+                Eigen::Vector3d tangent = v_tangent.normalized();
+
+                globals::logger.printf(3, "%i v_tangent: %f, %f, %f, (normal %f, tangent %f) post friction\n", c, v_tangent.x(), v_tangent.y(), v_tangent.z(), contacts[c].impulse, contacts[c].last_friction_impulse.norm());
+            }
+
+            for (int c = 0; c < hits.size(); c++) {
+                uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
+                uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
+                
+                Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
+                Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
+
+                Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
+                Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
+
+                Eigen::Vector3d v1_AB = v1_A - v1_B;
+
+                globals::logger.printf(3, "%i v1_AB: %f, %f, %f post friction solve\n", c, v1_AB.x(), v1_AB.y(), v1_AB.z());
+            }
+
+            if (!solve_contacts(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates)) return false;
+            
+            for (int p = 0; p < cluster.particles.size(); p++) {
+                if (!cluster.particles[p].is_static) {
+                    Eigen::Vector3d impulse = impulses[p];
+                    Eigen::Vector3d rotational_impulse = rotational_impulses[p];
+                    globals::logger.printf(3, "p2 Impulse: %f, %f, %f\n", impulse.x(), impulse.y(), impulse.z());
+                    globals::logger.printf(3, "p2 rotational_impulse: %f, %f, %f\n", rotational_impulse.x(), rotational_impulse.y(), rotational_impulse.z());
+                    globals::logger.printf(3, "p2 Velocity %f, %f, %f\n", FStates[p].getVelocity().x(), FStates[p].getVelocity().y(), FStates[p].getVelocity().z());
+                }
+            }
+
+            for (int c = 0; c < hits.size(); c++) {
+                uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
+                uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
+
+                Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
+                Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
+
+                Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
+                Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
+
+                Eigen::Vector3d v1_AB = v1_A - v1_B;
+
+                globals::logger.printf(3, "%i v1_AB: %f, %f, %f post 2nd contact solve\n", c, v1_AB.x(), v1_AB.y(), v1_AB.z());
             }
         }
 
@@ -823,7 +889,45 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
         cluster.particles[p_i].future_state = FStates[p_i];
     }
 
-    _warm_start.update(contacts, hits);
+    for (int c = 0; c < hits.size(); c++) {
+        uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
+        uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
+
+        Eigen::Vector3d p0_A = common::transform(contacts[c].local_A, cluster.particles[a_id].current_state.getTransformation());
+        Eigen::Vector3d p0_B = common::transform(contacts[c].local_B, cluster.particles[b_id].current_state.getTransformation());
+        
+        Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, cluster.particles[a_id].future_state.getTransformation());
+        Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, cluster.particles[b_id].future_state.getTransformation());
+
+        double t0 = cluster.particles[a_id].current_state.getTime();
+        double t1 = cluster.particles[a_id].future_state.getTime();
+        double ts = t1 - t0;
+        
+        Eigen::Vector3d v1_A_fd = (p1_A - p0_A) / ts;
+        Eigen::Vector3d v1_B_fd = (p1_B - p0_B) / ts;
+
+        Eigen::Vector3d v1_A = cluster.particles[a_id].future_state.pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
+        Eigen::Vector3d v1_B = cluster.particles[b_id].future_state.pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
+
+        // globals::logger.printf(4, "ts: %f\n", ts);
+        // globals::logger.printf(4, "v1_A_fd: (%f, %f, %f) v1_A: (%f, %f, %f)\n", v1_A_fd.x(), v1_A_fd.y(), v1_A_fd.z(), v1_A.x(), v1_A.y(), v1_A.z());
+        // globals::logger.printf(4, "v1_B_fd: (%f, %f, %f) v1_B: (%f, %f, %f)\n", v1_B_fd.x(), v1_B_fd.y(), v1_B_fd.z(), v1_B.x(), v1_B.y(), v1_B.z());
+
+        Eigen::Vector3d v1_AB = v1_A - v1_B;
+        Eigen::Vector3d v1_AB_fd = v1_A_fd - v1_B_fd;
+           
+        Eigen::Vector3d n = contacts[c].global_normal.normalized();
+
+        Eigen::Vector3d v_tangent_pt = v1_AB - v1_AB.dot(n) * n;
+        Eigen::Vector3d v_tangent_fd = v1_AB_fd - v1_AB_fd.dot(n) * n;
+
+        Eigen::Vector3d v_tangent = v_tangent_pt;
+        Eigen::Vector3d tangent = v_tangent.normalized();
+
+        globals::logger.printf(3, "%i v_tangent: %f, %f, %f, (normal %f, tangent %f) post integrate\n", c, v_tangent.x(), v_tangent.y(), v_tangent.z(), contacts[c].impulse, contacts[c].last_friction_impulse.norm());
+    }
+
+    // _warm_start.update(contacts, hits);
 
     return true;
 }

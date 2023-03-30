@@ -637,20 +637,13 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
                                     double tangent_vel = std::sqrt(rel_vel.norm()*rel_vel.norm() - proj_vel*proj_vel);
                                     double tangent_dist = tangent_vel * max_time_step_for_pair;
-                                    // globals::logger.printf(2, "td/i: %f\n", tangent_dist/interaction_dist);
-                                    // globals::logger.printf(2, "tv/i: %f\n", tangent_vel/interaction_dist);
                                     
-                                    // const float pass_through = 0.1; // when tangent_dist == interaction_dist then new_step == pass_through
-                                    // float shift = 1/(1/pass_through - 1);
-                                    // // Passes through:
-                                    // //      (0, 1) ie no tangent velocity => don't shrink
-                                    // //      (interaction_dist, pass_through)
-                                    // //      (>iteraction_dist, <pass_through)
-                                    // double new_step = std::max(1e-6, shift * interaction_dist / (tangent_dist + shift * interaction_dist));
-                                    // min_scaling_seen = std::min(min_scaling_seen, new_step);
-                                    const double d = 0.2; // Constant to control how quickly timestep size decreases with tangental velocity
-                                    double new_step = (d * interaction_dist) / (tangent_dist + d * interaction_dist); // Passes through (0,1) ie. no tangental velocity => no timestep reduction here
-                                    globals::logger.printf(4, "D new_step: %f\n", new_step);
+                                    const double d = 0.5; // Constant to control how quickly timestep size decreases with tangental velocity
+                                    const double limit = d * (globals::opt.time_step_size - max_time_step_for_pair) / globals::opt.time_step_size;
+                                    double new_step = tangent_dist < limit ? 1.0 : (d * interaction_dist) / ((tangent_dist-limit) + d * interaction_dist); // Passes through (0,1) ie. no tangental velocity => no timestep reduction here
+                                    if (new_step < min_scaling_seen) {
+                                        globals::logger.printf(4, "D new_step: %f\n", new_step);
+                                    }
                                     min_scaling_seen = std::min(min_scaling_seen, new_step);
                                     if (max_time_step_for_pair * new_step < 1e-6) {
                                         globals::logger.printf(3, "Small time step tangent 0\n");
@@ -662,7 +655,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                 }
                 b.target_toc = std::min(b.target_toc, (float)min_scaling_seen);
 
-                // globals::logger.printf(1, "min toc: %f, target toc: %f\n", b.min_toc, b.target_toc);
+                // globals::logger.printf(4, "min toc: %f, target toc: %f\n", b.min_toc, b.target_toc);
 
                 if (std::isinf(b.min_toc)) {
                     // None of the continuous contacts set the min_toc so it can advance all the way.
@@ -726,7 +719,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
     if (cluster.step_size < 0.0) {
         cluster.step_size = (cluster.particles[0]).last_time_step_size;
     }
-    // globals::logger.printf(1, "Cluster time step: %f\n", cluster.step_size);
+    // globals::logger.printf(4, "Cluster time step: %f\n", cluster.step_size);
 }
 
 
