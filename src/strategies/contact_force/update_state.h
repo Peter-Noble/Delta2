@@ -1,3 +1,5 @@
+#pragma once
+
 #include "../../model/state.h"
 #include "../../model/particle.h"
 

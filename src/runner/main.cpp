@@ -49,7 +49,7 @@ void guiThread(common::AnimationViewer* view) {
 
 int main(int argc, char *argv[]) {
     globals::logger.printf(0, "Main\n");
-    globals::itt_handles.disable_detailed_domain();
+    // globals::itt_handles.disable_detailed_domain();
 
     int threads = tbb::info::default_concurrency();
     if (globals::opt.threads > 0) {
@@ -105,9 +105,9 @@ int main(int argc, char *argv[]) {
         globals::logger.printf(1, "Step: %i\n", step);
 
         if (globals::opt.export_result) {
-            Delta2::globals::logger.printf(2, "Starting capture\n");
+            Delta2::globals::logger.printf(3, "Starting capture\n");
             export_writer.capture(particles);
-            Delta2::globals::logger.printf(2, "Done capture\n");
+            Delta2::globals::logger.printf(3, "Done capture\n");
         }
 
         {
