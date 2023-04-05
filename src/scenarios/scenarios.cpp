@@ -9,6 +9,7 @@
 #include "../scenarios/sliding.h"
 #include "../scenarios/tiny_tower.h"
 #include "../scenarios/angle_sliding.h"
+#include "../scenarios/big_pile.h"
 
 void Delta2::scenarios::make_scenario(std::vector<Delta2::Particle>& particles, Delta2::strategy::ContactForceStrategy& force_strategy) {
     switch (globals::opt.scenario) {
@@ -65,6 +66,11 @@ void Delta2::scenarios::make_scenario(std::vector<Delta2::Particle>& particles, 
     case 10:
         {
             scenarios::angle_sliding_first(particles, force_strategy);
+            break;
+        }
+    case 11:
+        {
+            scenarios::pyramid(particles, force_strategy);
             break;
         }
     default:
