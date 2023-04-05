@@ -39,6 +39,10 @@ namespace Delta2 {
 			int sequential_impulse_inner_iterations;
 			int sequential_impulse_grain_size;
 
+			int sequential_parallel_threshold;
+			int sequential_parallel_individual_colour_threshold;
+			int sequential_parallel_grain_size;
+
 			float cluster_separation_factor;
 
 			pcg32_random_t rng;
@@ -71,6 +75,10 @@ namespace Delta2 {
 				sequential_impulse_total_iterations = 1000;
 				sequential_impulse_inner_iterations = 2;
 				sequential_impulse_grain_size = 1000;
+
+				sequential_parallel_threshold = 200;
+				sequential_parallel_individual_colour_threshold = 100;
+				sequential_parallel_grain_size = 10;
 
 				cluster_separation_factor = 0.75;
 
@@ -165,6 +173,10 @@ namespace Delta2 {
 				printf("Seq total iterations:  %i\n", sequential_impulse_total_iterations);
 				printf("Seq inner iterations:  %i\n", sequential_impulse_inner_iterations);
 				printf("Seq grain size:        %i\n", sequential_impulse_grain_size);
+				printf("Seq par threshold:     %i\n", sequential_parallel_threshold);
+				printf("Seq par indiv thresh:  %i\n", sequential_parallel_individual_colour_threshold);
+				printf("Seq par grain size:    %i\n", sequential_parallel_grain_size);
+
 				printf("==========================================\n");
 				printf("Cluster sep factor:    %f\n", cluster_separation_factor);
 				printf("==========================================\n");
@@ -205,7 +217,14 @@ namespace Delta2 {
 				app.add_option("--seq_total_iter", sequential_impulse_total_iterations, "Total number of iterations to use for sequential impulses");
 				app.add_option("--seq_inner_iter", sequential_impulse_inner_iterations, "Number of inner iterations to use for sequential impulses");
 				app.add_option("--seq_grain_size", sequential_impulse_grain_size, "Grain size to use for sequential impulses");
+				
+				app.add_option("--seq_par_thresh", sequential_parallel_threshold, "Number of hits in a cluster to activate graph colouring and parallel evaluation");
+				app.add_option("--seq_par_indiv_thresh", sequential_parallel_individual_colour_threshold, "Minimum number of hits of one colour to evaluate in parallel");
+				app.add_option("--seq_par_grain_size", sequential_parallel_grain_size, "Grain size to use for parallel hit evaluation");
 
+				sequential_parallel_threshold = 200;
+				sequential_parallel_individual_colour_threshold = 100;
+				sequential_parallel_grain_size = 10;
 				CLI11_PARSE(app, argc, argv);
 
 				print();
