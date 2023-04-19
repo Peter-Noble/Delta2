@@ -76,9 +76,9 @@ namespace Delta2 {
 				sequential_impulse_inner_iterations = 2;
 				sequential_impulse_grain_size = 1000;
 
-				sequential_parallel_threshold = 200;
-				sequential_parallel_individual_colour_threshold = 100;
-				sequential_parallel_grain_size = 10;
+				sequential_parallel_threshold = 1000;
+				sequential_parallel_individual_colour_threshold = 200;
+				sequential_parallel_grain_size = 100;
 
 				cluster_separation_factor = 0.75;
 
