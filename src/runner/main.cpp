@@ -116,7 +116,7 @@ int main(int argc, char *argv[]) {
         }
 
         for (Particle& p : particles) {
-            const double energy_damp = 0.9;
+            const double energy_damp = 0.99;
             double damp_fac = std::pow(energy_damp, p.current_state.getTime() - p.last_state.getTime());
             p.current_state.setVelocity(p.current_state.getVelocity() * damp_fac);
             p.current_state.setAngular(p.current_state.getAngularMomentum() * damp_fac);
