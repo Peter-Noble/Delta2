@@ -382,7 +382,7 @@ bool solve_contacts(collision::Cluster& cluster,
                         for (int i = r.begin(); i < r.end(); i++) {
                             contact_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, all_d1_above, converged);
                         }
-                    });
+                    }, tbb::static_partitioner());
                     // time_point<Clock> end = Clock::now();
                     // microseconds diff = duration_cast<microseconds>(end - start);
                     // globals::logger.printf(1, "Parallel size: %i in %iμs\n", colours[colour].size(), diff.count());
@@ -429,7 +429,7 @@ bool solve_contacts(collision::Cluster& cluster,
     for (int c = 0; c < hits.size(); c++) {
         Eigen::Vector3d n = contacts[c].global_normal.normalized();
         Eigen::Vector3d total_impulse = n * contacts[c].impulse;
-        globals::logger.printf(3, "Contact %i total_impulse: %f, %f, %f (%f)\n", c, total_impulse.x(), total_impulse.y(), total_impulse.z(), total_impulse.norm());
+        globals::logger.printf(4, "Contact %i total_impulse: %f, %f, %f (%f)\n", c, total_impulse.x(), total_impulse.y(), total_impulse.z(), total_impulse.norm());
     }
 
     __itt_task_end(globals::itt_handles.detailed_domain);
@@ -459,6 +459,9 @@ void friction_iteration(collision::ContactBundle& bundle,
     const uint32_t a_id = bundle.lower;
     const uint32_t b_id = bundle.upper;
 
+    const Eigen::Matrix3d a_inv = cluster.particles[a_id].getInverseInertiaMatrix();
+    const Eigen::Matrix3d b_inv = cluster.particles[b_id].getInverseInertiaMatrix();
+
     int i = -1;
     for (int c : bundle.hits) {
         i++;
@@ -468,17 +471,17 @@ void friction_iteration(collision::ContactBundle& bundle,
         
         const Eigen::Vector3d n = contacts[c].global_normal.norm() > 1e-12 ? contacts[c].global_normal.normalized() : (b_FState_translation - a_FState_translation).normalized();
 
-        const Eigen::Vector3d p0_A = common::transform(contacts[c].local_A, cluster.particles[a_id].current_state.getTransformation());
-        const Eigen::Vector3d p0_B = common::transform(contacts[c].local_B, cluster.particles[b_id].current_state.getTransformation());
-
         const Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
         const Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
 
-        const Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
-        const Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
+        const Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, a_inv);
+        const Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, b_inv);
         const Eigen::Vector3d v1_AB = v1_A - v1_B;
         const Eigen::Vector3d v_tangent_pt = v1_AB - v1_AB.dot(n) * n;
         
+        // const Eigen::Vector3d p0_A = common::transform(contacts[c].local_A, cluster.particles[a_id].current_state.getTransformation());
+        // const Eigen::Vector3d p0_B = common::transform(contacts[c].local_B, cluster.particles[b_id].current_state.getTransformation());
+
         // double t0 = cluster.particles[a_id].current_state.getTime();
         // double t1 = FStates[a_id].getTime();
         // double ts = t1 - t0;
@@ -636,61 +639,32 @@ bool solve_friction(collision::Cluster& cluster,
     const int parallel_individual_colour_threshold = globals::opt.sequential_parallel_individual_colour_threshold;
     const int parallel_grain_size = globals::opt.sequential_parallel_grain_size;
 
-    std::vector<Eigen::Vector3d> tangents;
-
-    std::map<std::pair<int, int>, std::pair<int, Eigen::Vector3d>> average_contact_per_pair;
-    
-    std::vector<Eigen::Vector3d> updated_friction_total;
-    for (int c = 0; c < hits.size(); c++) {
-        updated_friction_total.push_back({0, 0, 0});
-    }
-
     std::atomic_bool converged = false;
     int it = 0;
     while (!converged && it < max_iterations || it < 10) {
         converged = true;
 
-        // for (collision::ContactBundle& bundle : bundles) {
-        //     friction_iteration(bundle, it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
-        // }
-
         if (colours.size() > 0) {
             for (int colour = 0; colour < colours.size(); colour++) {
-                // globals::logger.printf(1, "Colour size: %i\n", colours[colour].size());
                 if (colours[colour].size() > parallel_individual_colour_threshold) {
-                    // time_point<Clock> start = Clock::now();
                     tbb::parallel_for(tbb::blocked_range<int>(0, colours[colour].size(), parallel_grain_size),
                                     [&](tbb::blocked_range<int> r) {
                         for (int i = r.begin(); i < r.end(); i++) {
                             friction_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
-                            // friction_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
                         }
-                    });
-                    // time_point<Clock> end = Clock::now();
-                    // microseconds diff = duration_cast<microseconds>(end - start);
-                    // globals::logger.printf(1, "Parallel size: %i in %iμs\n", colours[colour].size(), diff.count());
+                    }, tbb::static_partitioner());
                 }
                 else {
-                    // time_point<Clock> start = Clock::now();
                     for (int b = 0; b < colours[colour].size(); b++) {
                         friction_iteration(colours[colour][b], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
                     }
-                    // time_point<Clock> end = Clock::now();
-                    // microseconds diff = duration_cast<microseconds>(end - start);
-                    // globals::logger.printf(1, "Coloured but too small: %i in %iμs\n", colours[colour].size(), diff.count());
                 }
             }
         }
         else {
-            // time_point<Clock> start = Clock::now();
             for (collision::ContactBundle& bundle : bundles) {
                 friction_iteration(bundle, it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
             }
-            // time_point<Clock> end = Clock::now();
-            // microseconds diff = duration_cast<microseconds>(end - start);
-            // if (hits.size() > parallel_individual_colour_threshold) {
-            //     globals::logger.printf(1, "Not coloured: %i in %iμs\n", hits.size(), diff.count());
-            // }
         }
 
         it++;
@@ -704,8 +678,84 @@ bool solve_friction(collision::Cluster& cluster,
     globals::logger.printf(3, "%i: Iterations used friction phase: %i\n", cluster_id, it);
 
     for (int c = 0; c < hits.size(); c++) {
-        globals::logger.printf(3, "Contact %i last_impulse_friction: %f, %f, %f (%f)\n", c, contacts[c].last_friction_impulse.x(), contacts[c].last_friction_impulse.y(), contacts[c].last_friction_impulse.z(), contacts[c].last_friction_impulse.norm());
+        globals::logger.printf(4, "Contact %i last_impulse_friction: %f, %f, %f (%f)\n", c, contacts[c].last_friction_impulse.x(), contacts[c].last_friction_impulse.y(), contacts[c].last_friction_impulse.z(), contacts[c].last_friction_impulse.norm());
     }
+    __itt_task_end(globals::itt_handles.detailed_domain);
+    return true;
+}
+
+bool solve_combined(collision::Cluster& cluster,
+                    std::vector<collision::Contact<double>>& hits,
+                    std::vector<LocalContact>& contacts,
+                    std::vector<Eigen::Vector3d>& impulses,
+                    std::vector<Eigen::Vector3d>& rotational_impulses,
+                    std::vector<Eigen::Vector3d>& impulse_offsets,
+                    std::vector<Eigen::Vector3d>& rotational_impulse_offsets,
+                    std::vector<State>& FStates,
+                    std::vector<std::vector<collision::ContactBundle>>& colours,
+                    std::vector<collision::ContactBundle>& bundles) {
+    __itt_string_handle* solve_combined_task = __itt_string_handle_create("Solve combined");
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, solve_combined_task);
+
+    int cluster_id = -1;
+    for (Particle* p : cluster.particles) {
+        if (!p->is_static) {
+            cluster_id = p->cluster_id;
+            break;
+        }
+    }
+
+    const int max_iterations = globals::opt.sequential_impulse_total_iterations;
+
+    const int parallel_threshold = globals::opt.sequential_parallel_threshold;
+    const int parallel_individual_colour_threshold = globals::opt.sequential_parallel_individual_colour_threshold;
+    const int parallel_grain_size = globals::opt.sequential_parallel_grain_size;
+
+    std::atomic_bool all_d1_above = true;
+    std::atomic_bool converged = false;
+    const int it_start = max_iterations / 4;
+    int it_shift = it_start;
+    while (!converged && it_shift < max_iterations + it_start || it_shift < it_start + 10) {
+        converged = true;
+        all_d1_above = true;
+        int it = std::min(max_iterations-1, it_shift);
+
+        if (colours.size() > 0) {
+            for (int colour = 0; colour < colours.size(); colour++) {
+                if (colours[colour].size() > parallel_individual_colour_threshold) {
+                    tbb::parallel_for(tbb::blocked_range<int>(0, colours[colour].size(), parallel_grain_size),
+                                    [&](tbb::blocked_range<int> r) {
+                        for (int i = r.begin(); i < r.end(); i++) {
+                            friction_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
+                            contact_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, all_d1_above, converged);
+                        }
+                    }, tbb::static_partitioner());
+                }
+                else {
+                    for (int b = 0; b < colours[colour].size(); b++) {
+                        friction_iteration(colours[colour][b], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
+                        contact_iteration(colours[colour][b], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, all_d1_above, converged);
+                    }
+                }
+            }
+        }
+        else {
+            for (collision::ContactBundle& bundle : bundles) {
+                friction_iteration(bundle, it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
+                contact_iteration(bundle, it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, all_d1_above, converged);
+            }
+        }
+
+        it_shift++;
+    }
+
+    // if (it == max_iterations) {
+    //      __itt_task_end(globals::itt_handles.detailed_domain);
+    //     return false;  // TODO this used to cause some very odd errors in the tiny_tower scenario. Still the case?
+    // }
+    
+    globals::logger.printf(3, "%i: Iterations used combined phase: %i\n", cluster_id, it_shift - it_start);
+
     __itt_task_end(globals::itt_handles.detailed_domain);
     return true;
 }
@@ -763,8 +813,8 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
     for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
         if (!cluster.particles[p_i].is_static) {
             Eigen::Vector3d velocity = FStates[p_i].getVelocity();
-            globals::logger.printf(3, "Pre solve velocity for %i: %f, %f, %f\n", p_i, velocity.x(), velocity.y(), velocity.z());
-            globals::logger.printf(3, "impulses[p_i] %f, %f %f\n", impulses[p_i].x(), impulses[p_i].y(), impulses[p_i].z());
+            globals::logger.printf(4, "Pre solve velocity for %i: %f, %f, %f\n", p_i, velocity.x(), velocity.y(), velocity.z());
+            globals::logger.printf(4, "impulses[p_i] %f, %f %f\n", impulses[p_i].x(), impulses[p_i].y(), impulses[p_i].z());
         }
     }
 
@@ -783,123 +833,13 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
         }
 
         if (!solve_contacts(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, colours, bundles)) return false;
+        if (!solve_friction(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, colours, bundles)) return false;
 
-        for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
-            if (!cluster.particles[p_i].is_static) {
-                Eigen::Vector3d velocity = FStates[p_i].getVelocity();
-                globals::logger.printf(3, "Post solve velocity for %i: %f, %f, %f\n", p_i, velocity.x(), velocity.y(), velocity.z());
-            }
-        }   
-
-        for (int c = 0; c < hits.size(); c++) {
-            uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
-            uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
-            
-            Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
-            Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
-
-            Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
-            Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
-
-            Eigen::Vector3d v1_AB = v1_A - v1_B;
-
-            globals::logger.printf(3, "%i v1_AB: %f, %f, %f post 1st contact solve\n", c, v1_AB.x(), v1_AB.y(), v1_AB.z());
-        }
-
-        for (int inner = 0; inner < globals::opt.sequential_impulse_inner_iterations; inner++) {
-            // if (!solve_friction(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, colours, bundles)) return false;
-            if (!solve_friction(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, colours, bundles)) return false;
-
-            for (int p = 0; p < cluster.particles.size(); p++) {
-                if (!cluster.particles[p].is_static) {
-                    Eigen::Vector3d impulse = impulses[p];
-                    Eigen::Vector3d rotational_impulse = rotational_impulses[p];
-                    globals::logger.printf(3, "pf Impulse: %f, %f, %f\n", impulse.x(), impulse.y(), impulse.z());
-                    globals::logger.printf(3, "pf rotational_impulse: %f, %f, %f\n", rotational_impulse.x(), rotational_impulse.y(), rotational_impulse.z());
-                    globals::logger.printf(3, "pf Velocity %f, %f, %f\n", FStates[p].getVelocity().x(), FStates[p].getVelocity().y(), FStates[p].getVelocity().z());
-                }
-            }
-
-            for (int c = 0; c < hits.size(); c++) {
-                uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
-                uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
-
-                Eigen::Vector3d p0_A = common::transform(contacts[c].local_A, cluster.particles[a_id].current_state.getTransformation());
-                Eigen::Vector3d p0_B = common::transform(contacts[c].local_B, cluster.particles[b_id].current_state.getTransformation());
-                
-                Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
-                Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
-
-                double t0 = cluster.particles[a_id].current_state.getTime();
-                double t1 = FStates[a_id].getTime();
-                double ts = t1 - t0;
-                
-                Eigen::Vector3d v1_A_fd = (p1_A - p0_A) / ts;
-                Eigen::Vector3d v1_B_fd = (p1_B - p0_B) / ts;
-
-                Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
-                Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
-
-                // globals::logger.printf(4, "ts: %f\n", ts);
-                // globals::logger.printf(4, "v1_A_fd: (%f, %f, %f) v1_A: (%f, %f, %f)\n", v1_A_fd.x(), v1_A_fd.y(), v1_A_fd.z(), v1_A.x(), v1_A.y(), v1_A.z());
-                // globals::logger.printf(4, "v1_B_fd: (%f, %f, %f) v1_B: (%f, %f, %f)\n", v1_B_fd.x(), v1_B_fd.y(), v1_B_fd.z(), v1_B.x(), v1_B.y(), v1_B.z());
-
-                Eigen::Vector3d v1_AB = v1_A - v1_B;
-                Eigen::Vector3d v1_AB_fd = v1_A_fd - v1_B_fd;
-                
-                Eigen::Vector3d n = contacts[c].global_normal.normalized();
-
-                Eigen::Vector3d v_tangent_pt = v1_AB - v1_AB.dot(n) * n;
-                Eigen::Vector3d v_tangent_fd = v1_AB_fd - v1_AB_fd.dot(n) * n;
-
-                Eigen::Vector3d v_tangent = v_tangent_pt;
-                Eigen::Vector3d tangent = v_tangent.normalized();
-
-                globals::logger.printf(3, "%i v_tangent: %f, %f, %f, (normal %f, tangent %f) post friction\n", c, v_tangent.x(), v_tangent.y(), v_tangent.z(), contacts[c].impulse, contacts[c].last_friction_impulse.norm());
-            }
-
-            for (int c = 0; c < hits.size(); c++) {
-                uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
-                uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
-                
-                Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
-                Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
-
-                Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
-                Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
-
-                Eigen::Vector3d v1_AB = v1_A - v1_B;
-
-                globals::logger.printf(3, "%i v1_AB: %f, %f, %f post friction solve\n", c, v1_AB.x(), v1_AB.y(), v1_AB.z());
-            }
-            
-            if (!solve_contacts(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, colours, bundles)) return false;
-            
-            for (int p = 0; p < cluster.particles.size(); p++) {
-                if (!cluster.particles[p].is_static) {
-                    Eigen::Vector3d impulse = impulses[p];
-                    Eigen::Vector3d rotational_impulse = rotational_impulses[p];
-                    globals::logger.printf(3, "p2 Impulse: %f, %f, %f\n", impulse.x(), impulse.y(), impulse.z());
-                    globals::logger.printf(3, "p2 rotational_impulse: %f, %f, %f\n", rotational_impulse.x(), rotational_impulse.y(), rotational_impulse.z());
-                    globals::logger.printf(3, "p2 Velocity %f, %f, %f\n", FStates[p].getVelocity().x(), FStates[p].getVelocity().y(), FStates[p].getVelocity().z());
-                }
-            }
-
-            for (int c = 0; c < hits.size(); c++) {
-                uint32_t a_id = cluster.particles.getLocalID(hits[c].p_a->id);
-                uint32_t b_id = cluster.particles.getLocalID(hits[c].p_b->id);
-
-                Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
-                Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
-
-                Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, hits[c].p_a->getInverseInertiaMatrix());
-                Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, hits[c].p_b->getInverseInertiaMatrix());
-
-                Eigen::Vector3d v1_AB = v1_A - v1_B;
-
-                globals::logger.printf(3, "%i v1_AB: %f, %f, %f post 2nd contact solve\n", c, v1_AB.x(), v1_AB.y(), v1_AB.z());
-            }
-        }
+        // for (int inner = 0; inner < globals::opt.sequential_impulse_inner_iterations; inner++) {
+        //     if (!solve_friction(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, colours, bundles)) return false;
+        //     if (!solve_contacts(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, colours, bundles)) return false;
+        // }
+        if (!solve_combined(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, colours, bundles)) return false;
 
         {
             std::lock_guard draws_lock(globals::contact_draws_lock);
@@ -951,7 +891,7 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
         Eigen::Vector3d v_tangent = v_tangent_pt;
         Eigen::Vector3d tangent = v_tangent.normalized();
 
-        globals::logger.printf(3, "%i v_tangent: %f, %f, %f, (normal %f, tangent %f) post integrate\n", c, v_tangent.x(), v_tangent.y(), v_tangent.z(), contacts[c].impulse, contacts[c].last_friction_impulse.norm());
+        globals::logger.printf(4, "%i v_tangent: %f, %f, %f, (normal %f, tangent %f) post integrate\n", c, v_tangent.x(), v_tangent.y(), v_tangent.z(), contacts[c].impulse, contacts[c].last_friction_impulse.norm());
     }
 
     // _warm_start.update(contacts, hits);
