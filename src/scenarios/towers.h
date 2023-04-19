@@ -37,7 +37,7 @@ namespace Delta2 {
                     for (int i = 0; i < max_i; i++) {
                         auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
                         p.current_state.setTranslation({-(max_x / 2 * spacing_x) + x * spacing_x, -(max_y / 2 * spacing_y) + y * spacing_y + (i * -y * tilt_offset) * 0.2, 1.1 + i * 2.1});
-                        p.current_state.setRotation(Delta2::common::eulerAnglesToQuaternion(Eigen::Vector3d({0.0, 0.0, (double)globals::opt.rand_float(igl::PI*2.0)})));
+                        p.current_state.setRotation(Delta2::common::eulerAnglesToQuaternion(Eigen::Vector3d({0.0, 0.0, (double)globals::opt.rand_float(3.141598*2.0)})));
                     }
                 }
             }
