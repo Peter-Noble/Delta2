@@ -54,7 +54,7 @@ else
 	LIBNAMES = /opt/intel/oneapi/vtune/latest/sdk/lib64/libittnotify.a /home/peter/Documents/embree-3.13.2.x86_64.linux/lib/libembree3.so.3 /usr/lib/x86_64-linux-gnu/libglfw.so.3.3 $(VLIBNAMES)
 endif
 
-CFLAGS = -std=c++17 -DCGAL_DISABLE_ROUNDING_MATH_CHECK $(VCFLAGS)
+CFLAGS = -std=c++17 -DCGAL_DISABLE_ROUNDING_MATH_CHECK $(VCFLAGS) # -qopt-report
 FLAGS = -march=native $(VFLAGS)
 
 #  -fsanitize=memory -fno-optimize-sibling-calls
