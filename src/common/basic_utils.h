@@ -52,6 +52,14 @@ namespace Delta2 {
         template Eigen::Vector3d transform(const Eigen::Vector3d&, const Eigen::Matrix3d&);
 
         template<typename real>
+        Eigen::Vector<real, 3> transform(const Eigen::Vector<real, 3>& pt, const Eigen::Quaternion<real>& trans) {
+            Eigen::Vector<real, 3> result = trans.toRotationMatrix() * pt;
+            return result;
+        }
+        template Eigen::Vector3f transform(const Eigen::Vector3f&, const Eigen::Quaternion<float>&);
+        template Eigen::Vector3d transform(const Eigen::Vector3d&, const Eigen::Quaternion<double>&);
+
+        template<typename real>
         Eigen::Matrix<real, -1, -1> transform(const Eigen::Matrix<real, -1, -1>& V, const Eigen::Matrix<real, 4, 4>& trans) {
             Eigen::Matrix<real, -1, -1> result;
             result.resize(V.rows(), 3);
@@ -66,6 +74,20 @@ namespace Delta2 {
         template Eigen::Matrix<float, -1, -1> transform(const Eigen::Matrix<float, -1, -1>& V, const Eigen::Matrix<float, 4, 4>& trans);
         template Eigen::Matrix<double, -1, -1> transform(const Eigen::Matrix<double, -1, -1>& V, const Eigen::Matrix<double, 4, 4>& trans);
 
+        template<typename real>
+        Eigen::Matrix<real, -1, -1> transform(const Eigen::Matrix<real, -1, -1>& V, const Eigen::Quaternion<real>& trans) {
+            Eigen::Matrix<real, -1, -1> result;
+            result.resize(V.rows(), 3);
+            for (int i = 0; i < V.rows(); i++) {
+                Eigen::Vector<real, 3> t = transform(Eigen::Vector<real, 3>({V(i, 0), V(i, 1), V(i, 2)}), trans.toRotationMatrix());
+                result(i, 0) = t.x();
+                result(i, 1) = t.y();
+                result(i, 2) = t.z();
+            }
+            return result;
+        }
+        template Eigen::Matrix<float, -1, -1> transform(const Eigen::Matrix<float, -1, -1>& V, const Eigen::Quaternion<float>& trans);
+        template Eigen::Matrix<double, -1, -1> transform(const Eigen::Matrix<double, -1, -1>& V, const Eigen::Quaternion<double>& trans);
 
         template<typename real>
         Eigen::Quaternion<real> eulerAnglesToQuaternion(const Eigen::Vector<real, 3> angles) {
