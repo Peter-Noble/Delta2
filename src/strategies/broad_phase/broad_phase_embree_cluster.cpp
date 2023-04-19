@@ -84,7 +84,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     // }
 
     // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, local_pde_task);
-    const int max_recursive_step_depth = 12;
+    const int max_recursive_step_depth = 6;
     bool forced_advance = depth >= max_recursive_step_depth && cluster.step_size < 1e-8;
     globals::logger.printf(3, "%i: Step recursive depth: %i\n", cluster_id, depth);
     if (forced_advance) {
