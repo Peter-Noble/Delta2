@@ -174,7 +174,7 @@ for i, p in enumerate(particles):
         b_particles[-1].rotation_quaternion = s.rotation
         frame = round(s.time * bpy.data.scenes["Scene"].render.fps) + 1
         b_particles[-1].keyframe_insert(data_path="location", frame=frame)
-        b_particles[-1].keyframe_insert(data_path="rotation_euler", frame=frame)
+        b_particles[-1].keyframe_insert(data_path="rotation_quaternion", frame=frame)
     
     wm.progress_update(1 + i/len(particles))
 
