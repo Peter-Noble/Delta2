@@ -33,6 +33,10 @@ meshes/
 *.out
 *.err
 *.tmp
+*.log
+*.hs
+*.results
+results
 
 build/*
 old/
