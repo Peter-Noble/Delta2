@@ -20,8 +20,8 @@ is_hamilton = 0
 
 ifeq ($(is_hamilton), 1)
 	ifeq ($(CC), $(filter $(CC),icx dpcpp))
-		VINCLUDE = -I/home/wxmv95/tetgen
-		VLIBNAMES = /home/wxmv95/tetgen/libtet.a
+		VINCLUDE = -I/home/wxmv95/tetgen -I${VTUNE_HOME}/vtune/latest/include -I${VT_ROOT}/include
+		VLIBNAMES = /home/wxmv95/tetgen/libtet.a -L${VT_LIB_DIR} -L${VTUNE_HOME}/vtune/latest/lib64 -lVT ${VT_ADD_LIBS} -littnotify
 		VCFLAGS = -qopenmp
 		VFLAGS = -qopenmp
 	else

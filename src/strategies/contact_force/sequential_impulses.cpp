@@ -382,7 +382,7 @@ bool solve_contacts(collision::Cluster& cluster,
                         for (int i = r.begin(); i < r.end(); i++) {
                             contact_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, all_d1_above, converged);
                         }
-                    }, tbb::static_partitioner());
+                    });
                     // time_point<Clock> end = Clock::now();
                     // microseconds diff = duration_cast<microseconds>(end - start);
                     // globals::logger.printf(1, "Parallel size: %i in %iμs\n", colours[colour].size(), diff.count());
@@ -652,7 +652,7 @@ bool solve_friction(collision::Cluster& cluster,
                         for (int i = r.begin(); i < r.end(); i++) {
                             friction_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
                         }
-                    }, tbb::static_partitioner());
+                    });
                 }
                 else {
                     for (int b = 0; b < colours[colour].size(); b++) {
@@ -729,7 +729,7 @@ bool solve_combined(collision::Cluster& cluster,
                             friction_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
                             contact_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, all_d1_above, converged);
                         }
-                    }, tbb::static_partitioner());
+                    });
                 }
                 else {
                     for (int b = 0; b < colours[colour].size(); b++) {
