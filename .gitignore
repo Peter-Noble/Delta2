@@ -28,7 +28,6 @@ particles
 *.swo
 *.vtk
 export/
-meshes/
 *.optrpt
 *.out
 *.err
