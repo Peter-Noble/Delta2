@@ -12,24 +12,24 @@ using namespace Delta2;
 
 MeshData::MeshData(std::string path, common::Options& opt, bool isSurface) {
     bool result = igl::readOBJ(path, _vertices, _faces);
-    initBoudingData();
     if (isSurface) {
         initInertiaDataSurface(0.01);
     } else {
         initInertiaDataVolume();
     }
+    initBoudingData();
     _surrogate = model::SurrogateTree(_vertices.template cast<double>(), _faces, opt);
 }
 
 MeshData::MeshData(Eigen::MatrixXd V, Eigen::MatrixXi F, common::Options& opt, bool isSurface) {
     _vertices = V;
     _faces = F;
-    initBoudingData();
     if (isSurface) {
         initInertiaDataSurface(0.01);
     } else {
         initInertiaDataVolume();
     }
+    initBoudingData();
     _surrogate = model::SurrogateTree(_vertices.template cast<double>(), _faces, opt);
 }
 
