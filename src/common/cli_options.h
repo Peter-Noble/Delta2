@@ -100,6 +100,7 @@ namespace Delta2 {
 				printf("================ Settings ================\n");
 				printf("Scenario:              %i\n", scenario);
 				printf("Scenario LOD:          %i\n", scenario_lod);
+				printf("Scenario size:         %i\n", scenario_size);
 				printf("Export skip:           %i\n", export_skip);
 				printf("Geo eps:               %f\n", geo_eps);
 				if (print_tree) {
