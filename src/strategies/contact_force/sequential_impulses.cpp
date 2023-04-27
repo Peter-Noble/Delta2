@@ -377,7 +377,7 @@ bool solve_contacts(collision::Cluster& cluster,
                 // globals::logger.printf(1, "Colour size: %i\n", colours[colour].size());
                 if (colours[colour].size() > parallel_individual_colour_threshold) {
                     // time_point<Clock> start = Clock::now();
-                    int max_concurrency = colours[colour].size() / parallel_grain_size;
+                    int max_concurrency = std::min(tbb::info::default_concurrency(), (int)colours[colour].size() / parallel_grain_size);
                     tbb::task_arena arena(max_concurrency);
                     arena.execute([&] {
                         tbb::parallel_for(tbb::blocked_range<int>(0, colours[colour].size(), parallel_grain_size),
@@ -651,7 +651,7 @@ bool solve_friction(collision::Cluster& cluster,
         if (colours.size() > 0) {
             for (int colour = 0; colour < colours.size(); colour++) {
                 if (colours[colour].size() > parallel_individual_colour_threshold) {
-                    int max_concurrency = colours[colour].size() / parallel_grain_size;
+                    int max_concurrency = std::min(tbb::info::default_concurrency(), (int)colours[colour].size() / parallel_grain_size);
                     tbb::task_arena arena(max_concurrency);
                     arena.execute([&] {
                         tbb::parallel_for(tbb::blocked_range<int>(0, colours[colour].size(), parallel_grain_size),
@@ -731,7 +731,7 @@ bool solve_combined(collision::Cluster& cluster,
         if (colours.size() > 0) {
             for (int colour = 0; colour < colours.size(); colour++) {
                 if (colours[colour].size() > parallel_individual_colour_threshold) {
-                    int max_concurrency = colours[colour].size() / parallel_grain_size;
+                    int max_concurrency = std::min(tbb::info::default_concurrency(), (int)colours[colour].size() / parallel_grain_size);
                     tbb::task_arena arena(max_concurrency);
                     arena.execute([&] {
                         tbb::parallel_for(tbb::blocked_range<int>(0, colours[colour].size(), parallel_grain_size),
