@@ -23,6 +23,7 @@ namespace Delta2 {
 			int export_skip;
 			int scenario_lod;
 			int scenario_size;
+			int scenario_size2;
 			std::string mesh_metric;
 			float geo_eps;
 			bool print_tree;
@@ -59,6 +60,7 @@ namespace Delta2 {
 				export_skip = 0;
 				scenario_lod = 0;
 				scenario_size = -1;
+				scenario_size2 = -1;
 				mesh_metric = "";
 				geo_eps = 0.01;
 				print_tree = false;
@@ -101,6 +103,7 @@ namespace Delta2 {
 				printf("Scenario:              %i\n", scenario);
 				printf("Scenario LOD:          %i\n", scenario_lod);
 				printf("Scenario size:         %i\n", scenario_size);
+				printf("Scenario size 2:       %i\n", scenario_size2);
 				printf("Export skip:           %i\n", export_skip);
 				printf("Geo eps:               %f\n", geo_eps);
 				if (print_tree) {
@@ -194,6 +197,7 @@ namespace Delta2 {
 				app.add_option("-s,--scenario", scenario, "Scenario");
 				app.add_option("-l,--scenario_lod", scenario_lod, "Scenario LOD");
 				app.add_option("--scenario_size", scenario_size, "Scenario size");
+				app.add_option("--scenario_size2", scenario_size2, "Scenario size2");
 				app.add_option("-t,--time_step", time_step_size, "Time step size");
 				app.add_option("-a,--adaptive_time_step_factor", adaptive_time_step_factor, "How small compared to the target time step the adaptive step sizes are allowed to go");
 				app.add_option("-n,--num_steps", num_time_steps, "Number of time steps");
