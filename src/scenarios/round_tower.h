@@ -11,13 +11,8 @@ namespace Delta2 {
         void round_tower(std::vector<Delta2::Particle>& particles, strategy::ContactForceStrategy& force_strategy) {
             Eigen::MatrixXd V;
             Eigen::MatrixXi F;
-            
-            {
-                Delta2::common::plane(100, V, F);
-                std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, globals::opt, true));
-                auto& p = particles.emplace_back(M, 1.0, 1.0, 0.25);
-                p.is_static = true;
-            }
+            Delta2::common::plane(100, V, F);
+            std::shared_ptr<Delta2::MeshData> P(new Delta2::MeshData(V, F, globals::opt, true));
 
             Delta2::common::cube(1.0, V, F);
             std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, globals::opt));
@@ -38,8 +33,15 @@ namespace Delta2 {
             const int ring_num = 18*2;
 
             for (int i = 0; i < size; i++) {
-                for (int j = 0; i < size; i++) {
+                for (int j = 0; j < size; j++) {
                     Eigen::Vector3d offset({100 * i, 100 * j, 0});
+
+                    {
+                        auto& p = particles.emplace_back(P, 1.0, 1.0, 0.25);
+                        p.is_static = true;
+                        p.current_state.setTranslation(offset);
+                    }
+
                     for (int z = 0; z < max_z; z++) {
                         for (int x = 0; x < ring_num; x++) {
                             const Eigen::Quaterniond rot = common::eulerAnglesToQuaternion(Eigen::Vector3d({0, 0, common::degToRad((x+z/2.0)*360.0/ring_num)}));
