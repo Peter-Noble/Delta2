@@ -377,11 +377,15 @@ bool solve_contacts(collision::Cluster& cluster,
                 // globals::logger.printf(1, "Colour size: %i\n", colours[colour].size());
                 if (colours[colour].size() > parallel_individual_colour_threshold) {
                     // time_point<Clock> start = Clock::now();
-                    tbb::parallel_for(tbb::blocked_range<int>(0, colours[colour].size(), parallel_grain_size),
-                                    [&](tbb::blocked_range<int> r) {
-                        for (int i = r.begin(); i < r.end(); i++) {
-                            contact_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, all_d1_above, converged);
-                        }
+                    int max_concurrency = colours[colour].size() / parallel_grain_size;
+                    tbb::task_arena arena(max_concurrency);
+                    arena.execute([&] {
+                        tbb::parallel_for(tbb::blocked_range<int>(0, colours[colour].size(), parallel_grain_size),
+                                        [&](tbb::blocked_range<int> r) {
+                            for (int i = r.begin(); i < r.end(); i++) {
+                                contact_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, all_d1_above, converged);
+                            }
+                        });
                     });
                     // time_point<Clock> end = Clock::now();
                     // microseconds diff = duration_cast<microseconds>(end - start);
@@ -647,11 +651,15 @@ bool solve_friction(collision::Cluster& cluster,
         if (colours.size() > 0) {
             for (int colour = 0; colour < colours.size(); colour++) {
                 if (colours[colour].size() > parallel_individual_colour_threshold) {
-                    tbb::parallel_for(tbb::blocked_range<int>(0, colours[colour].size(), parallel_grain_size),
-                                    [&](tbb::blocked_range<int> r) {
-                        for (int i = r.begin(); i < r.end(); i++) {
-                            friction_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
-                        }
+                    int max_concurrency = colours[colour].size() / parallel_grain_size;
+                    tbb::task_arena arena(max_concurrency);
+                    arena.execute([&] {
+                        tbb::parallel_for(tbb::blocked_range<int>(0, colours[colour].size(), parallel_grain_size),
+                                        [&](tbb::blocked_range<int> r) {
+                            for (int i = r.begin(); i < r.end(); i++) {
+                                friction_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
+                            }
+                        });
                     });
                 }
                 else {
@@ -723,12 +731,16 @@ bool solve_combined(collision::Cluster& cluster,
         if (colours.size() > 0) {
             for (int colour = 0; colour < colours.size(); colour++) {
                 if (colours[colour].size() > parallel_individual_colour_threshold) {
-                    tbb::parallel_for(tbb::blocked_range<int>(0, colours[colour].size(), parallel_grain_size),
-                                    [&](tbb::blocked_range<int> r) {
-                        for (int i = r.begin(); i < r.end(); i++) {
-                            friction_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
-                            contact_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, all_d1_above, converged);
-                        }
+                    int max_concurrency = colours[colour].size() / parallel_grain_size;
+                    tbb::task_arena arena(max_concurrency);
+                    arena.execute([&] {
+                        tbb::parallel_for(tbb::blocked_range<int>(0, colours[colour].size(), parallel_grain_size),
+                                        [&](tbb::blocked_range<int> r) {
+                            for (int i = r.begin(); i < r.end(); i++) {
+                                friction_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, converged);
+                                contact_iteration(colours[colour][i], it, cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, all_d1_above, converged);
+                            }
+                        });
                     });
                 }
                 else {
