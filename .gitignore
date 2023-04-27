@@ -4,6 +4,7 @@
 .vscode/
 particles/
 x64/
+src/html
 
 CppProperties.json
 
@@ -36,6 +37,7 @@ export/
 *.hs
 *.results
 results
+*.opt.yaml
 
 build/*
 old/
