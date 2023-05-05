@@ -33,22 +33,22 @@ ParticleHandler::ParticleHandler(std::vector<Particle>& ps) {
     }
 }
 
-Particle& ParticleHandler::getParticle(uint32_t local_id) const {
-    return *_ps[local_id];
-}
+// Particle& ParticleHandler::getParticle(uint32_t local_id) const {
+//     return *_ps[local_id];
+// }
 
-Particle& ParticleHandler::operator[](uint32_t local_id) const {
-    return getParticle(local_id);
-}
+// Particle& ParticleHandler::operator[](uint32_t local_id) const {
+//     return getParticle(local_id);
+// }
 
 Particle& ParticleHandler::getParticleGlobalID(uint32_t id) const {
     uint32_t local_id = _global_to_local_ids.at(id);
     return *_ps[local_id];
 }
 
-uint32_t ParticleHandler::getLocalID(uint32_t id) const {
-    return _global_to_local_ids.at(id);
-}
+// uint32_t ParticleHandler::getLocalID(uint32_t id) const {
+//     return _global_to_local_ids.at(id);
+// }
 
 uint32_t ParticleHandler::size() const {
     return _ps.size();

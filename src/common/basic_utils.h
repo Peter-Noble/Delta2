@@ -7,8 +7,7 @@
 
 namespace Delta2 {
     namespace common {
-        template<typename real>
-        real clamp01(real t) {
+        inline float clamp01(float t) {
             if (t < 0) {
                 return 0;
             } else if (t > 1) {
@@ -17,112 +16,152 @@ namespace Delta2 {
                 return t;
             }
         }
-        template float clamp01(float);
-        template double clamp01(double);
+        inline double clamp01(double t) {
+            if (t < 0) {
+                return 0;
+            } else if (t > 1) {
+                return 1;
+            } else {
+                return t;
+            }
+        }
 
-        template<typename real>
-        Eigen::Vector<real, 3> lerp(const Eigen::Vector<real, 3>& A, const Eigen::Vector<real, 3>& B, real t) {
+        inline Eigen::Vector<float, 3> lerp(const Eigen::Vector<float, 3>& A, const Eigen::Vector<float, 3>& B, float t) {
             return A * (1 - t) + B * t;
         }
-        template Eigen::Vector3f lerp(const Eigen::Vector3f&, const Eigen::Vector3f&, float);
-        template Eigen::Vector3d lerp(const Eigen::Vector3d&, const Eigen::Vector3d&, double);
-
-        template<typename real>
-        real lerp(real A, real B, real t) {
+        inline Eigen::Vector<double, 3> lerp(const Eigen::Vector<double, 3>& A, const Eigen::Vector<double, 3>& B, double t) {
             return A * (1 - t) + B * t;
         }
-        template float lerp(float, float, float);
-        template double lerp(double, double, double);
+        
+        inline float lerp(float A, float B, float t) {
+            return A * (1 - t) + B * t;
+        }
+        inline double lerp(double A, double B, double t) {
+            return A * (1 - t) + B * t;
+        }
 
-        template<typename real>
-        Eigen::Vector<real, 3> transform(const Eigen::Vector<real, 3>& pt, const Eigen::Matrix<real, 4, 4>& trans) {
-            Eigen::Vector<real, 4> tmp = trans * pt.homogeneous();
-            Eigen::Vector<real, 3> result = tmp.template head<3>() / tmp.w();
+        inline Eigen::Vector<float, 3> transform(const Eigen::Vector<float, 3>& pt, const Eigen::Matrix<float, 4, 4>& trans) {
+            Eigen::Vector<float, 4> tmp = trans * pt.homogeneous();
+            Eigen::Vector<float, 3> result = tmp.template head<3>() / tmp.w();
             return result;
         }
-        template Eigen::Vector3f transform(const Eigen::Vector3f&, const Eigen::Matrix4f&);
-        template Eigen::Vector3d transform(const Eigen::Vector3d&, const Eigen::Matrix4d&);
-
-        template<typename real>
-        Eigen::Vector<real, 3> transform(const Eigen::Vector<real, 3>& pt, const Eigen::Matrix<real, 3, 3>& trans) {
-            Eigen::Vector<real, 3> result = trans * pt;
+        inline Eigen::Vector<double, 3> transform(const Eigen::Vector<double, 3>& pt, const Eigen::Matrix<double, 4, 4>& trans) {
+            Eigen::Vector<double, 4> tmp = trans * pt.homogeneous();
+            Eigen::Vector<double, 3> result = tmp.template head<3>() / tmp.w();
             return result;
         }
-        template Eigen::Vector3f transform(const Eigen::Vector3f&, const Eigen::Matrix3f&);
-        template Eigen::Vector3d transform(const Eigen::Vector3d&, const Eigen::Matrix3d&);
 
-        template<typename real>
-        Eigen::Vector<real, 3> transform(const Eigen::Vector<real, 3>& pt, const Eigen::Quaternion<real>& trans) {
-            Eigen::Vector<real, 3> result = trans.toRotationMatrix() * pt;
+        inline Eigen::Vector<float, 3> transform(const Eigen::Vector<float, 3>& pt, const Eigen::Matrix<float, 3, 3>& trans) {
+            Eigen::Vector<float, 3> result = trans * pt;
             return result;
         }
-        template Eigen::Vector3f transform(const Eigen::Vector3f&, const Eigen::Quaternion<float>&);
-        template Eigen::Vector3d transform(const Eigen::Vector3d&, const Eigen::Quaternion<double>&);
+        inline Eigen::Vector<double, 3> transform(const Eigen::Vector<double, 3>& pt, const Eigen::Matrix<double, 3, 3>& trans) {
+            Eigen::Vector<double, 3> result = trans * pt;
+            return result;
+        }
 
-        template<typename real>
-        Eigen::Matrix<real, -1, -1> transform(const Eigen::Matrix<real, -1, -1>& V, const Eigen::Matrix<real, 4, 4>& trans) {
-            Eigen::Matrix<real, -1, -1> result;
+        inline Eigen::Vector<float, 3> transform(const Eigen::Vector<float, 3>& pt, const Eigen::Quaternion<float>& trans) {
+            Eigen::Vector<float, 3> result = trans.toRotationMatrix() * pt;
+            return result;
+        }
+        inline Eigen::Vector<double, 3> transform(const Eigen::Vector<double, 3>& pt, const Eigen::Quaternion<double>& trans) {
+            Eigen::Vector<double, 3> result = trans.toRotationMatrix() * pt;
+            return result;
+        }
+
+        inline Eigen::Matrix<float, -1, -1> transform(const Eigen::Matrix<float, -1, -1>& V, const Eigen::Matrix<float, 4, 4>& trans) {
+            Eigen::Matrix<float, -1, -1> result;
             result.resize(V.rows(), 3);
             for (int i = 0; i < V.rows(); i++) {
-                Eigen::Vector<real, 3> t = transform(Eigen::Vector<real, 3>({V(i, 0), V(i, 1), V(i, 2)}), trans);
+                Eigen::Vector<float, 3> t = transform(Eigen::Vector<float, 3>({V(i, 0), V(i, 1), V(i, 2)}), trans);
                 result(i, 0) = t.x();
                 result(i, 1) = t.y();
                 result(i, 2) = t.z();
             }
             return result;
         }
-        template Eigen::Matrix<float, -1, -1> transform(const Eigen::Matrix<float, -1, -1>& V, const Eigen::Matrix<float, 4, 4>& trans);
-        template Eigen::Matrix<double, -1, -1> transform(const Eigen::Matrix<double, -1, -1>& V, const Eigen::Matrix<double, 4, 4>& trans);
-
-        template<typename real>
-        Eigen::Matrix<real, -1, -1> transform(const Eigen::Matrix<real, -1, -1>& V, const Eigen::Quaternion<real>& trans) {
-            Eigen::Matrix<real, -1, -1> result;
+        inline Eigen::Matrix<double, -1, -1> transform(const Eigen::Matrix<double, -1, -1>& V, const Eigen::Matrix<double, 4, 4>& trans) {
+            Eigen::Matrix<double, -1, -1> result;
             result.resize(V.rows(), 3);
             for (int i = 0; i < V.rows(); i++) {
-                Eigen::Vector<real, 3> t = transform(Eigen::Vector<real, 3>({V(i, 0), V(i, 1), V(i, 2)}), trans.toRotationMatrix());
+                Eigen::Vector<double, 3> t = transform(Eigen::Vector<double, 3>({V(i, 0), V(i, 1), V(i, 2)}), trans);
                 result(i, 0) = t.x();
                 result(i, 1) = t.y();
                 result(i, 2) = t.z();
             }
             return result;
         }
-        template Eigen::Matrix<float, -1, -1> transform(const Eigen::Matrix<float, -1, -1>& V, const Eigen::Quaternion<float>& trans);
-        template Eigen::Matrix<double, -1, -1> transform(const Eigen::Matrix<double, -1, -1>& V, const Eigen::Quaternion<double>& trans);
 
-        template<typename real>
-        Eigen::Quaternion<real> eulerAnglesToQuaternion(const Eigen::Vector<real, 3> angles) {
-            Eigen::Quaternion<real> qa;
-            qa = Eigen::AngleAxis<real>(angles[0], Eigen::Vector<real, 3>::UnitX())
-                * Eigen::AngleAxis<real>(angles[1], Eigen::Vector<real, 3>::UnitY())
-                * Eigen::AngleAxis<real>(angles[2], Eigen::Vector<real, 3>::UnitZ());
+        inline Eigen::Matrix<float, -1, -1> transform(const Eigen::Matrix<float, -1, -1>& V, const Eigen::Quaternion<float>& trans) {
+            Eigen::Matrix<float, -1, -1> result;
+            result.resize(V.rows(), 3);
+            for (int i = 0; i < V.rows(); i++) {
+                Eigen::Vector<float, 3> t = transform(Eigen::Vector<float, 3>({V(i, 0), V(i, 1), V(i, 2)}), trans.toRotationMatrix());
+                result(i, 0) = t.x();
+                result(i, 1) = t.y();
+                result(i, 2) = t.z();
+            }
+            return result;
+        }
+        inline Eigen::Matrix<double, -1, -1> transform(const Eigen::Matrix<double, -1, -1>& V, const Eigen::Quaternion<double>& trans) {
+            Eigen::Matrix<double, -1, -1> result;
+            result.resize(V.rows(), 3);
+            for (int i = 0; i < V.rows(); i++) {
+                Eigen::Vector<double, 3> t = transform(Eigen::Vector<double, 3>({V(i, 0), V(i, 1), V(i, 2)}), trans.toRotationMatrix());
+                result(i, 0) = t.x();
+                result(i, 1) = t.y();
+                result(i, 2) = t.z();
+            }
+            return result;
+        }
+
+        inline Eigen::Quaternion<float> eulerAnglesToQuaternion(const Eigen::Vector<float, 3> angles) {
+            Eigen::Quaternion<float> qa;
+            qa = Eigen::AngleAxis<float>(angles[0], Eigen::Vector<float, 3>::UnitX())
+                * Eigen::AngleAxis<float>(angles[1], Eigen::Vector<float, 3>::UnitY())
+                * Eigen::AngleAxis<float>(angles[2], Eigen::Vector<float, 3>::UnitZ());
+            return qa;
+        }
+        inline Eigen::Quaternion<double> eulerAnglesToQuaternion(const Eigen::Vector<double, 3> angles) {
+            Eigen::Quaternion<double> qa;
+            qa = Eigen::AngleAxis<double>(angles[0], Eigen::Vector<double, 3>::UnitX())
+                * Eigen::AngleAxis<double>(angles[1], Eigen::Vector<double, 3>::UnitY())
+                * Eigen::AngleAxis<double>(angles[2], Eigen::Vector<double, 3>::UnitZ());
             return qa;
         }
 
-        template<typename real>
-        Eigen::Matrix<real, 4, 4> transformationMatrix(const Eigen::Quaternion<real>& rotation, const Eigen::Vector<real, 3>& translation) {
-            Eigen::Matrix<real, 4, 4> transform;
+        inline Eigen::Matrix<float, 4, 4> transformationMatrix(const Eigen::Quaternion<float>& rotation, const Eigen::Vector<float, 3>& translation) {
+            Eigen::Matrix<float, 4, 4> transform;
             transform.setIdentity();
             transform.template block<3,3>(0,0) = rotation.toRotationMatrix();
             transform.template block<3,1>(0,3) = translation;
             return transform;
         }
-        template Eigen::Matrix4f transformationMatrix(const Eigen::Quaternionf&, const Eigen::Vector3f&);
-        template Eigen::Matrix4d transformationMatrix(const Eigen::Quaterniond&, const Eigen::Vector3d&);
-
-        template<typename real>
-        Eigen::Matrix<real, 4, 4> transformationMatrix(const Eigen::Vector<real, 3>& rotation, const Eigen::Vector<real, 3>& translation) {
+        inline Eigen::Matrix<double, 4, 4> transformationMatrix(const Eigen::Quaternion<double>& rotation, const Eigen::Vector<double, 3>& translation) {
+            Eigen::Matrix<double, 4, 4> transform;
+            transform.setIdentity();
+            transform.template block<3,3>(0,0) = rotation.toRotationMatrix();
+            transform.template block<3,1>(0,3) = translation;
+            return transform;
+        }
+        
+        inline Eigen::Matrix<float, 4, 4> transformationMatrix(const Eigen::Vector<float, 3>& rotation, const Eigen::Vector<float, 3>& translation) {
             return transformationMatrix(eulerAnglesToQuaternion(rotation), translation);
         }
-        template Eigen::Matrix4f transformationMatrix(const Eigen::Vector3f&, const Eigen::Vector3f&);
-        template Eigen::Matrix4d transformationMatrix(const Eigen::Vector3d&, const Eigen::Vector3d&);
-
+        inline Eigen::Matrix<double, 4, 4> transformationMatrix(const Eigen::Vector<double, 3>& rotation, const Eigen::Vector<double, 3>& translation) {
+            return transformationMatrix(eulerAnglesToQuaternion(rotation), translation);
+        }
+        
         void concatMesh(const Eigen::MatrixXd& VA, const Eigen::MatrixXi& FA, const Eigen::MatrixXd& VB, const Eigen::MatrixXi& FB, Eigen::MatrixXd& V_out, Eigen::MatrixXi& F_out);
         void concatColors(const Eigen::MatrixXd& CA, const Eigen::MatrixXd& CB, Eigen::MatrixXd& C_out);
         Eigen::Quaterniond exp(Eigen::Vector3d d);
 
-        template<typename real>
-        real degToRad(real deg) {
-            real pi = 3.14159265358979323846;
+        inline float degToRad(float deg) {
+            float pi = 3.14159265358979323846;
+            return 2.0 * pi * deg / 360.0;
+        }
+        inline double degToRad(double deg) {
+            double pi = 3.14159265358979323846;
             return 2.0 * pi * deg / 360.0;
         }
     }

@@ -466,14 +466,47 @@ void friction_iteration(collision::ContactBundle& bundle,
     const Eigen::Matrix3d a_inv = cluster.particles[a_id].getInverseInertiaMatrix();
     const Eigen::Matrix3d b_inv = cluster.particles[b_id].getInverseInertiaMatrix();
 
-    int i = -1;
-    for (int c : bundle.hits) {
-        i++;
-
         const Eigen::Vector3d a_FState_translation = FStates[a_id].getTranslation();
         const Eigen::Vector3d b_FState_translation = FStates[b_id].getTranslation();
         
-        const Eigen::Vector3d n = contacts[c].global_normal.norm() > 1e-12 ? contacts[c].global_normal.normalized() : (b_FState_translation - a_FState_translation).normalized();
+    const int c_first = bundle.hits[0];
+
+    const Eigen::Vector3d n = contacts[c_first].global_normal.norm() > 1e-12 ? contacts[c_first].global_normal.normalized() : (b_FState_translation - a_FState_translation).normalized();
+    const double mu = std::min(cluster.particles[a_id].friction_coeff, cluster.particles[b_id].friction_coeff);
+    const double max_impulse = (contacts[c_first].impulse + contacts[c_first].impulse_offset) * mu;
+    
+    const double interp = std::min(1.0, 2.0*(double)it/(double)max_iterations);
+    
+    bool converged_tmp = true;
+
+    double k_tangent_base = 0.0;
+    Eigen::Matrix3d ii_A;
+    Eigen::Vector3d r_A;
+    if (!hits[c_first].p_a->is_static) {
+        ii_A = hits[c_first].p_a->getInverseInertiaMatrix();
+        r_A = hits[c_first].A - hits[c_first].p_a->future_state.getTranslation();
+        const double im_A = 1.0 / hits[c_first].p_a->getMass();
+        k_tangent_base += im_A;
+    } else {
+        ii_A = Eigen::Matrix3d::Identity();
+        r_A = Eigen::Vector3d::Zero();
+    }
+    Eigen::Matrix3d ii_B;
+    Eigen::Vector3d r_B;
+    if (!hits[c_first].p_b->is_static) {
+        ii_B = hits[c_first].p_b->getInverseInertiaMatrix();
+        r_B = hits[c_first].B - hits[c_first].p_b->future_state.getTranslation();
+        const double im_B = 1.0 / hits[c_first].p_b->getMass();
+        k_tangent_base += im_B;
+    } else {
+        ii_B = Eigen::Matrix3d::Identity();
+        r_B = Eigen::Vector3d::Zero();
+    }
+
+    int i = -1;
+    if (it == 0 || !(interp < 1.0)) {
+        for (int c : bundle.hits) {
+            i++;
 
         const Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
         const Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
@@ -483,61 +516,49 @@ void friction_iteration(collision::ContactBundle& bundle,
         const Eigen::Vector3d v1_AB = v1_A - v1_B;
         const Eigen::Vector3d v_tangent_pt = v1_AB - v1_AB.dot(n) * n;
         
-        // const Eigen::Vector3d p0_A = common::transform(contacts[c].local_A, cluster.particles[a_id].current_state.getTransformation());
-        // const Eigen::Vector3d p0_B = common::transform(contacts[c].local_B, cluster.particles[b_id].current_state.getTransformation());
+            const Eigen::Vector3d v_tangent = v_tangent_pt;
+            const Eigen::Vector3d tangent = v_tangent.normalized();
 
-        // double t0 = cluster.particles[a_id].current_state.getTime();
-        // double t1 = FStates[a_id].getTime();
-        // double ts = t1 - t0;
+            const Eigen::Vector3d rt_A = r_A.cross(tangent);
+            const Eigen::Vector3d rt_B = r_B.cross(tangent);
+            const double k_tangent = k_tangent_base + rt_A.transpose() * ii_A * rt_A + rt_B.transpose() * ii_B * rt_B;
 
-        // State FState_extrapolate_A = FStates[a_id].extrapolate(ts, hits[c].p_a->getInverseInertiaMatrix());
-        // State FState_extrapolate_B = FStates[b_id].extrapolate(ts, hits[c].p_b->getInverseInertiaMatrix());
+            // const double m_inv_effective_tangent = k_tangent < 1e-6 ? 0.0 : 1.0 / k_tangent;
+            const double m_inv_effective_tangent = 1.0 / k_tangent; // Assume none zero
+    
+            const double friction_damp = common::lerp(0.1, 0.01, (double)it/(double)max_iterations);
+            const Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * friction_damp;
 
-        // Could alternatively be used to compute the velocity at this point as the finite difference between this point now and at the last time step
-        // Eigen::Vector3d v1_A_fd = (p1_A - p0_A) / ts;
-        // Eigen::Vector3d v1_B_fd = (p1_B - p0_B) / ts;
-        // Eigen::Vector3d v1_AB_fd = v1_A_fd - v1_B_fd;
-        // Eigen::Vector3d v_tangent_fd = v1_AB_fd - v1_AB_fd.dot(n) * n;
+            Eigen::Vector3d friction_impulse_total = contacts[c].last_friction_impulse + delta_friction_impulse;
 
-        // A third alternative.  Project the state out into the future and take a finite difference with that.
-        // Eigen::Vector3d v1_A_ext = FStates[a_id].pointVelocity(p1_A, FState_extrapolate_A);
-        // Eigen::Vector3d v1_B_ext = FStates[b_id].pointVelocity(p1_B, FState_extrapolate_B);
-        // Eigen::Vector3d v1_AB_ext = v1_A_ext - v1_B_ext;
-        // Eigen::Vector3d v_tangent_ext = v1_AB_ext - v1_AB_ext.dot(n) * n;
+            const double norm = friction_impulse_total.norm();
+            friction_impulse_total = friction_impulse_total * std::min(norm, max_impulse) * (1 / norm);
+
+            updated_friction_total[i] = friction_impulse_total;
+
+            converged_tmp &= (contacts[c].last_friction_impulse - updated_friction_total[i]).squaredNorm() > 1e-8*1e-8;
+        }
+    } else {
+        for (int c : bundle.hits) {
+            i++;
+
+            const Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
+            const Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
+
+            const Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, a_inv);
+            const Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, b_inv);
+            const Eigen::Vector3d v1_AB = v1_A - v1_B;
+            const Eigen::Vector3d v_tangent_pt = v1_AB - v1_AB.dot(n) * n;
 
         const Eigen::Vector3d v_tangent = v_tangent_pt;
         const Eigen::Vector3d tangent = v_tangent.normalized();
 
-        // if (it == 0) {
-        //     globals::logger.printf(3, "%i: %i v_tangent: %f, %f, %f (normal %f, tangent %f)\n", cluster_id, c, v_tangent.x(), v_tangent.y(), v_tangent.z(), contacts[c].impulse, contacts[c].last_friction_impulse.norm());
-        //     globals::logger.printf(3, "%i: %i v1_AB: %f, %f, %f first friction\n", cluster_id, c, v1_AB.x(), v1_AB.y(), v1_AB.z());
-        //     globals::logger.printf(3, "%i: %i n: %f, %f, %f first friction\n", cluster_id, c, n.x(), n.y(), n.z());
-        // }
-        
-        const double mu = std::min(cluster.particles[a_id].friction_coeff, cluster.particles[b_id].friction_coeff);
-        const double max_impulse = (contacts[c].impulse + contacts[c].impulse_offset) * mu;
-
-        double k_tangent = 0.0;
-        if (!hits[c].p_a->is_static) {
-            const Eigen::Matrix3d ii_A = hits[c].p_a->getInverseInertiaMatrix();
-            const Eigen::Vector3d r_A = hits[c].A - hits[c].p_a->future_state.getTranslation();
             const Eigen::Vector3d rt_A = r_A.cross(tangent);
-            const double im_A = 1.0 / hits[c].p_a->getMass();
-            k_tangent += im_A + rt_A.transpose() * ii_A * rt_A;
-
-        }
-        if (!hits[c].p_b->is_static) {
-            const Eigen::Matrix3d ii_B = hits[c].p_b->getInverseInertiaMatrix();
-            const Eigen::Vector3d r_B = hits[c].B - hits[c].p_b->future_state.getTranslation();
             const Eigen::Vector3d rt_B = r_B.cross(tangent);
-            const double im_B = 1.0 / hits[c].p_b->getMass();
-            k_tangent += im_B + rt_B.transpose() * ii_B * rt_B;
-        }
+            const double k_tangent = k_tangent_base + rt_A.transpose() * ii_A * rt_A + rt_B.transpose() * ii_B * rt_B;
 
-        // if (k_tangent < 1e-6 && max_impulse > 0) {
-        //     globals::logger.printf(1, "Extremely small k_tangent for non-zero impulse");
-        // }
-        const double m_inv_effective_tangent = k_tangent < 1e-6 ? 0.0 : 1.0 / k_tangent;
+            // const double m_inv_effective_tangent = k_tangent < 1e-6 ? 0.0 : 1.0 / k_tangent;
+            const double m_inv_effective_tangent = 1.0 / k_tangent; // Assume none zero
 
         const double friction_damp = common::lerp(0.1, 0.01, (double)it/(double)max_iterations);
         const Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * friction_damp;
@@ -545,19 +566,20 @@ void friction_iteration(collision::ContactBundle& bundle,
         Eigen::Vector3d friction_impulse_total = contacts[c].last_friction_impulse + delta_friction_impulse;
         const Eigen::Vector3d friction_impulse_total_pre_avg = friction_impulse_total;
 
-        if (it > 0) {
-            const auto key = std::make_pair(std::min(a_id, b_id), std::max(a_id, b_id));
             const Eigen::Vector3d average = bundle.tangent_average / bundle.hits.size();
-            friction_impulse_total = common::lerp(average, friction_impulse_total, std::min(1.0, std::min(1.0, 2.0*(double)it/(double)max_iterations)));
+            friction_impulse_total = common::lerp(average, friction_impulse_total, interp);
             friction_impulse_total = -tangent * std::max(0.0, (-tangent).dot(friction_impulse_total));
-        }
-        friction_impulse_total = friction_impulse_total_pre_avg.normalized() * std::clamp(friction_impulse_total.norm(), 0.0, max_impulse);
+
+            friction_impulse_total = friction_impulse_total_pre_avg.normalized() * std::min(friction_impulse_total.norm(), max_impulse);
 
         updated_friction_total[i] = friction_impulse_total;
 
-        if ((contacts[c].last_friction_impulse - updated_friction_total[i]).norm() > 1e-8) {
-            converged = false;
+            converged_tmp &= (contacts[c].last_friction_impulse - updated_friction_total[i]).squaredNorm() > 1e-8*1e-8;
         }
+    }
+
+    if (!converged_tmp) {
+            converged = false;
     }
 
     bundle.tangent_average = {0, 0, 0};

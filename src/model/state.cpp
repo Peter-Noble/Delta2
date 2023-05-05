@@ -13,45 +13,45 @@ State::State() {
     _velocity = { 0, 0, 0 };
 }
 
-double State::getTime() const {
-    return _time;
-}
+// double State::getTime() const {
+//     return _time;
+// }
 
-void State::setTime(double t) {
-    _time = t;
-}
+// void State::setTime(double t) {
+//     _time = t;
+// }
 
-const Eigen::Quaterniond& State::getRotation() const {
-    return _rotation;
-}
+// const Eigen::Quaterniond& State::getRotation() const {
+//     return _rotation;
+// }
 
-void State::setRotation(const Eigen::Quaterniond& r) {
-    _rotation = r;
-}
+// void State::setRotation(const Eigen::Quaterniond& r) {
+//     _rotation = r;
+// }
 
-const Eigen::Vector3d& State::getAngularMomentum() const {
-    return _angular_momentum;
-}
+// const Eigen::Vector3d& State::getAngularMomentum() const {
+//     return _angular_momentum;
+// }
 
-void State::setAngular(const Eigen::Vector3d& momentum) {
-    _angular_momentum = momentum;
-}
+// void State::setAngular(const Eigen::Vector3d& momentum) {
+//     _angular_momentum = momentum;
+// }
 
-const Eigen::Vector3d& State::getTranslation() const {
-    return _translation;
-}
+// const Eigen::Vector3d& State::getTranslation() const {
+//     return _translation;
+// }
 
-void State::setTranslation(Eigen::Vector3d t) {
-    _translation = t;
-}
+// void State::setTranslation(Eigen::Vector3d t) {
+//     _translation = t;
+// }
 
-const Eigen::Vector3d& State::getVelocity() const {
-    return _velocity;
-}
+// const Eigen::Vector3d& State::getVelocity() const {
+//     return _velocity;
+// }
 
-void State::setVelocity(Eigen::Vector3d v) {
-    _velocity = v;
-}
+// void State::setVelocity(Eigen::Vector3d v) {
+//     _velocity = v;
+// }
 
 State State::interpolate(State last, double time) const {
     #ifndef NDEBUG
@@ -74,22 +74,22 @@ State State::interpolate(State last, double time) const {
 
 // pt is in global space
 // the returned value is in relative space to the current orientation in this state
-Eigen::Vector3d State::pointVelocity(const Eigen::Vector3d& pt, const State& future) const {
-    // TODO velocity at a point section - https://gafferongames.com/post/physics_in_3d/
-    Eigen::Vector4d new_pt = future.getTransformation() * (getTransformation().inverse() * pt.homogeneous());
-    return (new_pt - pt.homogeneous()).head<3>() / (future.getTime() - getTime());
-}
+// Eigen::Vector3d State::pointVelocity(const Eigen::Vector3d& pt, const State& future) const {
+//     // TODO velocity at a point section - https://gafferongames.com/post/physics_in_3d/
+//     Eigen::Vector4d new_pt = future.getTransformation() * (getTransformation().inverse() * pt.homogeneous());
+//     return (new_pt - pt.homogeneous()).head<3>() / (future.getTime() - getTime());
+// }
 
 // pt is in global space
-Eigen::Vector3d State::pointVelocity(const Eigen::Vector3d& pt, const Eigen::Matrix3d& inv_inertia) const {
-    Eigen::Vector3d w = inv_inertia * getAngularMomentum();
-    // globals::logger.printf(2, "w: %f, %f, %f\n", w.x(), w.y(), w.z());
-    return getVelocity() + w.cross(pt - getTranslation());
-}
+// Eigen::Vector3d State::pointVelocity(const Eigen::Vector3d& pt, const Eigen::Matrix3d& inv_inertia) const {
+//     Eigen::Vector3d w = inv_inertia * getAngularMomentum();
+//     // globals::logger.printf(2, "w: %f, %f, %f\n", w.x(), w.y(), w.z());
+//     return getVelocity() + w.cross(pt - getTranslation());
+// }
 
-Eigen::Matrix4d State::getTransformation() const {
-    return common::transformationMatrix(_rotation, _translation);
-}
+// Eigen::Matrix4d State::getTransformation() const {
+//     return common::transformationMatrix(_rotation, _translation);
+// }
 
 State State::extrapolate(double t, Eigen::Matrix3d inv_inertia) {
     State result;

@@ -9,10 +9,10 @@ namespace Delta2 {
             ParticleHandler(); // TODO Here for convenience so that clusters can be constructed without particles ready yet.  Is there a better way of doingn this?
             ParticleHandler(std::vector<Particle*>& ps);
             ParticleHandler(std::vector<Particle>& ps);
-            Particle& getParticle(uint32_t local_id) const;
-            Particle& operator[](uint32_t local_id) const;
+            inline Particle& getParticle(uint32_t local_id) const {return *_ps[local_id];};
+            inline Particle& operator[](uint32_t local_id) const {return getParticle(local_id);};
             Particle& getParticleGlobalID(uint32_t id) const;
-            uint32_t getLocalID(uint32_t id) const;
+            inline uint32_t getLocalID(uint32_t id) const {return _global_to_local_ids.at(id);};
             uint32_t size() const;
             std::vector<Particle*>::iterator begin();
             std::vector<Particle*>::iterator end();

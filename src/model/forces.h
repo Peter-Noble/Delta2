@@ -98,12 +98,18 @@ namespace Delta2 {
             return result;
         }*/
 
-        template<typename real>
-        Eigen::Vector<real, 3> calcTorque(const Eigen::Vector<real, 3>& force, const Eigen::Vector<real, 3>& point, const Eigen::Vector<real, 3>& centre_of_mass) {
-            //Eigen::Vector<real, 3> trans_force = -force - centre_of_mass;
-            Eigen::Vector<real, 3> trans_force = -force;
-            Eigen::Vector<real, 3> trans_point = point - centre_of_mass;
-            Eigen::Vector<real, 3> torque = trans_force.cross(trans_point);
+        inline Eigen::Vector<float, 3> calcTorque(const Eigen::Vector<float, 3>& force, const Eigen::Vector<float, 3>& point, const Eigen::Vector<float, 3>& centre_of_mass) {
+            //Eigen::Vector<float, 3> trans_force = -force - centre_of_mass;
+            Eigen::Vector<float, 3> trans_force = -force;
+            Eigen::Vector<float, 3> trans_point = point - centre_of_mass;
+            Eigen::Vector<float, 3> torque = trans_force.cross(trans_point);
+            return torque;
+        }
+        inline Eigen::Vector<double, 3> calcTorque(const Eigen::Vector<double, 3>& force, const Eigen::Vector<double, 3>& point, const Eigen::Vector<double, 3>& centre_of_mass) {
+            //Eigen::Vector<double, 3> trans_force = -force - centre_of_mass;
+            Eigen::Vector<double, 3> trans_force = -force;
+            Eigen::Vector<double, 3> trans_point = point - centre_of_mass;
+            Eigen::Vector<double, 3> torque = trans_force.cross(trans_point);
             return torque;
         }
 
