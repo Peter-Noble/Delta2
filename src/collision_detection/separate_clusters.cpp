@@ -1,5 +1,6 @@
 #include "separate_clusters.h"
-#include "../collision_detection/full_tree_comparison.h"
+#include "full_tree_comparison.h"
+#include "parallel_connected_components.h"
 #include "igl/connected_components.h"
 #include <chrono>
 #include <omp.h>
@@ -364,52 +365,82 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
 
     // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, connected_component_task);
     int num_particles = particles.size();
-    Eigen::SparseMatrix<int> interaction_graph(num_particles, num_particles);
-
-    for (int b_i = 0; b_i < broad_phase.size(); b_i++) {
-        collision::BroadPhaseCollision& b = broad_phase[b_i];
-
-        int a_id = particles.getLocalID(b.A.first); // local geo id
-        int b_id = particles.getLocalID(b.B.first);
-
-        if (!particles[a_id].is_static && !particles[b_id].is_static) {
-            interaction_graph.coeffRef(a_id, b_id) = 1;
-            interaction_graph.coeffRef(b_id, a_id) = 1;
-        }
-    }
-
-    Eigen::MatrixXi components;
-    Eigen::MatrixXi sizes;
-    igl::connected_components(interaction_graph, components, sizes);
-    // __itt_task_end(globals::itt_handles.detailed_domain);
-
-    // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, create_clusters_task);
     std::vector<Cluster> clusters;
     std::vector<std::vector<Particle*>> cluster_particles;
 
-    for (int c = 0; c < sizes.rows(); c++) {
-        Cluster& C = clusters.emplace_back();
+    if (broad_phase.size() < 1000) {  // Threshold for parallel connected components
+        Eigen::SparseMatrix<int> interaction_graph(num_particles, num_particles);
+        interaction_graph.reserve(broad_phase.size() * 2);
 
-        C.sleeping = true;
-        C.min_current_time = std::numeric_limits<double>::infinity();
-        C.step_size = std::numeric_limits<double>::infinity();
-        C.is_static = true;
+        for (int b_i = 0; b_i < broad_phase.size(); b_i++) {
+            collision::BroadPhaseCollision& b = broad_phase[b_i];
 
-        cluster_particles.push_back({});
-    }
+            int a_id = particles.getLocalID(b.A.first); // local geo id
+            int b_id = particles.getLocalID(b.B.first);
 
-    for (int p_i = 0; p_i < num_particles; p_i++) {
-        Particle* address = &(particles[p_i]);
-        cluster_particles[components(p_i, 0)].push_back(address);
-        clusters[components(p_i, 0)].min_current_time = std::min(clusters[components(p_i, 0)].min_current_time, particles[p_i].current_state.getTime());
-        clusters[components(p_i, 0)].step_size = std::min(clusters[components(p_i, 0)].step_size, address->last_time_step_size);
-        if (!particles[p_i].getSleeping()) {
-            clusters[components(p_i, 0)].sleeping = false;
+            if (!particles[a_id].is_static && !particles[b_id].is_static) {
+                interaction_graph.coeffRef(a_id, b_id) = 1;
+                interaction_graph.coeffRef(b_id, a_id) = 1;
+            }
+        }
+
+        Eigen::MatrixXi components;
+        Eigen::MatrixXi sizes;
+        igl::connected_components(interaction_graph, components, sizes);
+
+        for (int c = 0; c < sizes.rows(); c++) {
+            Cluster& C = clusters.emplace_back();
+
+            C.sleeping = true;
+            C.min_current_time = std::numeric_limits<double>::infinity();
+            C.step_size = std::numeric_limits<double>::infinity();
+            C.is_static = true;
+
+            cluster_particles.push_back({});
+        }
+
+        for (int p_i = 0; p_i < num_particles; p_i++) {
+            Particle* address = &(particles[p_i]);
+            cluster_particles[components(p_i, 0)].push_back(address);
+            clusters[components(p_i, 0)].min_current_time = std::min(clusters[components(p_i, 0)].min_current_time, particles[p_i].current_state.getTime());
+            clusters[components(p_i, 0)].step_size = std::min(clusters[components(p_i, 0)].step_size, address->last_time_step_size);
+            if (!particles[p_i].getSleeping()) {
+                clusters[components(p_i, 0)].sleeping = false;
+            }
         }
     }
-    // __itt_task_end(globals::itt_handles.detailed_domain);
+    else {
+        std::vector<uint32_t> colours = collision::simpleParallelConnectedComponents(broad_phase, particles);
 
-    // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sort_interactions_task);
+        std::unordered_map<uint32_t, int> seen_ids;
+
+        for (uint32_t c : colours) {
+            if (seen_ids.find(c) == seen_ids.end()) {
+                Cluster& C = clusters.emplace_back();
+
+                C.sleeping = true;
+                C.min_current_time = std::numeric_limits<double>::infinity();
+                C.step_size = std::numeric_limits<double>::infinity();
+                C.is_static = true;
+
+                cluster_particles.push_back({});
+
+                seen_ids.insert(std::make_pair(c, clusters.size()));
+            }
+        }
+
+        for (int p_i = 0; p_i < num_particles; p_i++) {
+            Particle* address = &(particles[p_i]);
+            int cluster_id = seen_ids[colours[particles.getLocalID(particles[p_i].id)]];
+            cluster_particles[cluster_id].push_back(address);
+            clusters[cluster_id].min_current_time = std::min(clusters[cluster_id].min_current_time, particles[p_i].current_state.getTime());
+            clusters[cluster_id].step_size = std::min(clusters[cluster_id].step_size, address->last_time_step_size);
+            if (!particles[p_i].getSleeping()) {
+                clusters[cluster_id].sleeping = false;
+            }
+        }
+    }
+
     // Add each broad phase interaction to required clusters
     // TODO this isn't very efficient as each interaction searches through all the particles in all the clusters.
     for (collision::BroadPhaseCollision& b : broad_phase) {
@@ -451,7 +482,7 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
     }
     // __itt_task_end(globals::itt_handles.detailed_domain);
 
-    for (int c_i = 0; c_i < sizes.rows(); c_i++) {
+    for (int c_i = 0; c_i < cluster_particles.size(); c_i++) {
         for (Particle* p : cluster_particles[c_i]) {
             if (!p->is_static) {
                 p->rollBackState(clusters[c_i].min_current_time);

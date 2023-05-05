@@ -466,9 +466,9 @@ void friction_iteration(collision::ContactBundle& bundle,
     const Eigen::Matrix3d a_inv = cluster.particles[a_id].getInverseInertiaMatrix();
     const Eigen::Matrix3d b_inv = cluster.particles[b_id].getInverseInertiaMatrix();
 
-        const Eigen::Vector3d a_FState_translation = FStates[a_id].getTranslation();
-        const Eigen::Vector3d b_FState_translation = FStates[b_id].getTranslation();
-        
+    const Eigen::Vector3d a_FState_translation = FStates[a_id].getTranslation();
+    const Eigen::Vector3d b_FState_translation = FStates[b_id].getTranslation();
+    
     const int c_first = bundle.hits[0];
 
     const Eigen::Vector3d n = contacts[c_first].global_normal.norm() > 1e-12 ? contacts[c_first].global_normal.normalized() : (b_FState_translation - a_FState_translation).normalized();
@@ -507,15 +507,15 @@ void friction_iteration(collision::ContactBundle& bundle,
     if (it == 0 || !(interp < 1.0)) {
         for (int c : bundle.hits) {
             i++;
+                    
+            const Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
+            const Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
 
-        const Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
-        const Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
+            const Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, a_inv);
+            const Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, b_inv);
+            const Eigen::Vector3d v1_AB = v1_A - v1_B;
+            const Eigen::Vector3d v_tangent_pt = v1_AB - v1_AB.dot(n) * n;
 
-        const Eigen::Vector3d v1_A = FStates[a_id].pointVelocity(p1_A, a_inv);
-        const Eigen::Vector3d v1_B = FStates[b_id].pointVelocity(p1_B, b_inv);
-        const Eigen::Vector3d v1_AB = v1_A - v1_B;
-        const Eigen::Vector3d v_tangent_pt = v1_AB - v1_AB.dot(n) * n;
-        
             const Eigen::Vector3d v_tangent = v_tangent_pt;
             const Eigen::Vector3d tangent = v_tangent.normalized();
 
@@ -541,7 +541,7 @@ void friction_iteration(collision::ContactBundle& bundle,
     } else {
         for (int c : bundle.hits) {
             i++;
-
+            
             const Eigen::Vector3d p1_A = common::transform(contacts[c].local_A, FStates[a_id].getTransformation());
             const Eigen::Vector3d p1_B = common::transform(contacts[c].local_B, FStates[b_id].getTransformation());
 
@@ -550,8 +550,8 @@ void friction_iteration(collision::ContactBundle& bundle,
             const Eigen::Vector3d v1_AB = v1_A - v1_B;
             const Eigen::Vector3d v_tangent_pt = v1_AB - v1_AB.dot(n) * n;
 
-        const Eigen::Vector3d v_tangent = v_tangent_pt;
-        const Eigen::Vector3d tangent = v_tangent.normalized();
+            const Eigen::Vector3d v_tangent = v_tangent_pt;
+            const Eigen::Vector3d tangent = v_tangent.normalized();
 
             const Eigen::Vector3d rt_A = r_A.cross(tangent);
             const Eigen::Vector3d rt_B = r_B.cross(tangent);
@@ -560,11 +560,11 @@ void friction_iteration(collision::ContactBundle& bundle,
             // const double m_inv_effective_tangent = k_tangent < 1e-6 ? 0.0 : 1.0 / k_tangent;
             const double m_inv_effective_tangent = 1.0 / k_tangent; // Assume none zero
 
-        const double friction_damp = common::lerp(0.1, 0.01, (double)it/(double)max_iterations);
-        const Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * friction_damp;
+            const double friction_damp = common::lerp(0.1, 0.01, (double)it/(double)max_iterations);
+            const Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * friction_damp;
 
-        Eigen::Vector3d friction_impulse_total = contacts[c].last_friction_impulse + delta_friction_impulse;
-        const Eigen::Vector3d friction_impulse_total_pre_avg = friction_impulse_total;
+            Eigen::Vector3d friction_impulse_total = contacts[c].last_friction_impulse + delta_friction_impulse;
+            const Eigen::Vector3d friction_impulse_total_pre_avg = friction_impulse_total;
 
             const Eigen::Vector3d average = bundle.tangent_average / bundle.hits.size();
             friction_impulse_total = common::lerp(average, friction_impulse_total, interp);
@@ -572,14 +572,14 @@ void friction_iteration(collision::ContactBundle& bundle,
 
             friction_impulse_total = friction_impulse_total_pre_avg.normalized() * std::min(friction_impulse_total.norm(), max_impulse);
 
-        updated_friction_total[i] = friction_impulse_total;
+            updated_friction_total[i] = friction_impulse_total;
 
             converged_tmp &= (contacts[c].last_friction_impulse - updated_friction_total[i]).squaredNorm() > 1e-8*1e-8;
         }
     }
 
     if (!converged_tmp) {
-            converged = false;
+        converged = false;
     }
 
     bundle.tangent_average = {0, 0, 0};
@@ -860,14 +860,14 @@ bool SequentialImpulses::solve(collision::Cluster& cluster, std::vector<collisio
         std::vector<std::vector<collision::ContactBundle>> colours;
         std::vector<collision::ContactBundle> bundles;
         if (hits.size() > globals::opt.sequential_parallel_threshold) {
-            colours = colour_hits(cluster, hits);
+            colours = colour_hits(cluster.particles, hits);
         }
         else {
-            bundles = bundle_hits(cluster, hits);
+            bundles = bundle_hits(cluster.particles, hits);
         }
 
         if (!solve_contacts(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, colours, bundles)) return false;
-        if (!solve_friction(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, colours, bundles)) return false;
+        // if (!solve_friction(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, colours, bundles)) return false;
 
         // for (int inner = 0; inner < globals::opt.sequential_impulse_inner_iterations; inner++) {
         //     if (!solve_friction(cluster, hits, contacts, impulses, rotational_impulses, impulse_offsets, rotational_impulse_offsets, FStates, colours, bundles)) return false;

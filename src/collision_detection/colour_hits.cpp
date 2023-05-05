@@ -4,7 +4,7 @@
 using namespace Delta2;
 using namespace collision;
 
-std::vector<ContactBundle> Delta2::collision::bundle_hits(Cluster& cluster, std::vector<Contact<double>>& hits) {
+std::vector<ContactBundle> Delta2::collision::bundle_hits(model::ParticleHandler& particles, std::vector<Contact<double>>& hits) {
     std::vector<ContactBundle> bundles;
 
     int last_lower = -1;
@@ -22,8 +22,8 @@ std::vector<ContactBundle> Delta2::collision::bundle_hits(Cluster& cluster, std:
 
         if (lower != last_lower || upper != last_upper) {
             bool found = false;
-            const int local_lower = cluster.particles.getLocalID(lower);
-            const int local_upper = cluster.particles.getLocalID(upper);
+            const int local_lower = particles.getLocalID(lower);
+            const int local_upper = particles.getLocalID(upper);
             for (int b_old = 0; b_old < bundles.size(); b_old++) {
                 if (bundles[b_old].lower == local_lower && bundles[b_old].upper == local_upper) {
                     found = true;
@@ -51,11 +51,11 @@ std::vector<ContactBundle> Delta2::collision::bundle_hits(Cluster& cluster, std:
     return bundles;
 }
 
-std::vector<std::vector<ContactBundle>> Delta2::collision::colour_hits(Cluster& cluster, std::vector<Contact<double>>& hits) {
+std::vector<std::vector<ContactBundle>> Delta2::collision::colour_hits(model::ParticleHandler& particles, std::vector<Contact<double>>& hits) {
     // Returns a vector for each colour used containing the indices of the hits with that colour groups by batch (same pair of involved particles)
-    std::vector<ContactBundle> bundles = Delta2::collision::bundle_hits(cluster, hits);
+    std::vector<ContactBundle> bundles = Delta2::collision::bundle_hits(particles, hits);
 
-    std::vector<int> particle_adj[cluster.particles.size()];
+    std::vector<int> particle_adj[particles.size()];
     
     int max_degree = 0;
 
@@ -64,10 +64,10 @@ std::vector<std::vector<ContactBundle>> Delta2::collision::colour_hits(Cluster& 
         const int a_id = bundles[b].lower;
         const int b_id = bundles[b].upper;
 
-        if (!cluster.particles[a_id].is_static) {
+        if (!particles[a_id].is_static) {
             particle_adj[a_id].push_back(b);
         }
-        if (!cluster.particles[b_id].is_static) {
+        if (!particles[b_id].is_static) {
             particle_adj[b_id].push_back(b);
         }
 
@@ -99,14 +99,14 @@ std::vector<std::vector<ContactBundle>> Delta2::collision::colour_hits(Cluster& 
         const int a_id = bundles[b].lower;
         const int b_id = bundles[b].upper;
 
-        if (!cluster.particles[a_id].is_static) {
+        if (!particles[a_id].is_static) {
             for (int a : particle_adj[a_id]) {
                 if (colour[a] != -1) {
                     avail[colour[a]] = false;
                 }
             }
         }
-        if (!cluster.particles[b_id].is_static) {
+        if (!particles[b_id].is_static) {
             for (int a : particle_adj[b_id]) {
                 if (colour[a] != -1) {
                     avail[colour[a]] = false;
