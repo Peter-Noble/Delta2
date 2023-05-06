@@ -202,7 +202,7 @@ void AnimationViewer::show() {
                 concatColors(C, Cp, C);
             }
 
-            Eigen::Matrix4d T = transformationMatrix<double>({-igl::PI/2.0, 0, 0}, {0, 0, 0});
+            Eigen::Matrix4d T = transformationMatrix(Eigen::Vector3d({-igl::PI/2.0, 0, 0}), {0, 0, 0});
             V = transform(V, T);
             _viewer.data().set_mesh(V, F);
             _viewer.data().set_colors(C);
