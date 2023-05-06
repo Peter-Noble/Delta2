@@ -364,11 +364,13 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
     // __itt_string_handle* sort_interactions_task = __itt_string_handle_create("Sort interactions");
 
     // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, connected_component_task);
+    globals::logger.printf(1, "Separate collision clusters\n");
     int num_particles = particles.size();
     std::vector<Cluster> clusters;
     std::vector<std::vector<Particle*>> cluster_particles;
 
-    if (broad_phase.size() < 1000) {  // Threshold for parallel connected components
+    if (broad_phase.size() < 10000000000) {  // Threshold for parallel connected components
+        globals::logger.printf(1, "Sequential section\n");
         Eigen::SparseMatrix<int> interaction_graph(num_particles, num_particles);
         interaction_graph.reserve(broad_phase.size() * 2);
 
@@ -384,10 +386,12 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             }
         }
 
+        globals::logger.printf(1, "connected_components\n");
         Eigen::MatrixXi components;
         Eigen::MatrixXi sizes;
         igl::connected_components(interaction_graph, components, sizes);
 
+        globals::logger.printf(1, "Create clusters\n");
         for (int c = 0; c < sizes.rows(); c++) {
             Cluster& C = clusters.emplace_back();
 
@@ -399,6 +403,7 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             cluster_particles.push_back({});
         }
 
+        globals::logger.printf(1, "Sort particles\n");
         for (int p_i = 0; p_i < num_particles; p_i++) {
             Particle* address = &(particles[p_i]);
             cluster_particles[components(p_i, 0)].push_back(address);
@@ -425,7 +430,7 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
 
                 cluster_particles.push_back({});
 
-                seen_ids.insert(std::make_pair(c, clusters.size()));
+                seen_ids.insert(std::make_pair(c, clusters.size()-1));
             }
         }
 
@@ -440,6 +445,8 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             }
         }
     }
+
+    globals::logger.printf(1, "Divergent region done\n");
 
     // Add each broad phase interaction to required clusters
     // TODO this isn't very efficient as each interaction searches through all the particles in all the clusters.
