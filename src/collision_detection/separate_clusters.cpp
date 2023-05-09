@@ -359,17 +359,22 @@ void collision::separateCollisionClustersWithTimeStepSelection(collision::BroadP
 
 
 std::vector<collision::Cluster> collision::separateCollisionClusters(collision::BroadPhaseCollisions& broad_phase, model::ParticleHandler& particles) {
-    // __itt_string_handle* connected_component_task = __itt_string_handle_create("Connected components");
-    // __itt_string_handle* create_clusters_task = __itt_string_handle_create("Create clusters");
-    // __itt_string_handle* sort_interactions_task = __itt_string_handle_create("Sort interactions");
+    __itt_string_handle* connected_component_task = __itt_string_handle_create("Connected components");
+    __itt_string_handle* sequential_cc_task = __itt_string_handle_create("Connected components - sequential cc");
+    __itt_string_handle* parallel_cc_task = __itt_string_handle_create("Connected components - parallel cc");
+    __itt_string_handle* sort_interactions_to_clusters_task = __itt_string_handle_create("Connected components - interactions to clusters");
+    __itt_string_handle* separate_clusters_rollback_task = __itt_string_handle_create("Separate clusters - rollback");
+    __itt_string_handle* separate_clusters_filter_and_resize_task = __itt_string_handle_create("Separate clusters - filter_and_resize");
+    __itt_string_handle* separate_clusters_set_id_task = __itt_string_handle_create("Separate clusters - set_id");
 
-    // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, connected_component_task);
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, connected_component_task);
     globals::logger.printf(1, "Separate collision clusters\n");
     int num_particles = particles.size();
     std::vector<Cluster> clusters;
     std::vector<std::vector<Particle*>> cluster_particles;
 
-    if (broad_phase.size() < 10000000000) {  // Threshold for parallel connected components
+    if (broad_phase.size() < 100) {  // Threshold for parallel connected components
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_cc_task);
         globals::logger.printf(1, "Sequential section\n");
         Eigen::SparseMatrix<int> interaction_graph(num_particles, num_particles);
         interaction_graph.reserve(broad_phase.size() * 2);
@@ -413,9 +418,55 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
                 clusters[components(p_i, 0)].sleeping = false;
             }
         }
+
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sort_interactions_to_clusters_task);
+        // Add each broad phase interaction to required clusters
+        // TODO this isn't very efficient as each interaction searches through all the particles in all the clusters.
+        for (collision::BroadPhaseCollision& b : broad_phase) {
+            int a_id = particles.getLocalID(b.A.first); // local geo id
+            int b_id = particles.getLocalID(b.B.first);
+
+            if (particles[a_id].is_static && particles[b_id].is_static) {
+                continue;
+            }
+
+            for (int c_i = 0; c_i < clusters.size(); c_i++) {
+                Particle* address_a = &(particles[a_id]);
+                Particle* address_b = &(particles[b_id]);    
+
+                bool a_in = std::find(cluster_particles[c_i].begin(), cluster_particles[c_i].end(), address_a) != cluster_particles[c_i].end();
+                bool b_in = std::find(cluster_particles[c_i].begin(), cluster_particles[c_i].end(), address_b) != cluster_particles[c_i].end();
+
+                if (a_in) {
+                    if (b_in) {
+                        clusters[c_i].interations.push_back(b);
+                        break;
+                    }
+                    else if (particles[b_id].is_static) {
+                        cluster_particles[c_i].push_back(address_b);
+                        clusters[c_i].interations.push_back(b);
+                        break;
+                    }
+                }
+                else {
+                    if (b_in) {
+                        if (particles[a_id].is_static) {
+                            cluster_particles[c_i].push_back(address_a);
+                            clusters[c_i].interations.push_back(b);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        __itt_task_end(globals::itt_handles.detailed_domain);
+        __itt_task_end(globals::itt_handles.detailed_domain);
     }
     else {
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, parallel_cc_task);
+        globals::logger.printf(1, "simpleParallelConnectedComponents\n");
         std::vector<uint32_t> colours = collision::simpleParallelConnectedComponents(broad_phase, particles);
+        globals::logger.printf(1, "simpleParallelConnectedComponents done\n");
 
         std::unordered_map<uint32_t, int> seen_ids;
 
@@ -434,6 +485,8 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             }
         }
 
+        globals::logger.printf(1, "Sort particles to clusters\n");
+
         for (int p_i = 0; p_i < num_particles; p_i++) {
             Particle* address = &(particles[p_i]);
             int cluster_id = seen_ids[colours[particles.getLocalID(particles[p_i].id)]];
@@ -444,51 +497,59 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
                 clusters[cluster_id].sleeping = false;
             }
         }
-    }
+        __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sort_interactions_to_clusters_task);
+        // Add each broad phase interaction to required clusters
+        // TODO for more speed loop over the colours, do the cluster_id lookup once and then iterate through the list to transfer to broadphase collisions
+        for (collision::BroadPhaseCollision& b : broad_phase) {
+            int a_id = particles.getLocalID(b.A.first); // local geo id
+            int b_id = particles.getLocalID(b.B.first);
 
-    globals::logger.printf(1, "Divergent region done\n");
-
-    // Add each broad phase interaction to required clusters
-    // TODO this isn't very efficient as each interaction searches through all the particles in all the clusters.
-    for (collision::BroadPhaseCollision& b : broad_phase) {
-        int a_id = particles.getLocalID(b.A.first); // local geo id
-        int b_id = particles.getLocalID(b.B.first);
-
-        for (int c_i = 0; c_i < clusters.size(); c_i++) {
             Particle* address_a = &(particles[a_id]);
             Particle* address_b = &(particles[b_id]);
-            
+
             if (particles[a_id].is_static && particles[b_id].is_static) {
                 continue;
             }
 
-            bool a_in = std::find(cluster_particles[c_i].begin(), cluster_particles[c_i].end(), address_a) != cluster_particles[c_i].end();
-            bool b_in = std::find(cluster_particles[c_i].begin(), cluster_particles[c_i].end(), address_b) != cluster_particles[c_i].end();
+            int a_cluster_id = seen_ids[colours[a_id]];
+            int b_cluster_id = seen_ids[colours[b_id]];
 
-            if (a_in) {
-                if (b_in) {
-                    clusters[c_i].interations.push_back(b);
-                    break;
-                }
-                else if (particles[b_id].is_static) {
-                    cluster_particles[c_i].push_back(address_b);
-                    clusters[c_i].interations.push_back(b);
-                    break;
-                }
+            if (a_cluster_id == b_cluster_id || particles[b_id].is_static) {
+                clusters[a_cluster_id].interations.push_back(b);
+                // globals::logger.printf(1, "broad phase to a cluster %i\n", a_cluster_id);
             }
-            else {
-                if (b_in) {
-                    if (particles[a_id].is_static) {
-                        cluster_particles[c_i].push_back(address_a);
-                        clusters[c_i].interations.push_back(b);
-                        break;
-                    }
+            else if (particles[a_id].is_static) {
+                clusters[b_cluster_id].interations.push_back(b);
+                // globals::logger.printf(1, "broad phase to b cluster %i\n", b_cluster_id);
+            }
+
+            if (particles[a_id].is_static) {
+                // globals::logger.printf(1, "particle a %i is static\n", a_id);
+                for (Particle* p : cluster_particles[b_cluster_id]) {
+                    // globals::logger.printf(1, "in cluster: %i\n", particles.getLocalID(p->id));
                 }
+                if (std::find(cluster_particles[b_cluster_id].begin(), cluster_particles[b_cluster_id].end(), address_a) == cluster_particles[b_cluster_id].end()) {
+                    cluster_particles[b_cluster_id].push_back(address_a);
+                    // globals::logger.printf(1, "particle %i added to a cluster %i\n", a_id, b_cluster_id);
+                };
+            }
+
+            if (particles[b_id].is_static) {
+                // globals::logger.printf(1, "particle b %i is static\n", b_id);
+                if (std::find(cluster_particles[a_cluster_id].begin(), cluster_particles[a_cluster_id].end(), address_b) == cluster_particles[a_cluster_id].end()) {
+                    cluster_particles[a_cluster_id].push_back(address_b);
+                    // globals::logger.printf(1, "particle %i added to b cluster %i\n", b_id, a_cluster_id);
+                };
             }
         }
+        __itt_task_end(globals::itt_handles.detailed_domain);
+        __itt_task_end(globals::itt_handles.detailed_domain);
     }
-    // __itt_task_end(globals::itt_handles.detailed_domain);
 
+    globals::logger.printf(1, "Divergent region done\n");
+    __itt_task_end(globals::itt_handles.detailed_domain);
+
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, separate_clusters_rollback_task);
     for (int c_i = 0; c_i < cluster_particles.size(); c_i++) {
         for (Particle* p : cluster_particles[c_i]) {
             if (!p->is_static) {
@@ -497,7 +558,9 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             }
         }
     }
+    __itt_task_end(globals::itt_handles.detailed_domain);
 
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, separate_clusters_filter_and_resize_task);
     // Filter out the clusters that have no non-sleeping particles
     int cluster_target = 0;
     for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++) {
@@ -508,34 +571,35 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
         }
     }
     clusters.resize(cluster_target); // Removed (and calls destructor) for the end clusters that are no longer needed
+    __itt_task_end(globals::itt_handles.detailed_domain);
 
-    for (Particle* p : particles) {
-        if (!p->is_static || !p->getSleeping()) {
-            bool found = false;
+    // for (Particle* p : particles) {
+    //     if (!p->is_static || !p->getSleeping()) {
+    //         bool found = false;
 
-            for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++) {
-                for (Particle* pc : clusters[cluster_i].particles) {
-                    if (pc->id == p->id) {
-                        found = true;
-                        // globals::logger.printf(3, "Found: %i in %i\n", p->id, cluster_i);
-                        break;
-                    }
-                }
-                if (found) {
-                    break;
-                }
-            }
-            if (found) {
-                continue;
-            }
-            assert(false);
-        }
-        // else {
-        //     globals::logger.printf(3, "Skipping: %i\n", p->id);
-        // }
-    }
+    //         for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++) {
+    //             for (Particle* pc : clusters[cluster_i].particles) {
+    //                 if (pc->id == p->id) {
+    //                     found = true;
+    //                     // globals::logger.printf(3, "Found: %i in %i\n", p->id, cluster_i);
+    //                     break;
+    //                 }
+    //             }
+    //             if (found) {
+    //                 break;
+    //             }
+    //         }
+    //         if (found) {
+    //             continue;
+    //         }
+    //         assert(false);
+    //     }
+    //     // else {
+    //     //     globals::logger.printf(3, "Skipping: %i\n", p->id);
+    //     // }
+    // }
 
-
+    __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, separate_clusters_set_id_task);
     for (int cluster_i = 0; cluster_i < clusters.size(); cluster_i++) {
         int cluster_id = -1;
         for (Particle* p : clusters[cluster_i].particles) {
@@ -554,6 +618,7 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             }
         }
     }
+    __itt_task_end(globals::itt_handles.detailed_domain);
 
     // globals::logger.printf(3, "%i total clusters\n", clusters.size());
     return clusters;
