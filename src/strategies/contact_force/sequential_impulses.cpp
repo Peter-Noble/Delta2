@@ -34,6 +34,8 @@ using std::chrono::microseconds;
 using namespace std::literals::chrono_literals;
 using std::this_thread::sleep_for;
 
+double converge_to = 1e-4;
+
 double averageForce(double f0, double f1, double d0, double d1, double outer) {
     assert(f0 >= 0.0);
     assert(f1 >= 0.0);
@@ -135,8 +137,8 @@ std::vector<LocalContact> create_local_contacts(std::vector<collision::Contact<d
             k_tangent += im_B + rt_B.transpose() * ii_B * rt_B;
         }
 
-        lc.mass_eff_normal = k_normal < 1e-6 ? 0.0 : 1.0 / k_normal;
-        lc.mass_eff_tangent = k_tangent < 1e-6 ? 0.0 : 1.0 / k_tangent;
+        lc.mass_eff_normal = k_normal < 1e-8 ? 0.0 : 1.0 / k_normal;
+        lc.mass_eff_tangent = k_tangent < 1e-8 ? 0.0 : 1.0 / k_tangent;
 
         lc.impulse = 0.0;
         lc.impulse_offset = 0.0;
@@ -269,7 +271,8 @@ void contact_iteration(collision::ContactBundle& bundle,
         Eigen::Vector3d update_impulse = n * update_impulse_mag;
         bundle.normal_average += update_impulse;
 
-        if (std::abs(update_impulse_mag) > 1e-8) {
+        if (std::abs(update_impulse_mag) > converge_to) {
+            // globals::logger.printf(1, "Contact iteration not converged\n");
             converged = false;
         }
         update_impulse *= -1;  //  The impulse is calculated A->B but applied B->A so flip it
@@ -526,7 +529,7 @@ void friction_iteration(collision::ContactBundle& bundle,
             // const double m_inv_effective_tangent = k_tangent < 1e-6 ? 0.0 : 1.0 / k_tangent;
             const double m_inv_effective_tangent = 1.0 / k_tangent; // Assume none zero
     
-            const double friction_damp = common::lerp(0.1, 0.01, (double)it/(double)max_iterations);
+            const double friction_damp = common::lerp(0.1, 0.001, (double)it/(double)max_iterations);
             const Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * friction_damp;
 
             Eigen::Vector3d friction_impulse_total = contacts[c].last_friction_impulse + delta_friction_impulse;
@@ -536,7 +539,10 @@ void friction_iteration(collision::ContactBundle& bundle,
 
             updated_friction_total[i] = friction_impulse_total;
 
-            converged_tmp &= (contacts[c].last_friction_impulse - updated_friction_total[i]).squaredNorm() > 1e-8*1e-8;
+            // globals::logger.printf(1, "it: %i, diff x1000: %f\n", it, (contacts[c].last_friction_impulse - updated_friction_total[i]).norm() * 1000);
+            // globals::logger.printf(1, "Before: %s\n", converged_tmp ? "True" : "False");
+            converged_tmp &= (contacts[c].last_friction_impulse - updated_friction_total[i]).norm() < converge_to;
+            // globals::logger.printf(1, "After: %s\n", converged_tmp ? "True" : "False");
         }
     } else {
         for (int c : bundle.hits) {
@@ -560,7 +566,7 @@ void friction_iteration(collision::ContactBundle& bundle,
             // const double m_inv_effective_tangent = k_tangent < 1e-6 ? 0.0 : 1.0 / k_tangent;
             const double m_inv_effective_tangent = 1.0 / k_tangent; // Assume none zero
 
-            const double friction_damp = common::lerp(0.1, 0.01, (double)it/(double)max_iterations);
+            const double friction_damp = common::lerp(0.1, 0.001, (double)it/(double)max_iterations);
             const Eigen::Vector3d delta_friction_impulse = -v_tangent * m_inv_effective_tangent * friction_damp;
 
             Eigen::Vector3d friction_impulse_total = contacts[c].last_friction_impulse + delta_friction_impulse;
@@ -574,11 +580,15 @@ void friction_iteration(collision::ContactBundle& bundle,
 
             updated_friction_total[i] = friction_impulse_total;
 
-            converged_tmp &= (contacts[c].last_friction_impulse - updated_friction_total[i]).squaredNorm() > 1e-8*1e-8;
+            // globals::logger.printf(1, "it: %i, diff x1000: %f\n", it, (contacts[c].last_friction_impulse - updated_friction_total[i]).norm() * 1000);
+            // globals::logger.printf(1, "Before: %s\n", converged_tmp ? "True" : "False");
+            converged_tmp &= (contacts[c].last_friction_impulse - updated_friction_total[i]).norm() < converge_to;
+            // globals::logger.printf(1, "After: %s\n", converged_tmp ? "True" : "False");
         }
     }
 
     if (!converged_tmp) {
+        // globals::logger.printf(1, "Friction iteration not converged\n");
         converged = false;
     }
 
@@ -705,7 +715,7 @@ bool solve_friction(collision::Cluster& cluster,
     //     return false;  // TODO this used to cause some very odd errors in the tiny_tower scenario. Still the case?
     // }
     
-    globals::logger.printf(3, "%i: Iterations used friction phase: %i\n", cluster_id, it);
+    // globals::logger.printf(3, "%i: Iterations used friction phase: %i\n", cluster_id, it);
 
     for (int c = 0; c < hits.size(); c++) {
         globals::logger.printf(4, "Contact %i last_impulse_friction: %f, %f, %f (%f)\n", c, contacts[c].last_friction_impulse.x(), contacts[c].last_friction_impulse.y(), contacts[c].last_friction_impulse.z(), contacts[c].last_friction_impulse.norm());
@@ -725,6 +735,7 @@ bool solve_combined(collision::Cluster& cluster,
                     std::vector<std::vector<collision::ContactBundle>>& colours,
                     std::vector<collision::ContactBundle>& bundles) {
     __itt_string_handle* solve_combined_task = __itt_string_handle_create("Solve combined");
+    __itt_string_handle* final_iteration_task = __itt_string_handle_create("Final iteration");
     __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, solve_combined_task);
 
     int cluster_id = -1;
@@ -746,6 +757,9 @@ bool solve_combined(collision::Cluster& cluster,
     const int it_start = max_iterations / 4;
     int it_shift = it_start;
     while (!converged && it_shift < max_iterations + it_start || it_shift < it_start + 10) {
+        if (it_shift + 1 == max_iterations + it_start) {
+            __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, final_iteration_task);
+        }
         converged = true;
         all_d1_above = true;
         int it = std::min(max_iterations-1, it_shift);
@@ -780,7 +794,18 @@ bool solve_combined(collision::Cluster& cluster,
             }
         }
 
+        if (it_shift + 1 == max_iterations + it_start) {
+            __itt_task_end(globals::itt_handles.detailed_domain);
+        }
+
         it_shift++;
+
+        if (!converged && it_shift < max_iterations + it_start) {
+            // globals::logger.printf(1, "Converged: %s, it_shift: %i, max_iterations: %i, it_start: %i\n", converged ? "True" : "False", it_shift, max_iterations, it_start);
+        }
+        if (it_shift < it_start + 10) {
+            // globals::logger.printf(1, "it_shift: %f, it_start: %i\n", it_shift, it_start);
+        }
     }
 
     // if (it == max_iterations) {
