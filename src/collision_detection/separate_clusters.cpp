@@ -368,14 +368,12 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
     __itt_string_handle* separate_clusters_set_id_task = __itt_string_handle_create("Separate clusters - set_id");
 
     __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, connected_component_task);
-    globals::logger.printf(1, "Separate collision clusters\n");
     int num_particles = particles.size();
     std::vector<Cluster> clusters;
     std::vector<std::vector<Particle*>> cluster_particles;
 
     if (broad_phase.size() < 100) {  // Threshold for parallel connected components
         __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, sequential_cc_task);
-        globals::logger.printf(1, "Sequential section\n");
         Eigen::SparseMatrix<int> interaction_graph(num_particles, num_particles);
         interaction_graph.reserve(broad_phase.size() * 2);
 
@@ -391,12 +389,10 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             }
         }
 
-        globals::logger.printf(1, "connected_components\n");
         Eigen::MatrixXi components;
         Eigen::MatrixXi sizes;
         igl::connected_components(interaction_graph, components, sizes);
 
-        globals::logger.printf(1, "Create clusters\n");
         for (int c = 0; c < sizes.rows(); c++) {
             Cluster& C = clusters.emplace_back();
 
@@ -408,7 +404,6 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
             cluster_particles.push_back({});
         }
 
-        globals::logger.printf(1, "Sort particles\n");
         for (int p_i = 0; p_i < num_particles; p_i++) {
             Particle* address = &(particles[p_i]);
             cluster_particles[components(p_i, 0)].push_back(address);
@@ -464,9 +459,7 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
     }
     else {
         __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, parallel_cc_task);
-        globals::logger.printf(1, "simpleParallelConnectedComponents\n");
         std::vector<uint32_t> colours = collision::simpleParallelConnectedComponents(broad_phase, particles);
-        globals::logger.printf(1, "simpleParallelConnectedComponents done\n");
 
         std::unordered_map<uint32_t, int> seen_ids;
 
@@ -484,8 +477,6 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
                 seen_ids.insert(std::make_pair(c, clusters.size()-1));
             }
         }
-
-        globals::logger.printf(1, "Sort particles to clusters\n");
 
         for (int p_i = 0; p_i < num_particles; p_i++) {
             Particle* address = &(particles[p_i]);
@@ -516,29 +507,22 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
 
             if (a_cluster_id == b_cluster_id || particles[b_id].is_static) {
                 clusters[a_cluster_id].interations.push_back(b);
-                // globals::logger.printf(1, "broad phase to a cluster %i\n", a_cluster_id);
             }
             else if (particles[a_id].is_static) {
                 clusters[b_cluster_id].interations.push_back(b);
-                // globals::logger.printf(1, "broad phase to b cluster %i\n", b_cluster_id);
             }
 
             if (particles[a_id].is_static) {
-                // globals::logger.printf(1, "particle a %i is static\n", a_id);
                 for (Particle* p : cluster_particles[b_cluster_id]) {
-                    // globals::logger.printf(1, "in cluster: %i\n", particles.getLocalID(p->id));
                 }
                 if (std::find(cluster_particles[b_cluster_id].begin(), cluster_particles[b_cluster_id].end(), address_a) == cluster_particles[b_cluster_id].end()) {
                     cluster_particles[b_cluster_id].push_back(address_a);
-                    // globals::logger.printf(1, "particle %i added to a cluster %i\n", a_id, b_cluster_id);
                 };
             }
 
             if (particles[b_id].is_static) {
-                // globals::logger.printf(1, "particle b %i is static\n", b_id);
                 if (std::find(cluster_particles[a_cluster_id].begin(), cluster_particles[a_cluster_id].end(), address_b) == cluster_particles[a_cluster_id].end()) {
                     cluster_particles[a_cluster_id].push_back(address_b);
-                    // globals::logger.printf(1, "particle %i added to b cluster %i\n", b_id, a_cluster_id);
                 };
             }
         }
@@ -546,7 +530,6 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
         __itt_task_end(globals::itt_handles.detailed_domain);
     }
 
-    globals::logger.printf(1, "Divergent region done\n");
     __itt_task_end(globals::itt_handles.detailed_domain);
 
     __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, separate_clusters_rollback_task);

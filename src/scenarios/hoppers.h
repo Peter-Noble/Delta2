@@ -71,7 +71,7 @@ namespace Delta2 {
                     Eigen::Vector3d centre = {24.6 * x, 24.6 * y, 0};
                     {
                         auto& p = particles.emplace_back(P, 1.0, 1.0, 0.25);
-                        p.current_state.setTranslation(centre + Eigen::Vector3d({0, 0, -15}));
+                        p.current_state.setTranslation(centre + Eigen::Vector3d({0, 0, -25}));
                         p.is_static = true;
                     }
                     {
@@ -90,14 +90,18 @@ namespace Delta2 {
                                 }
                             }
                             for (int pz = 0; pz < 3; pz++) {
-                                auto& p = particles.emplace_back(medium[Delta2::globals::opt.rand(medium.size())], 1.0, 1.0, 0.25);
-                                // auto& p = particles.emplace_back(C, 1.0, 1.0, 0.25);
-                                p.current_state.setTranslation(centre + Eigen::Vector3d({px * 5, py * 5, 10 + pz * 3}));
+                                if ((px + py + pz) % 2 != 0) {
+                                    auto& p = particles.emplace_back(medium[Delta2::globals::opt.rand(medium.size())], 1.0, 1.0, 0.25);
+                                    // auto& p = particles.emplace_back(C, 1.0, 1.0, 0.25);
+                                    p.current_state.setTranslation(centre + Eigen::Vector3d({px * 5, py * 5, 10 + pz * 3}));
+                                }
                             }
                             for (int pz = 0; pz < 6; pz++) {
-                                auto& p = particles.emplace_back(small[Delta2::globals::opt.rand(small.size())], 1.0, 1.0, 0.25);
-                                // auto& p = particles.emplace_back(C, 1.0, 1.0, 0.25);
-                                p.current_state.setTranslation(centre + Eigen::Vector3d({px * 4.0, py * 4.0, 24 + pz * 3}));
+                                if ((px + py + pz) % 2 != 0) {
+                                    auto& p = particles.emplace_back(small[Delta2::globals::opt.rand(small.size())], 1.0, 1.0, 0.25);
+                                    // auto& p = particles.emplace_back(C, 1.0, 1.0, 0.25);
+                                    p.current_state.setTranslation(centre + Eigen::Vector3d({px * 4.0, py * 4.0, 24 + pz * 3}));
+                                }
                             }
                         }
                     }
