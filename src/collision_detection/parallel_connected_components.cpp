@@ -49,10 +49,8 @@ std::vector<uint32_t> collision::simpleParallelConnectedComponents(collision::Br
     }
     __itt_task_end(globals::itt_handles.detailed_domain);
 
-    globals::logger.printf(1, "Colour hits\n");
     // std::vector<std::vector<ContactBundle>> colours = collision::colour_hits(particles, hits);
     std::vector<std::vector<ContactBundle>> colours = collision::colour_hits(particles, bundles);
-    globals::logger.printf(1, "Colour hits done\n");
 
     // For each particle set current label
     for (int i = 0; i < num_particles; i++) {
@@ -71,9 +69,7 @@ std::vector<uint32_t> collision::simpleParallelConnectedComponents(collision::Br
 
     bool no_change = false;
 
-    globals::logger.printf(1, "Loop begin\n");
     while (!no_change) {
-        globals::logger.printf(1, "Inner loop\n");
         no_change = true;
         for (int colour = 0; colour < colours.size(); colour++) {
             if (colours[colour].size() > parallel_individual_colour_threshold) {
@@ -115,6 +111,5 @@ std::vector<uint32_t> collision::simpleParallelConnectedComponents(collision::Br
             }
         }
     }
-    globals::logger.printf(1, "Loop end\n");
     return labels;
 }
