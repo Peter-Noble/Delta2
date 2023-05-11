@@ -97,6 +97,10 @@ std::vector<std::vector<ContactBundle>> Delta2::collision::colour_hits(model::Pa
 
     std::vector<int> particle_adj[particles.size()];
     
+    if (bundles.size() == 0) {
+        return {};
+    }
+
     int max_degree = 0;
 
     __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, adjacency_task);
