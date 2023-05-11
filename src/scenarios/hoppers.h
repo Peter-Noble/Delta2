@@ -67,7 +67,7 @@ namespace Delta2 {
             std::shared_ptr<Delta2::MeshData> C(new Delta2::MeshData(V, F, globals::opt));
 
             for (int x = 0; x < size; x++) {
-                for (int y = 0; y < size; y++) {
+                for (int y = 0; y < 1; y++) {
                     Eigen::Vector3d centre = {24.6 * x, 24.6 * y, 0};
                     {
                         auto& p = particles.emplace_back(P, 1.0, 1.0, 0.25);
