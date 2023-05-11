@@ -265,7 +265,7 @@ namespace Delta2 {
                 num_hits.clear();
                 
                 // __itt_task_begin(domain, __itt_null, __itt_null, bucket_contact_connected_task);
-                findContactsBucketConnectedContinuousComparison<branching, real>(dc_connected, a, b, hits, num_hits);
+                findContactsBucketConnectedContinuousComparison<branching, real>(dc_connected, a, b, hits, min_time_out / max_time, num_hits);
                 // __itt_task_end(domain);
 
                 last_hit_num = 0;

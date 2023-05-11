@@ -573,130 +573,8 @@ namespace Delta2 {
             return true;
         }
 
-        template<typename real>
-        real edgeEdgeCCD(const Delta2::common::Edge<real>& a_start, const Delta2::common::Edge<real>& a_end, const Delta2::common::Edge<real>& b_start, const Delta2::common::Edge<real>& b_end, real search_dist, Eigen::Vector<real, 3>& P_out, Eigen::Vector<real, 3>& Q_out, real& toc_out) {
-            // https://physics.stackexchange.com/questions/373534/sweeping-collision-detection-between-two-line-segments-moving-in-3d
-            // Eigen::Vector<real, 3> a_min = a_start.min(a_end);
-            // Eigen::Vector<real, 3> a_max = a_start.max(a_end);
-            // Eigen::Vector<real, 3> b_min = b_start.min(b_end);
-            // Eigen::Vector<real, 3> b_max = b_start.max(b_end);
-            
-            // bool bbox = testAxis(a_min.x(), a_max.x(), b_min.x(), b_max.x(), search_dist);
-            // bbox &= testAxis(a_min.y(), a_max.y(), b_min.y(), b_max.y(), search_dist);
-            // bbox &= testAxis(a_min.z(), a_max.z(), b_min.z(), b_max.z(), search_dist);
-
-            // if (!bbox) {
-            //     return std::numeric_limits<double>::infinity();
-            // }
-
-            real min_dist = std::numeric_limits<real>::max();
-            
-            Eigen::Vector<real, 3> n_start = (a_start.B - a_start.A).cross(b_start.A - a_start.A);
-            real dot_start = (b_start.B - a_start.A).dot(n_start);
-            Eigen::Vector<real, 3> n_end = (a_end.B - a_end.A).cross(b_end.A - a_end.A);
-            real dot_end = (b_end.B - a_end.A).dot(n_end);
-            if (dot_start * dot_end < 0.0) {
-                // All points are on a plane at some point => there MIGHT be an intersection
-                real t_lower = 0.0;
-                real t_upper = 1.0;
-
-                for (int iter = 0; iter < 20; iter++) {
-                    real t_mid = (t_lower + t_upper) / 2.0;
-
-                    common::Edge<real> a_t_edge(common::lerp(a_start.A, a_end.A, t_mid), common::lerp(a_start.B, a_end.B, t_mid));
-                    common::Edge<real> b_t_edge(common::lerp(b_start.A, b_end.A, t_mid), common::lerp(b_start.B, b_end.B, t_mid));
-                    Eigen::Vector<real, 3> n_mid = (a_t_edge.B - a_t_edge.A).cross(b_t_edge.A - a_t_edge.A);
-                    real dot_mid = (b_t_edge.B - a_t_edge.A).dot(n_mid);
-
-                    if (std::abs(dot_mid) < 1e-8) {
-                        t_lower = t_mid;
-                        t_upper = t_mid;
-                        break;
-                    }
-                    else if (dot_start * dot_mid < 0.0) {
-                        t_upper = t_mid;
-                    }
-                    else { // dot_end * dot_mid < 0.0
-                        t_lower = t_mid;
-                    }
-                }
-
-                real t_mid = (t_lower + t_upper) / 2.0;
-
-                common::Edge<real> a_t_edge(common::lerp(a_start.A, a_end.A, t_mid), common::lerp(a_start.B, a_end.B, t_mid));
-                common::Edge<real> b_t_edge(common::lerp(b_start.A, b_end.A, t_mid), common::lerp(b_start.B, b_end.B, t_mid));
-
-                min_dist = a_t_edge.closest(b_t_edge, P_out, Q_out);
-                toc_out = t_mid;
-            }
-
-            if (min_dist > 1e-8) {
-                real t = 0.0;
-
-                for (int iter = 0; iter < 10; iter++) {
-                    common::Edge<real> a_t_edge(common::lerp(a_start.A, a_end.A, t), common::lerp(a_start.B, a_end.B, t));
-                    common::Edge<real> b_t_edge(common::lerp(b_start.A, b_end.A, t), common::lerp(b_start.B, b_end.B, t));
-
-                    Eigen::Vector<real, 3> P, Q;
-                    
-                    real dist = a_t_edge.closest(b_t_edge, P, Q);
-
-                    if (dist < min_dist) {
-                        min_dist = dist;
-                        P_out = P;
-                        Q_out = Q;
-                        toc_out = t;
-                    }
-
-                    real pa = a_t_edge.project(P);
-                    real pb = b_t_edge.project(Q);
-
-                    real t_diff = ((-2*a_start.B.x()*pa + 2*b_start.B.x()*pb + 2*(1 - pa)*(a_end.A.x() - a_start.A.x()) + 2*(b_end.A.x() - b_start.A.x())*(pb - 1))*(pa*(a_end.B.x() + a_start.B.x()*(1 - t)) - pb*(b_end.B.x() + b_start.B.x()*(1 - t)) + (1 - pa)*(a_end.A.x()*t + a_start.A.x()*(1 - t)) - (1 - pb)*(b_end.A.x()*t + b_start.A.x()*(1 - t)))/2 + (-2*a_start.B.y()*pa + 2*b_start.B.y()*pb + 2*(1 - pa)*(a_end.A.y() - a_start.A.y()) + 2*(b_end.A.y() - b_start.A.y())*(pb - 1))*(pa*(a_end.B.y() + a_start.B.y()*(1 - t)) - pb*(b_end.B.y() + b_start.B.y()*(1 - t)) + (1 - pa)*(a_end.A.y()*t + a_start.A.y()*(1 - t)) - (1 - pb)*(b_end.A.y()*t + b_start.A.y()*(1 - t)))/2 + (-2*a_start.B.z()*pa + 2*b_start.B.z()*pb + 2*(1 - pa)*(a_end.A.z() - a_start.A.z()) + 2*(b_end.A.z() - b_start.A.z())*(pb - 1))*(pa*(a_end.B.z() + a_start.B.z()*(1 - t)) - pb*(b_end.B.z() + b_start.B.z()*(1 - t)) + (1 - pa)*(a_end.A.z()*t + a_start.A.z()*(1 - t)) - (1 - pb)*(b_end.A.z()*t + b_start.A.z()*(1 - t)))/2)/sqrt(std::pow(pa*(a_end.B.x() + a_start.B.x()*(1 - t)) - pb*(b_end.B.x() + b_start.B.x()*(1 - t)) + (1 - pa)*(a_end.A.x()*t + a_start.A.x()*(1 - t)) - (1 - pb)*(b_end.A.x()*t + b_start.A.x()*(1 - t)), 2) + std::pow(pa*(a_end.B.y() + a_start.B.y()*(1 - t)) - pb*(b_end.B.y() + b_start.B.y()*(1 - t)) + (1 - pa)*(a_end.A.y()*t + a_start.A.y()*(1 - t)) - (1 - pb)*(b_end.A.y()*t + b_start.A.y()*(1 - t)), 2) + std::pow(pa*(a_end.B.z() + a_start.B.z()*(1 - t)) - pb*(b_end.B.z() + b_start.B.z()*(1 - t)) + (1 - pa)*(a_end.A.z()*t + a_start.A.z()*(1 - t)) - (1 - pb)*(b_end.A.z()*t + b_start.A.z()*(1 - t)), 2));
-                    real t_diff2 = ((-2*a_start.B.x()*pa + 2*b_start.B.x()*pb + 2*(1 - pa)*(a_end.A.x() - a_start.A.x()) + 2*(b_end.A.x() - b_start.A.x())*(pb - 1))*(-a_start.B.x()*pa/2 + b_start.B.x()*pb/2 + (1 - pa)*(a_end.A.x() - a_start.A.x())/2 + (b_end.A.x() - b_start.A.x())*(pb - 1)/2) + (-2*a_start.B.y()*pa + 2*b_start.B.y()*pb + 2*(1 - pa)*(a_end.A.y() - a_start.A.y()) + 2*(b_end.A.y() - b_start.A.y())*(pb - 1))*(-a_start.B.y()*pa/2 + b_start.B.y()*pb/2 + (1 - pa)*(a_end.A.y() - a_start.A.y())/2 + (b_end.A.y() - b_start.A.y())*(pb - 1)/2) + (-2*a_start.B.z()*pa + 2*b_start.B.z()*pb + 2*(1 - pa)*(a_end.A.z() - a_start.A.z()) + 2*(b_end.A.z() - b_start.A.z())*(pb - 1))*(-a_start.B.z()*pa/2 + b_start.B.z()*pb/2 + (1 - pa)*(a_end.A.z() - a_start.A.z())/2 + (b_end.A.z() - b_start.A.z())*(pb - 1)/2))/sqrt(std::pow(pa*(a_end.B.x() + a_start.B.x()*(1 - t)) - pb*(b_end.B.x() + b_start.B.x()*(1 - t)) + (1 - pa)*(a_end.A.x()*t + a_start.A.x()*(1 - t)) - (1 - pb)*(b_end.A.x()*t + b_start.A.x()*(1 - t)), 2) + std::pow(pa*(a_end.B.y() + a_start.B.y()*(1 - t)) - pb*(b_end.B.y() + b_start.B.y()*(1 - t)) + (1 - pa)*(a_end.A.y()*t + a_start.A.y()*(1 - t)) - (1 - pb)*(b_end.A.y()*t + b_start.A.y()*(1 - t)), 2) + std::pow(pa*(a_end.B.z() + a_start.B.z()*(1 - t)) - pb*(b_end.B.z() + b_start.B.z()*(1 - t)) + (1 - pa)*(a_end.A.z()*t + a_start.A.z()*(1 - t)) - (1 - pb)*(b_end.A.z()*t + b_start.A.z()*(1 - t)), 2) ) + (-(-2*a_start.B.x()*pa + 2*b_start.B.x()*pb + 2*(1 - pa)*(a_end.A.x() - a_start.A.x()) + 2*(b_end.A.x() - b_start.A.x())*(pb - 1))*(pa*(a_end.B.x() + a_start.B.x()*(1 - t)) - pb*(b_end.B.x() + b_start.B.x()*(1 - t)) + (1 - pa)*(a_end.A.x()*t + a_start.A.x()*(1 - t)) - (1 - pb)*(b_end.A.x()*t + b_start.A.x()*(1 - t)))/2 - (-2*a_start.B.y()*pa + 2*b_start.B.y()*pb + 2*(1 - pa)*(a_end.A.y() - a_start.A.y()) + 2*(b_end.A.y() - b_start.A.y())*(pb - 1))*(pa*(a_end.B.y() + a_start.B.y()*(1 - t)) - pb*(b_end.B.y() + b_start.B.y()*(1 - t)) + (1 - pa)*(a_end.A.y()*t + a_start.A.y()*(1 - t)) - (1 - pb)*(b_end.A.y()*t + b_start.A.y()*(1 - t)))/2 - (-2*a_start.B.z()*pa + 2*b_start.B.z()*pb + 2*(1 - pa)*(a_end.A.z() - a_start.A.z()) + 2*(b_end.A.z() - b_start.A.z())*(pb - 1))*(pa*(a_end.B.z() + a_start.B.z()*(1 - t)) - pb*(b_end.B.z() + b_start.B.z()*(1 - t)) + (1 - pa)*(a_end.A.z()*t + a_start.A.z()*(1 - t)) - (1 - pb)*(b_end.A.z()*t + b_start.A.z()*(1 - t)))/2)*((-2*a_start.B.x()*pa + 2*b_start.B.x()*pb + 2*(1 - pa)*(a_end.A.x() - a_start.A.x()) + 2*(b_end.A.x() - b_start.A.x())*(pb - 1))*(pa*(a_end.B.x() + a_start.B.x()*(1 - t)) - pb*(b_end.B.x() + b_start.B.x()*(1 - t)) + (1 - pa)*(a_end.A.x()*t + a_start.A.x()*(1 - t)) - (1 - pb)*(b_end.A.x()*t + b_start.A.x()*(1 - t)))/2 + (-2*a_start.B.y()*pa + 2*b_start.B.y()*pb + 2*(1 - pa)*(a_end.A.y() - a_start.A.y()) + 2*(b_end.A.y() - b_start.A.y())*(pb - 1))*(pa*(a_end.B.y() + a_start.B.y()*(1 - t)) - pb*(b_end.B.y() + b_start.B.y()*(1 - t)) + (1 - pa)*(a_end.A.y()*t + a_start.A.y()*(1 - t)) - (1 - pb)*(b_end.A.y()*t + b_start.A.y()*(1 - t)))/2 + (-2*a_start.B.z()*pa + 2*b_start.B.z()*pb + 2*(1 - pa)*(a_end.A.z() - a_start.A.z()) + 2*(b_end.A.z() - b_start.A.z())*(pb - 1))*(pa*(a_end.B.z() + a_start.B.z()*(1 - t)) - pb*(b_end.B.z() + b_start.B.z()*(1 - t)) + (1 - pa)*(a_end.A.z()*t + a_start.A.z()*(1 - t)) - (1 - pb)*(b_end.A.z()*t + b_start.A.z()*(1 - t)))/2)/std::pow(std::pow(pa*(a_end.B.x() + a_start.B.x()*(1 - t)) - pb*(b_end.B.x() + b_start.B.x()*(1 - t)) + (1 - pa)*(a_end.A.x()*t + a_start.A.x()*(1 - t)) - (1 - pb)*(b_end.A.x()*t + b_start.A.x()*(1 - t)), 2)+std::pow(pa*(a_end.B.y() + a_start.B.y()*(1 - t)) - pb*(b_end.B.y() + b_start.B.y()*(1 - t)) + (1 - pa)*(a_end.A.y()*t + a_start.A.y()*(1 - t)) - (1 - pb)*(b_end.A.y()*t + b_start.A.y()*(1 - t)), 2) + std::pow(pa*(a_end.B.z() + a_start.B.z()*(1 - t)) - pb*(b_end.B.z() + b_start.B.z()*(1 - t)) + (1 - pa)*(a_end.A.z()*t + a_start.A.z()*(1 - t)) - (1 - pb)*(b_end.A.z()*t + b_start.A.z()*(1 - t)), 2), (3.0/2.0));
-
-                    real alpha = 1.0 / (1.0 + iter);
-
-                    t = t - t_diff / t_diff2;
-                    t = common::clamp01(t);
-                }
-
-                /*
-                Initialising the search at the other side might be a good idea in terms of getting the smallest distance
-                but it's probably better to get a smaller t if the distance increases and then decreases again later.
-                Plus (ie. the real reason), this loop is super expensive.
-                t = 1.0;
-
-                for (int iter = 0; iter < 20; iter++) {
-                    common::Edge<real> a_t_edge(common::lerp(a_start.A, a_end.A, t), common::lerp(a_start.B, a_end.B, t));
-                    common::Edge<real> b_t_edge(common::lerp(b_start.A, b_end.A, t), common::lerp(b_start.B, b_end.B, t));
-
-                    Eigen::Vector<real, 3> P, Q;
-                    
-                    real dist = a_t_edge.closest(b_t_edge, P, Q);
-
-                    if (dist < min_dist) {
-                        min_dist = dist;
-                        P_out = P;
-                        Q_out = Q;
-                        toc_out = t;
-                    }
-
-                    real pa = a_t_edge.project(P);
-                    real pb = b_t_edge.project(Q);
-
-                    real t_diff = ((-2*a_start.B.x()*pa + 2*b_start.B.x()*pb + 2*(1 - pa)*(a_end.A.x() - a_start.A.x()) + 2*(b_end.A.x() - b_start.A.x())*(pb - 1))*(pa*(a_end.B.x() + a_start.B.x()*(1 - t)) - pb*(b_end.B.x() + b_start.B.x()*(1 - t)) + (1 - pa)*(a_end.A.x()*t + a_start.A.x()*(1 - t)) - (1 - pb)*(b_end.A.x()*t + b_start.A.x()*(1 - t)))/2 + (-2*a_start.B.y()*pa + 2*b_start.B.y()*pb + 2*(1 - pa)*(a_end.A.y() - a_start.A.y()) + 2*(b_end.A.y() - b_start.A.y())*(pb - 1))*(pa*(a_end.B.y() + a_start.B.y()*(1 - t)) - pb*(b_end.B.y() + b_start.B.y()*(1 - t)) + (1 - pa)*(a_end.A.y()*t + a_start.A.y()*(1 - t)) - (1 - pb)*(b_end.A.y()*t + b_start.A.y()*(1 - t)))/2 + (-2*a_start.B.z()*pa + 2*b_start.B.z()*pb + 2*(1 - pa)*(a_end.A.z() - a_start.A.z()) + 2*(b_end.A.z() - b_start.A.z())*(pb - 1))*(pa*(a_end.B.z() + a_start.B.z()*(1 - t)) - pb*(b_end.B.z() + b_start.B.z()*(1 - t)) + (1 - pa)*(a_end.A.z()*t + a_start.A.z()*(1 - t)) - (1 - pb)*(b_end.A.z()*t + b_start.A.z()*(1 - t)))/2)/sqrt(std::pow(pa*(a_end.B.x() + a_start.B.x()*(1 - t)) - pb*(b_end.B.x() + b_start.B.x()*(1 - t)) + (1 - pa)*(a_end.A.x()*t + a_start.A.x()*(1 - t)) - (1 - pb)*(b_end.A.x()*t + b_start.A.x()*(1 - t)), 2) + std::pow(pa*(a_end.B.y() + a_start.B.y()*(1 - t)) - pb*(b_end.B.y() + b_start.B.y()*(1 - t)) + (1 - pa)*(a_end.A.y()*t + a_start.A.y()*(1 - t)) - (1 - pb)*(b_end.A.y()*t + b_start.A.y()*(1 - t)), 2) + std::pow(pa*(a_end.B.z() + a_start.B.z()*(1 - t)) - pb*(b_end.B.z() + b_start.B.z()*(1 - t)) + (1 - pa)*(a_end.A.z()*t + a_start.A.z()*(1 - t)) - (1 - pb)*(b_end.A.z()*t + b_start.A.z()*(1 - t)), 2));
-                    real t_diff2 = ((-2*a_start.B.x()*pa + 2*b_start.B.x()*pb + 2*(1 - pa)*(a_end.A.x() - a_start.A.x()) + 2*(b_end.A.x() - b_start.A.x())*(pb - 1))*(-a_start.B.x()*pa/2 + b_start.B.x()*pb/2 + (1 - pa)*(a_end.A.x() - a_start.A.x())/2 + (b_end.A.x() - b_start.A.x())*(pb - 1)/2) + (-2*a_start.B.y()*pa + 2*b_start.B.y()*pb + 2*(1 - pa)*(a_end.A.y() - a_start.A.y()) + 2*(b_end.A.y() - b_start.A.y())*(pb - 1))*(-a_start.B.y()*pa/2 + b_start.B.y()*pb/2 + (1 - pa)*(a_end.A.y() - a_start.A.y())/2 + (b_end.A.y() - b_start.A.y())*(pb - 1)/2) + (-2*a_start.B.z()*pa + 2*b_start.B.z()*pb + 2*(1 - pa)*(a_end.A.z() - a_start.A.z()) + 2*(b_end.A.z() - b_start.A.z())*(pb - 1))*(-a_start.B.z()*pa/2 + b_start.B.z()*pb/2 + (1 - pa)*(a_end.A.z() - a_start.A.z())/2 + (b_end.A.z() - b_start.A.z())*(pb - 1)/2))/sqrt(std::pow(pa*(a_end.B.x() + a_start.B.x()*(1 - t)) - pb*(b_end.B.x() + b_start.B.x()*(1 - t)) + (1 - pa)*(a_end.A.x()*t + a_start.A.x()*(1 - t)) - (1 - pb)*(b_end.A.x()*t + b_start.A.x()*(1 - t)), 2) + std::pow(pa*(a_end.B.y() + a_start.B.y()*(1 - t)) - pb*(b_end.B.y() + b_start.B.y()*(1 - t)) + (1 - pa)*(a_end.A.y()*t + a_start.A.y()*(1 - t)) - (1 - pb)*(b_end.A.y()*t + b_start.A.y()*(1 - t)), 2) + std::pow(pa*(a_end.B.z() + a_start.B.z()*(1 - t)) - pb*(b_end.B.z() + b_start.B.z()*(1 - t)) + (1 - pa)*(a_end.A.z()*t + a_start.A.z()*(1 - t)) - (1 - pb)*(b_end.A.z()*t + b_start.A.z()*(1 - t)), 2) ) + (-(-2*a_start.B.x()*pa + 2*b_start.B.x()*pb + 2*(1 - pa)*(a_end.A.x() - a_start.A.x()) + 2*(b_end.A.x() - b_start.A.x())*(pb - 1))*(pa*(a_end.B.x() + a_start.B.x()*(1 - t)) - pb*(b_end.B.x() + b_start.B.x()*(1 - t)) + (1 - pa)*(a_end.A.x()*t + a_start.A.x()*(1 - t)) - (1 - pb)*(b_end.A.x()*t + b_start.A.x()*(1 - t)))/2 - (-2*a_start.B.y()*pa + 2*b_start.B.y()*pb + 2*(1 - pa)*(a_end.A.y() - a_start.A.y()) + 2*(b_end.A.y() - b_start.A.y())*(pb - 1))*(pa*(a_end.B.y() + a_start.B.y()*(1 - t)) - pb*(b_end.B.y() + b_start.B.y()*(1 - t)) + (1 - pa)*(a_end.A.y()*t + a_start.A.y()*(1 - t)) - (1 - pb)*(b_end.A.y()*t + b_start.A.y()*(1 - t)))/2 - (-2*a_start.B.z()*pa + 2*b_start.B.z()*pb + 2*(1 - pa)*(a_end.A.z() - a_start.A.z()) + 2*(b_end.A.z() - b_start.A.z())*(pb - 1))*(pa*(a_end.B.z() + a_start.B.z()*(1 - t)) - pb*(b_end.B.z() + b_start.B.z()*(1 - t)) + (1 - pa)*(a_end.A.z()*t + a_start.A.z()*(1 - t)) - (1 - pb)*(b_end.A.z()*t + b_start.A.z()*(1 - t)))/2)*((-2*a_start.B.x()*pa + 2*b_start.B.x()*pb + 2*(1 - pa)*(a_end.A.x() - a_start.A.x()) + 2*(b_end.A.x() - b_start.A.x())*(pb - 1))*(pa*(a_end.B.x() + a_start.B.x()*(1 - t)) - pb*(b_end.B.x() + b_start.B.x()*(1 - t)) + (1 - pa)*(a_end.A.x()*t + a_start.A.x()*(1 - t)) - (1 - pb)*(b_end.A.x()*t + b_start.A.x()*(1 - t)))/2 + (-2*a_start.B.y()*pa + 2*b_start.B.y()*pb + 2*(1 - pa)*(a_end.A.y() - a_start.A.y()) + 2*(b_end.A.y() - b_start.A.y())*(pb - 1))*(pa*(a_end.B.y() + a_start.B.y()*(1 - t)) - pb*(b_end.B.y() + b_start.B.y()*(1 - t)) + (1 - pa)*(a_end.A.y()*t + a_start.A.y()*(1 - t)) - (1 - pb)*(b_end.A.y()*t + b_start.A.y()*(1 - t)))/2 + (-2*a_start.B.z()*pa + 2*b_start.B.z()*pb + 2*(1 - pa)*(a_end.A.z() - a_start.A.z()) + 2*(b_end.A.z() - b_start.A.z())*(pb - 1))*(pa*(a_end.B.z() + a_start.B.z()*(1 - t)) - pb*(b_end.B.z() + b_start.B.z()*(1 - t)) + (1 - pa)*(a_end.A.z()*t + a_start.A.z()*(1 - t)) - (1 - pb)*(b_end.A.z()*t + b_start.A.z()*(1 - t)))/2)/std::pow(std::pow(pa*(a_end.B.x() + a_start.B.x()*(1 - t)) - pb*(b_end.B.x() + b_start.B.x()*(1 - t)) + (1 - pa)*(a_end.A.x()*t + a_start.A.x()*(1 - t)) - (1 - pb)*(b_end.A.x()*t + b_start.A.x()*(1 - t)), 2)+std::pow(pa*(a_end.B.y() + a_start.B.y()*(1 - t)) - pb*(b_end.B.y() + b_start.B.y()*(1 - t)) + (1 - pa)*(a_end.A.y()*t + a_start.A.y()*(1 - t)) - (1 - pb)*(b_end.A.y()*t + b_start.A.y()*(1 - t)), 2) + std::pow(pa*(a_end.B.z() + a_start.B.z()*(1 - t)) - pb*(b_end.B.z() + b_start.B.z()*(1 - t)) + (1 - pa)*(a_end.A.z()*t + a_start.A.z()*(1 - t)) - (1 - pb)*(b_end.A.z()*t + b_start.A.z()*(1 - t)), 2), (3.0/2.0));
-
-                    real alpha = 1.0 / (1.0 + iter);
-
-                    t = t - t_diff / t_diff2;
-                    t = common::clamp01(t);
-                }*/
-            }
-            return min_dist;
-        }
-        template float edgeEdgeCCD(const Delta2::common::Edge<float>&, const Delta2::common::Edge<float>&, const Delta2::common::Edge<float>&, const Delta2::common::Edge<float>&, float search_dist, Eigen::Vector<float, 3>&, Eigen::Vector<float, 3>&, float&);
-        template double edgeEdgeCCD(const Delta2::common::Edge<double>&, const Delta2::common::Edge<double>&, const Delta2::common::Edge<double>&, const Delta2::common::Edge<double>&, double search_dist, Eigen::Vector<double, 3>&, Eigen::Vector<double, 3>&, double&);
+        double edgeEdgeCCD(const common::Edge<double>& a_start, const common::Edge<double>& a_end, const common::Edge<double>& b_start, const common::Edge<double>& b_end, double search_dist, Eigen::Vector<double, 3>& P_out, Eigen::Vector<double, 3>& Q_out, double& toc_out);
+        float edgeEdgeCCD(const common::Edge<float>& a_start, const common::Edge<float>& a_end, const common::Edge<float>& b_start, const common::Edge<float>& b_end, float search_dist, Eigen::Vector<float, 3>& P_out, Eigen::Vector<float, 3>& Q_out, float& toc_out);
 
         /**
          * Return the shortest distance between two triangles as their points are linearly interpolated through the time interval 0-1
@@ -852,7 +730,7 @@ namespace Delta2 {
 
         // TODO actually needs vectorising
         template<int branching, class real>
-		void findContactsBucketConnectedContinuousComparison(std::vector<DeferredCompare>& bucket_pairs, Particle& a, Particle& b, std::vector<ContinuousContact<real>>& hits, std::vector<int>& pair_used_out) {
+		void findContactsBucketConnectedContinuousComparison(std::vector<DeferredCompare>& bucket_pairs, Particle& a, Particle& b, std::vector<ContinuousContact<real>>& hits, double max_toc, std::vector<int>& pair_used_out) {
 			int total_vert_tri = 0;
             int total_edge_edge = 0;
             
@@ -882,7 +760,8 @@ namespace Delta2 {
                         real toc;
                         real dist = Delta2::collision::pointTriCCDLinear(a_vert, a_t_start, a_t_end, b_tri, b_t_start, b_t_end, P, Q, toc);
 
-						if (dist < search_dist) {
+						if (dist < search_dist && toc <= max_toc) {
+						// if (dist < search_dist) {
 							ContinuousContact<real> ci(P, Q, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
 							hits.push_back(ci);
 						}
@@ -895,7 +774,8 @@ namespace Delta2 {
                         real toc;
                         real dist = Delta2::collision::pointTriCCDLinear(b_vert, b_t_start, b_t_end, a_tri, a_t_start, a_t_end, P, Q, toc);
 
-						if (dist < search_dist) {
+						if (dist < search_dist && toc <= max_toc) {
+						// if (dist < search_dist) {
 							ContinuousContact<real> ci(Q, P, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
 							hits.push_back(ci);
 						}
@@ -922,7 +802,8 @@ namespace Delta2 {
                         real toc;
                         real dist = Delta2::collision::edgeEdgeCCD(a_edge_start, a_edge_end, b_edge_start, b_edge_end, search_dist, P, Q, toc);
 
-						if (dist < search_dist) {
+						if (dist < search_dist && toc <= max_toc) {
+						// if (dist < search_dist) {
 							ContinuousContact<real> ci(Q, P, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
 							hits.push_back(ci);
 						}
