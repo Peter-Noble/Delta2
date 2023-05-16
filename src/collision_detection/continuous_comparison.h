@@ -683,7 +683,7 @@ namespace Delta2 {
         template double triTriCCDLinear(const Delta2::common::Triangle<double>&, const Eigen::Matrix4d&, const Eigen::Matrix4d&, const Delta2::common::Triangle<double>&, const Eigen::Matrix4d&, const Eigen::Matrix4d&, Eigen::Vector3d&, Eigen::Vector3d&, double&);
 
         template<int branching, class bucket_real>
-		void findContactsBucketContinuousComparison(std::vector<DeferredCompare>& bucket_pairs, Particle& a, Particle& b, std::vector<ContinuousContact<bucket_real>>& hits, std::vector<int>& pair_used_out) {
+		void findContactsBucketContinuousComparison(std::vector<DeferredCompare>& bucket_pairs, Particle& a, Particle& b, std::vector<ContinuousContact<bucket_real>>& hits, bucket_real max_toc, std::vector<int>& pair_used_out) {
             // __itt_string_handle* continuous_soup_bucket_task = __itt_string_handle_create("Continuous soup bucket");
             // __itt_string_handle* continuous_soup_triangle_task = __itt_string_handle_create("Continuous soup triangle");
             
@@ -715,7 +715,7 @@ namespace Delta2 {
                             bucket_real toc;
                             bucket_real dist = Delta2::collision::triTriCCDLinear(a_tri, a_t_start, a_t_end, b_tri, b_t_start, b_t_end, P, Q, toc);
 
-                            if (dist < search_dist) {
+                            if (dist < search_dist && toc <= max_toc) {
                                 ContinuousContact<bucket_real> ci(P, Q, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
                                 hits.push_back(ci);
                             }

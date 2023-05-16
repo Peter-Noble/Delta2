@@ -4,6 +4,7 @@
 #include "../model/collision_state.h"
 #include "comparison_dist.h"
 #include "continuous_comparison.h"
+#include "../globals.h"
 // #include <ittnotify.h>
 #include "contact_state.h"
 #include "../strategies/contact_detection/contact_detection_strategy.h"
@@ -180,8 +181,8 @@ namespace Delta2 {
 
         template<typename real, int branching, int bucket_size>
         std::vector<ContinuousContact<real>> compareTreesFullContinuous(Particle& a, Particle& b, real max_time, real& min_time_out) {
-            // __itt_string_handle* bucket_contact_soup_task = __itt_string_handle_create("findContactsBucketContinuousComparison");
-            // __itt_string_handle* bucket_contact_connected_task = __itt_string_handle_create("findContactsBucketConnectedContinuousComparison");
+            __itt_string_handle* bucket_contact_soup_task = __itt_string_handle_create("findContactsBucketContinuousComparison");
+            __itt_string_handle* bucket_contact_connected_task = __itt_string_handle_create("findContactsBucketConnectedContinuousComparison");
             
             std::vector<ContinuousContact<real>> result;
             
@@ -203,9 +204,9 @@ namespace Delta2 {
                 hits.clear();
                 num_hits.clear();
 
-                // __itt_task_begin(domain, __itt_null, __itt_null, bucket_contact_soup_task);
-                findContactsBucketContinuousComparison<branching, real>(dc_soup, a, b, hits, num_hits);
-                // __itt_task_end(domain);
+                __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, bucket_contact_soup_task);
+                findContactsBucketContinuousComparison<branching, real>(dc_soup, a, b, hits, min_time_out / max_time, num_hits);
+                __itt_task_end(globals::itt_handles.detailed_domain);
 
                 int last_hit_num = 0;
                 for (int i = 0; i < dc_soup.size(); i++) {
@@ -264,9 +265,9 @@ namespace Delta2 {
                 hits.clear();
                 num_hits.clear();
                 
-                // __itt_task_begin(domain, __itt_null, __itt_null, bucket_contact_connected_task);
+                __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, bucket_contact_connected_task);
                 findContactsBucketConnectedContinuousComparison<branching, real>(dc_connected, a, b, hits, min_time_out / max_time, num_hits);
-                // __itt_task_end(domain);
+                __itt_task_end(globals::itt_handles.detailed_domain);
 
                 last_hit_num = 0;
                 for (int i = 0; i < dc_connected.size(); i++) {

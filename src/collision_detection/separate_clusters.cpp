@@ -610,6 +610,7 @@ std::vector<collision::Cluster> collision::separateCollisionClusters(collision::
 
 void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
     // __itt_string_handle* time_step_selection_pair_task = __itt_string_handle_create("Time step selection pair task");
+    __itt_string_handle* compare_trees_full_continuous_task = __itt_string_handle_create("Compare trees full continuous");
 
     int num_particles = cluster.particles.size();
     std::vector<double> step_size;
@@ -649,7 +650,9 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
             double min_time;
 
+            __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_trees_full_continuous_task);
             std::vector<collision::ContinuousContact<double>> Ccs = collision::compareTreesFullContinuous<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], max_time_step_for_pair, min_time);
+            __itt_task_end(globals::itt_handles.detailed_domain);
 
             if (Ccs.size() > 0) {
                 double min_scaling_seen = 1.0;
