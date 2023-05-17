@@ -5,7 +5,11 @@
 #include "../model/collision_state.h"
 #include "contact.h"
 #include "../common/viewer.h"
-// #include <ittnotify.h>
+#include "../globals.h"
+
+#include "tbb/tbb.h"
+
+#include <ittnotify.h>
 
 namespace Delta2 {
     namespace collision {
@@ -684,8 +688,8 @@ namespace Delta2 {
 
         template<int branching, class bucket_real>
 		void findContactsBucketContinuousComparison(std::vector<DeferredCompare>& bucket_pairs, Particle& a, Particle& b, std::vector<ContinuousContact<bucket_real>>& hits, bucket_real max_toc, std::vector<int>& pair_used_out) {
-            // __itt_string_handle* continuous_soup_bucket_task = __itt_string_handle_create("Continuous soup bucket");
-            // __itt_string_handle* continuous_soup_triangle_task = __itt_string_handle_create("Continuous soup triangle");
+            __itt_string_handle* continuous_soup_bucket_task = __itt_string_handle_create("Continuous soup bucket");
+            __itt_string_handle* continuous_soup_triangle_task = __itt_string_handle_create("Continuous soup triangle");
             
             float search_dist = a.geo_eps + b.geo_eps;
             pair_used_out.reserve(bucket_pairs.size());
@@ -696,36 +700,56 @@ namespace Delta2 {
             Eigen::Matrix<bucket_real, 4, 4> b_t_start = b.current_state.getTransformation().cast<bucket_real>();
             Eigen::Matrix<bucket_real, 4, 4> b_t_end = b.future_state.getTransformation().cast<bucket_real>();
 
-			for (DeferredCompare& dc : bucket_pairs) {
-                // __itt_task_begin(domain, __itt_null, __itt_null, continuous_soup_bucket_task);
-				std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
-				std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
+            std::vector<std::vector<ContinuousContact<bucket_real>>> hits_tmp;
+            for (int d = 0; d < bucket_pairs.size(); d++) {
+                hits_tmp.push_back({});
+            }
 
-                // TODO loop over vertices and edges rather than triangles to reduce duplicated checks
-				for (common::Triangle<bucket_real>& a_tri : a_bucket->getTriangles()) {
-                    common::bbox<bucket_real> a_bbox = a_tri.transformed(a_t_start).bbox().expand(a_tri.transformed(a_t_end).bbox()).expand(a.geo_eps);
+            const int parallel_grain_size = 10;
+            int max_concurrency = std::min(tbb::info::default_concurrency(), (int)bucket_pairs.size() / parallel_grain_size);
+            tbb::task_arena arena(max_concurrency);
+            arena.execute([&] {
+                tbb::parallel_for(tbb::blocked_range<int>(0, bucket_pairs.size(), parallel_grain_size),
+                                [&](tbb::blocked_range<int> r) {
+                    for (int d = r.begin(); d < r.end(); d++) {
+                        DeferredCompare& dc = bucket_pairs[d];
+                        // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, continuous_soup_bucket_task);
+                        std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
+                        std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
 
-                    for (common::Triangle<bucket_real>& b_tri : b_bucket->getTriangles()) {
-                        // __itt_task_begin(domain, __itt_null, __itt_null, continuous_soup_triangle_task);
-                    
-                        common::bbox<bucket_real> b_bbox = b_tri.transformed(b_t_start).bbox().expand(b_tri.transformed(b_t_end).bbox()).expand(b.geo_eps);
+                        // TODO loop over vertices and edges rather than triangles to reduce duplicated checks
+                        for (common::Triangle<bucket_real>& a_tri : a_bucket->getTriangles()) {
+                            common::bbox<bucket_real> a_bbox = a_tri.transformed(a_t_start).bbox().expand(a_tri.transformed(a_t_end).bbox()).expand(a.geo_eps);
 
-                        if (a_bbox.overlap(b_bbox)) {
-                            Eigen::Vector<bucket_real, 3> P, Q;
-                            bucket_real toc;
-                            bucket_real dist = Delta2::collision::triTriCCDLinear(a_tri, a_t_start, a_t_end, b_tri, b_t_start, b_t_end, P, Q, toc);
+                            for (common::Triangle<bucket_real>& b_tri : b_bucket->getTriangles()) {
+                                // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, continuous_soup_triangle_task);
+                            
+                                common::bbox<bucket_real> b_bbox = b_tri.transformed(b_t_start).bbox().expand(b_tri.transformed(b_t_end).bbox()).expand(b.geo_eps);
 
-                            if (dist < search_dist && toc <= max_toc) {
-                                ContinuousContact<bucket_real> ci(P, Q, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
-                                hits.push_back(ci);
+                                if (a_bbox.overlap(b_bbox)) {
+                                    Eigen::Vector<bucket_real, 3> P, Q;
+                                    bucket_real toc;
+                                    bucket_real dist = Delta2::collision::triTriCCDLinear(a_tri, a_t_start, a_t_end, b_tri, b_t_start, b_t_end, P, Q, toc);
+
+                                    if (dist < search_dist && toc <= max_toc && toc < 1.0) {
+                                        ContinuousContact<bucket_real> ci(P, Q, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
+                                        hits_tmp[d].push_back(ci);
+                                    }
+                                }
+                                // __itt_task_end(globals::itt_handles.detailed_domain);
                             }
                         }
-                        // __itt_task_end(domain);
+                        // __itt_task_end(globals::itt_handles.detailed_domain);
                     }
-				}
+                });
+            });
+
+            for (int d = 0; d < bucket_pairs.size(); d++) {
+                for (int t = 0; t < hits_tmp[d].size(); t++) {
+                    hits.push_back(hits_tmp[d][t]);
+                }
                 pair_used_out.push_back(hits.size());
-                // __itt_task_end(domain);
-			}
+            }
 		};
 
         // TODO actually needs vectorising
@@ -738,79 +762,99 @@ namespace Delta2 {
             pair_used_out.reserve(bucket_pairs.size());
             pair_used_out.clear();
 
-			for (DeferredCompare& dc : bucket_pairs) {
-				std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
-				std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
+            std::vector<std::vector<ContinuousContact<real>>> hits_tmp;
+            for (int d = 0; d < bucket_pairs.size(); d++) {
+                hits_tmp.push_back({});
+            }
 
-                Eigen::Matrix<real, 4, 4> a_t_start = a.current_state.getTransformation().cast<real>();
-                Eigen::Matrix<real, 4, 4> a_t_end = a.future_state.getTransformation().cast<real>();
-                Eigen::Matrix<real, 4, 4> b_t_start = b.current_state.getTransformation().cast<real>();
-                Eigen::Matrix<real, 4, 4> b_t_end = b.future_state.getTransformation().cast<real>();
+            const int parallel_grain_size = 10;
+            int max_concurrency = std::min(tbb::info::default_concurrency(), (int)bucket_pairs.size() / parallel_grain_size);
+            tbb::task_arena arena(max_concurrency);
+            arena.execute([&] {
+                tbb::parallel_for(tbb::blocked_range<int>(0, bucket_pairs.size(), parallel_grain_size),
+                                [&](tbb::blocked_range<int> r) {
+                    for (int d = r.begin(); d < r.end(); d++) {
+                        DeferredCompare& dc = bucket_pairs[d];
+                        std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
+                        std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
 
-                std::vector<Eigen::Vector<real, 3>> a_verts = a_bucket->getVertices();
-                std::vector<Eigen::Vector<real, 3>> b_verts = b_bucket->getVertices();
+                        Eigen::Matrix<real, 4, 4> a_t_start = a.current_state.getTransformation().cast<real>();
+                        Eigen::Matrix<real, 4, 4> a_t_end = a.future_state.getTransformation().cast<real>();
+                        Eigen::Matrix<real, 4, 4> b_t_start = b.current_state.getTransformation().cast<real>();
+                        Eigen::Matrix<real, 4, 4> b_t_end = b.future_state.getTransformation().cast<real>();
 
-                std::vector<common::Edge<real>> a_edges = a_bucket->getEdges();
-                std::vector<common::Edge<real>> b_edges = b_bucket->getEdges();
+                        std::vector<Eigen::Vector<real, 3>> a_verts = a_bucket->getVertices();
+                        std::vector<Eigen::Vector<real, 3>> b_verts = b_bucket->getVertices();
 
-                // Compare a verts to b tris
-                for (Eigen::Vector<real, 3>& a_vert : a_bucket->getVertices()) {
-                    for (common::Triangle<real>& b_tri : b_bucket->getTriangles()) {
-                        Eigen::Vector<real, 3> P, Q;
-                        real toc;
-                        real dist = Delta2::collision::pointTriCCDLinear(a_vert, a_t_start, a_t_end, b_tri, b_t_start, b_t_end, P, Q, toc);
+                        std::vector<common::Edge<real>> a_edges = a_bucket->getEdges();
+                        std::vector<common::Edge<real>> b_edges = b_bucket->getEdges();
 
-						if (dist < search_dist && toc <= max_toc) {
-						// if (dist < search_dist) {
-							ContinuousContact<real> ci(P, Q, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
-							hits.push_back(ci);
-						}
+                        // Compare a verts to b tris
+                        for (Eigen::Vector<real, 3>& a_vert : a_bucket->getVertices()) {
+                            for (common::Triangle<real>& b_tri : b_bucket->getTriangles()) {
+                                Eigen::Vector<real, 3> P, Q;
+                                real toc;
+                                real dist = Delta2::collision::pointTriCCDLinear(a_vert, a_t_start, a_t_end, b_tri, b_t_start, b_t_end, P, Q, toc);
+
+                                if (dist < search_dist && toc <= max_toc && toc < 1.0) {
+                                // if (dist < search_dist) {
+                                    ContinuousContact<real> ci(P, Q, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
+                                    hits_tmp[d].push_back(ci);
+                                }
+                            }
+                        }
+                        // Compare b verts to a tris
+                        for (Eigen::Vector<real, 3>& b_vert : b_bucket->getVertices()) {
+                            for (common::Triangle<real>& a_tri : a_bucket->getTriangles()) {
+                                Eigen::Vector<real, 3> P, Q;
+                                real toc;
+                                real dist = Delta2::collision::pointTriCCDLinear(b_vert, b_t_start, b_t_end, a_tri, a_t_start, a_t_end, P, Q, toc);
+
+                                if (dist < search_dist && toc <= max_toc && toc < 1.0) {
+                                // if (dist < search_dist) {
+                                    ContinuousContact<real> ci(Q, P, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
+                                    hits_tmp[d].push_back(ci);
+                                }
+                            }
+                        }
+
+                        // Compare a edges to b edges
+                        for (common::Edge<real>& a_edge : a_bucket->getEdges()) {
+                            Eigen::Vector<real, 3> a_start_A = common::transform(a_edge.A, a_t_start);
+                            Eigen::Vector<real, 3> a_start_B = common::transform(a_edge.B, a_t_start);
+                            common::Edge<real> a_edge_start(a_start_A, a_start_B);
+                            Eigen::Vector<real, 3> a_end_A = common::transform(a_edge.A, a_t_end);
+                            Eigen::Vector<real, 3> a_end_B = common::transform(a_edge.B, a_t_end);
+                            common::Edge<real> a_edge_end(a_end_A, a_end_B);
+                            for (common::Edge<real>& b_edge : b_bucket->getEdges()) {
+                                Eigen::Vector<real, 3> b_start_A = common::transform(b_edge.A, b_t_start);
+                                Eigen::Vector<real, 3> b_start_B = common::transform(b_edge.B, b_t_start);
+                                common::Edge<real> b_edge_start(b_start_A, b_start_B);
+                                Eigen::Vector<real, 3> b_end_A = common::transform(b_edge.A, b_t_end);
+                                Eigen::Vector<real, 3> b_end_B = common::transform(b_edge.B, b_t_end);
+                                common::Edge<real> b_edge_end(b_end_A, b_end_B);
+                                
+                                Eigen::Vector<real, 3> P, Q;
+                                real toc;
+                                real dist = Delta2::collision::edgeEdgeCCD(a_edge_start, a_edge_end, b_edge_start, b_edge_end, search_dist, P, Q, toc);
+
+                                if (dist < search_dist && toc <= max_toc && toc < 1.0) {
+                                // if (dist < search_dist) {
+                                    ContinuousContact<real> ci(Q, P, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
+                                    hits_tmp[d].push_back(ci);
+                                }
+                            }
+                        }
                     }
-                }
-                // Compare b verts to a tris
-                for (Eigen::Vector<real, 3>& b_vert : b_bucket->getVertices()) {
-                    for (common::Triangle<real>& a_tri : a_bucket->getTriangles()) {
-                        Eigen::Vector<real, 3> P, Q;
-                        real toc;
-                        real dist = Delta2::collision::pointTriCCDLinear(b_vert, b_t_start, b_t_end, a_tri, a_t_start, a_t_end, P, Q, toc);
+                });
+            });
 
-						if (dist < search_dist && toc <= max_toc) {
-						// if (dist < search_dist) {
-							ContinuousContact<real> ci(Q, P, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
-							hits.push_back(ci);
-						}
-                    }
-                }
-
-                // Compare a edges to b edges
-                for (common::Edge<real>& a_edge : a_bucket->getEdges()) {
-                    Eigen::Vector<real, 3> a_start_A = common::transform(a_edge.A, a_t_start);
-                    Eigen::Vector<real, 3> a_start_B = common::transform(a_edge.B, a_t_start);
-                    common::Edge<real> a_edge_start(a_start_A, a_start_B);
-                    Eigen::Vector<real, 3> a_end_A = common::transform(a_edge.A, a_t_end);
-                    Eigen::Vector<real, 3> a_end_B = common::transform(a_edge.B, a_t_end);
-                    common::Edge<real> a_edge_end(a_end_A, a_end_B);
-                    for (common::Edge<real>& b_edge : b_bucket->getEdges()) {
-                        Eigen::Vector<real, 3> b_start_A = common::transform(b_edge.A, b_t_start);
-                        Eigen::Vector<real, 3> b_start_B = common::transform(b_edge.B, b_t_start);
-                        common::Edge<real> b_edge_start(b_start_A, b_start_B);
-                        Eigen::Vector<real, 3> b_end_A = common::transform(b_edge.A, b_t_end);
-                        Eigen::Vector<real, 3> b_end_B = common::transform(b_edge.B, b_t_end);
-                        common::Edge<real> b_edge_end(b_end_A, b_end_B);
-                        
-                        Eigen::Vector<real, 3> P, Q;
-                        real toc;
-                        real dist = Delta2::collision::edgeEdgeCCD(a_edge_start, a_edge_end, b_edge_start, b_edge_end, search_dist, P, Q, toc);
-
-						if (dist < search_dist && toc <= max_toc) {
-						// if (dist < search_dist) {
-							ContinuousContact<real> ci(Q, P, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
-							hits.push_back(ci);
-						}
-                    }
+            for (int d = 0; d < bucket_pairs.size(); d++) {
+                for (int t = 0; t < hits_tmp[d].size(); t++) {
+                    hits.push_back(hits_tmp[d][t]);
                 }
                 pair_used_out.push_back(hits.size());
-			}
+            }
 		};
     }
 }
