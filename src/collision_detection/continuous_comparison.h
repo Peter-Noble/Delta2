@@ -717,14 +717,25 @@ namespace Delta2 {
                         std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
                         std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
 
-                        // TODO loop over vertices and edges rather than triangles to reduce duplicated checks
-                        for (common::Triangle<bucket_real>& a_tri : a_bucket->getTriangles()) {
-                            common::bbox<bucket_real> a_bbox = a_tri.transformed(a_t_start).bbox().expand(a_tri.transformed(a_t_end).bbox()).expand(a.geo_eps);
+                        const std::vector<double>& a_epss = a_bucket->getEps();
+                        const std::vector<double>& a_inner_epss = a_bucket->getInnerEps();
+                        const std::vector<double>& b_epss = b_bucket->getEps();
+                        const std::vector<double>& b_inner_epss = b_bucket->getInnerEps();
 
+                        // TODO loop over vertices and edges rather than triangles to reduce duplicated checks
+                        int a_i = 0;
+                        for (common::Triangle<bucket_real>& a_tri : a_bucket->getTriangles()) {
+                            double a_eps = a_epss[a_i];
+                            double a_inner_eps = a_inner_epss[a_i];
+                            common::bbox<bucket_real> a_bbox = a_tri.transformed(a_t_start).bbox().expand(a_tri.transformed(a_t_end).bbox()).expand(a.geo_eps + a_eps);
+
+                            int b_i = 0;
                             for (common::Triangle<bucket_real>& b_tri : b_bucket->getTriangles()) {
                                 // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, continuous_soup_triangle_task);
+                                double b_eps = b_epss[b_i];
+                                double b_inner_eps = b_inner_epss[b_i];
                             
-                                common::bbox<bucket_real> b_bbox = b_tri.transformed(b_t_start).bbox().expand(b_tri.transformed(b_t_end).bbox()).expand(b.geo_eps);
+                                common::bbox<bucket_real> b_bbox = b_tri.transformed(b_t_start).bbox().expand(b_tri.transformed(b_t_end).bbox()).expand(b.geo_eps + b_eps);
 
                                 if (a_bbox.overlap(b_bbox)) {
                                     Eigen::Vector<bucket_real, 3> P, Q;
@@ -732,12 +743,14 @@ namespace Delta2 {
                                     bucket_real dist = Delta2::collision::triTriCCDLinear(a_tri, a_t_start, a_t_end, b_tri, b_t_start, b_t_end, P, Q, toc);
 
                                     if (dist < search_dist && toc <= max_toc && toc < 1.0) {
-                                        ContinuousContact<bucket_real> ci(P, Q, a.geo_eps, b.geo_eps, 0.0, 0.0, toc, a, b);
+                                        ContinuousContact<bucket_real> ci(P, Q, a_eps, b_eps, a_inner_eps, b_inner_eps, toc, a, b);
                                         hits_tmp[d].push_back(ci);
                                     }
                                 }
+                                b_i++;
                                 // __itt_task_end(globals::itt_handles.detailed_domain);
                             }
+                            a_i++;
                         }
                         // __itt_task_end(globals::itt_handles.detailed_domain);
                     }
