@@ -225,47 +225,71 @@ namespace Delta2 {
                     if (num_hits[i] > last_hit_num) {
                         bool advance_a = false;
                         bool advance_b = false;
+
+                        bool advance = false;
+                        // if (!dc_soup[i].a.is_inner && !dc_soup[i].b.is_inner) {
                         if (!dc_soup[i].a.is_inner && !dc_soup[i].b.is_inner) {
                             result.insert(result.end(), hits.begin() + last_hit_num, hits.begin() + num_hits[i]);
-                            for (ContinuousContact<real>& c : hits) {
+                            for (int c_i = last_hit_num; c_i < num_hits[i]; c_i++) {
+                                ContinuousContact<real>& c = hits[c_i];
                                 min_time_out = std::min(min_time_out, c.toc * max_time);
                             }
-                        }
-                        else if (!dc_soup[i].a.is_inner) {
-                            advance_b = true;
-                        }
-                        else if (!dc_soup[i].b.is_inner) {
-                            advance_a = true;
+                            // for (ContinuousContact<real>& c : hits) {
+                            //     min_time_out = std::min(min_time_out, c.toc * max_time);
+                            // }
                         }
                         else {
-                            // TODO this decision of which to advance first is a little arbitrary.
-                            //    Would probably be better to advance the one with the largest area.
-                            if (dc_soup[i].a.depth < dc_soup[i].b.depth) {
+                            advance = true;
+                            bool all_small = true;
+                            for (int c_i = last_hit_num; c_i < num_hits[i]; c_i++) {
+                                ContinuousContact<real>& c = hits[c_i];
+                                all_small &= c.eps_a < a.geo_eps * 4.0 && c.eps_inner_a < a.geo_eps * 2.0 && c.eps_b < b.geo_eps * 4.0 && c.eps_inner_b < b.geo_eps * 2.0;
+                            }
+                            if (all_small) {
+                                for (int c_i = last_hit_num; c_i < num_hits[i]; c_i++) {
+                                    ContinuousContact<real>& c = hits[c_i];
+                                    min_time_out = std::min(min_time_out, c.toc * max_time);
+                                }
+                            }
+                            advance &= !all_small;
+                        }
+                        if (advance) {
+                            if (!dc_soup[i].a.is_inner) {
+                                advance_b = true;
+                            }
+                            else if (!dc_soup[i].b.is_inner) {
                                 advance_a = true;
                             }
                             else {
-                                advance_b = true;
-                            }
-                        }
-                        if (advance_a) {
-                            for (int c = 0; c < dc_soup[i].a.num_children; c++) {
-                                const model::Node& a_node = a.mesh->getSurrogateTree().getNode(c + dc_soup[i].a.child_id_first);
-                                const model::Node& b_node = dc_soup[i].b;
-                                if (a_node.is_inner || b_node.is_inner) {
-                                    dc_soup_next.emplace_back(a_node, b_node);
-                                } else {
-                                    dc_connected_next.emplace_back(a_node, b_node);
+                                // TODO this decision of which to advance first is a little arbitrary.
+                                //    Would probably be better to advance the one with the largest area.
+                                if (dc_soup[i].a.depth < dc_soup[i].b.depth) {
+                                    advance_a = true;
+                                }
+                                else {
+                                    advance_b = true;
                                 }
                             }
-                        }
-                        else if (advance_b) {
-                            for (int c = 0; c < dc_soup[i].b.num_children; c++) {
-                                const model::Node& a_node = dc_soup[i].a;
-                                const model::Node& b_node = b.mesh->getSurrogateTree().getNode(c + dc_soup[i].b.child_id_first);
-                                if (a_node.is_inner || b_node.is_inner) {
-                                    dc_soup_next.emplace_back(a_node, b_node);
-                                } else {
-                                    dc_connected_next.emplace_back(a_node, b_node);
+                            if (advance_a) {
+                                for (int c = 0; c < dc_soup[i].a.num_children; c++) {
+                                    const model::Node& a_node = a.mesh->getSurrogateTree().getNode(c + dc_soup[i].a.child_id_first);
+                                    const model::Node& b_node = dc_soup[i].b;
+                                    if (a_node.is_inner || b_node.is_inner) {
+                                        dc_soup_next.emplace_back(a_node, b_node);
+                                    } else {
+                                        dc_connected_next.emplace_back(a_node, b_node);
+                                    }
+                                }
+                            }
+                            else if (advance_b) {
+                                for (int c = 0; c < dc_soup[i].b.num_children; c++) {
+                                    const model::Node& a_node = dc_soup[i].a;
+                                    const model::Node& b_node = b.mesh->getSurrogateTree().getNode(c + dc_soup[i].b.child_id_first);
+                                    if (a_node.is_inner || b_node.is_inner) {
+                                        dc_soup_next.emplace_back(a_node, b_node);
+                                    } else {
+                                        dc_connected_next.emplace_back(a_node, b_node);
+                                    }
                                 }
                             }
                         }

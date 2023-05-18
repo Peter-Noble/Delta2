@@ -86,21 +86,21 @@ namespace Delta2 {
                                 if ((px + py + pz) % 2 != 0) {
                                     auto& p = particles.emplace_back(large[Delta2::globals::opt.rand(large.size())], 1.0, 1.0, 0.25);
                                     // auto& p = particles.emplace_back(C, 1.0, 1.0, 0.25);
-                                    p.current_state.setTranslation(centre + Eigen::Vector3d({px * 3.0, py * 3.0, pz * 3}));
+                                    p.current_state.setTranslation(centre + Eigen::Vector3d({px * 3.0, py * 3.0, pz * 2.5}));
                                 }
                             }
                             for (int pz = 0; pz < 3; pz++) {
                                 if ((px + py + pz) % 2 != 0) {
                                     auto& p = particles.emplace_back(medium[Delta2::globals::opt.rand(medium.size())], 1.0, 1.0, 0.25);
                                     // auto& p = particles.emplace_back(C, 1.0, 1.0, 0.25);
-                                    p.current_state.setTranslation(centre + Eigen::Vector3d({px * 5, py * 5, 10 + pz * 3}));
+                                    p.current_state.setTranslation(centre + Eigen::Vector3d({px * 5, py * 5, 4 + pz * 1.75}));
                                 }
                             }
                             for (int pz = 0; pz < 6; pz++) {
                                 if ((px + py + pz) % 2 != 0) {
                                     auto& p = particles.emplace_back(small[Delta2::globals::opt.rand(small.size())], 1.0, 1.0, 0.25);
                                     // auto& p = particles.emplace_back(C, 1.0, 1.0, 0.25);
-                                    p.current_state.setTranslation(centre + Eigen::Vector3d({px * 4.0, py * 4.0, 24 + pz * 3}));
+                                    p.current_state.setTranslation(centre + Eigen::Vector3d({px * 4.0, py * 4.0, 10 + pz * 1}));
                                 }
                             }
                         }
