@@ -13,6 +13,9 @@ namespace Delta2 {
     namespace collision {
         template<typename real, int branching, int bucket_size>
         std::vector<Contact<real>> compareTreesFull(Particle& a, Particle& b, strategy::ContactDetectionStrategy& bucket_comparison) {
+            __itt_string_handle* compare_trees_full_task = __itt_string_handle_create("Compare trees full");
+            __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_trees_full_task);
+            
             std::vector<Contact<real>> result;
             
             std::vector<DeferredCompare> dc;
@@ -64,11 +67,15 @@ namespace Delta2 {
                 dc.swap(dc_next);
                 dc_next.clear();
             }
+            __itt_task_end(globals::itt_handles.detailed_domain);
             return result;
         };
 
         template<typename real, int branching, int bucket_size>
         std::vector<Contact<real>> compareTreesFullCurrent(Particle& a, Particle& b, strategy::ContactDetectionStrategy& bucket_comparison) {
+            __itt_string_handle* compare_trees_full_task = __itt_string_handle_create("Compare trees full current");
+            __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_trees_full_task);
+            
             std::vector<Contact<real>> result;
             
             std::vector<DeferredCompare> dc;
@@ -120,11 +127,15 @@ namespace Delta2 {
                 dc.swap(dc_next);
                 dc_next.clear();
             }
+            __itt_task_end(globals::itt_handles.detailed_domain);
             return result;
         };
 
         template<typename real, int branching, int bucket_size>
         std::vector<Contact<real>> compareTreesFullLast(Particle& a, Particle& b, strategy::ContactDetectionStrategy& bucket_comparison) {
+            __itt_string_handle* compare_trees_full_task = __itt_string_handle_create("Compare trees full last");
+            __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_trees_full_task);
+            
             std::vector<Contact<real>> result;
             
             std::vector<DeferredCompare> dc;
@@ -176,6 +187,7 @@ namespace Delta2 {
                 dc.swap(dc_next);
                 dc_next.clear();
             }
+            __itt_task_end(globals::itt_handles.detailed_domain);
             return result;
         };
 

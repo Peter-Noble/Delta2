@@ -7,6 +7,10 @@
 #include "../model/collision_state.h"
 #include "../common/viewer.h"
 
+#include "tbb/tbb.h"
+
+const int parallel_grain_size = 250;
+
 namespace Delta2 {
 	namespace collision {
         template<typename real>
@@ -216,35 +220,53 @@ namespace Delta2 {
             pair_used_out.reserve(bucket_pairs.size());
             pair_used_out.clear();
 
-			for (const DeferredCompare& dc : bucket_pairs) {
-				std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
-				std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
+            std::vector<std::vector<Contact<real>>> hits_tmp;
+            for (int d = 0; d < bucket_pairs.size(); d++) {
+                hits_tmp.push_back({});
+            }
 
-				std::vector<real> a_epss = a_bucket->getEps();
-				std::vector<real> b_epss = b_bucket->getEps();
-				std::vector<real> a_inner_epss = a_bucket->getInnerEps();
-				std::vector<real> b_inner_epss = b_bucket->getInnerEps();
+            int max_concurrency = std::min(tbb::info::default_concurrency(), (int)bucket_pairs.size() / parallel_grain_size);
+            tbb::task_arena arena(max_concurrency);
+            arena.execute([&] {
+                tbb::parallel_for(tbb::blocked_range<int>(0, bucket_pairs.size(), parallel_grain_size),
+                                [&](tbb::blocked_range<int> r) {
+                    for (int d = r.begin(); d < r.end(); d++) {
+                        const DeferredCompare& dc = bucket_pairs[d];
+                        std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
+                        std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
 
-                // TODO loop over vertices and edges rather than triangles to reduce duplicated checks
-                std::vector<common::Triangle<real>> a_tris = a_bucket->getTriangles();
-                std::vector<common::Triangle<real>> b_tris = b_bucket->getTriangles();
-                for (int a_i = 0; a_i < a_tris.size(); a_i++) {
-                    common::Triangle<real>& a_tri = a_tris[a_i];
-					common::Triangle<real> A = a_tri.transformed(a_trans);
+                        std::vector<real> a_epss = a_bucket->getEps();
+                        std::vector<real> b_epss = b_bucket->getEps();
+                        std::vector<real> a_inner_epss = a_bucket->getInnerEps();
+                        std::vector<real> b_inner_epss = b_bucket->getInnerEps();
 
-                    for (int b_i = 0; b_i < b_tris.size(); b_i++) {
-                        common::Triangle<real>& b_tri = b_tris[b_i];
-                        common::Triangle<real> B = b_tri.transformed(b_trans);
+                        // TODO loop over vertices and edges rather than triangles to reduce duplicated checks
+                        std::vector<common::Triangle<real>> a_tris = a_bucket->getTriangles();
+                        std::vector<common::Triangle<real>> b_tris = b_bucket->getTriangles();
+                        for (int a_i = 0; a_i < a_tris.size(); a_i++) {
+                            common::Triangle<real>& a_tri = a_tris[a_i];
+                            common::Triangle<real> A = a_tri.transformed(a_trans);
 
-                        auto [dist, P, Q] = _comparisonDist(A, B);
-						if (dist < search_dist + a_epss[a_i] + b_epss[b_i]) {
-							Contact<real> ci(P, Q, a.geo_eps + a_epss[a_i], b.geo_eps + b_epss[b_i], a_inner_epss[a_i], b_inner_epss[b_i], a, b);
-							hits.push_back(ci);
-						}
+                            for (int b_i = 0; b_i < b_tris.size(); b_i++) {
+                                common::Triangle<real>& b_tri = b_tris[b_i];
+                                common::Triangle<real> B = b_tri.transformed(b_trans);
+
+                                auto [dist, P, Q] = _comparisonDist(A, B);
+                                if (dist < search_dist + a_epss[a_i] + b_epss[b_i]) {
+                                    Contact<real> ci(P, Q, a.geo_eps + a_epss[a_i], b.geo_eps + b_epss[b_i], a_inner_epss[a_i], b_inner_epss[b_i], a, b);
+                                    hits.push_back(ci);
+                                }
+                            }
+                        }
                     }
-				}
+                });
+            });
+            for (int d = 0; d < bucket_pairs.size(); d++) {
+                for (int t = 0; t < hits_tmp[d].size(); t++) {
+                    hits.push_back(hits_tmp[d][t]);
+                }
                 pair_used_out.push_back(hits.size());
-			}
+            }
 		};
 
         template<int branching, class real>
@@ -253,35 +275,54 @@ namespace Delta2 {
             pair_used_out.reserve(bucket_pairs.size());
             pair_used_out.clear();
 
-			for (const DeferredCompare& dc : bucket_pairs) {
-				std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
-				std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
+            std::vector<std::vector<Contact<real>>> hits_tmp;
+            for (int d = 0; d < bucket_pairs.size(); d++) {
+                hits_tmp.push_back({});
+            }
 
-				std::vector<real> a_epss = a_bucket->getEps();
-				std::vector<real> b_epss = b_bucket->getEps();
-				std::vector<real> a_inner_epss = a_bucket->getInnerEps();
-				std::vector<real> b_inner_epss = b_bucket->getInnerEps();
+            int max_concurrency = std::min(tbb::info::default_concurrency(), (int)bucket_pairs.size() / parallel_grain_size);
+            tbb::task_arena arena(max_concurrency);
+            arena.execute([&] {
+                tbb::parallel_for(tbb::blocked_range<int>(0, bucket_pairs.size(), parallel_grain_size),
+                                [&](tbb::blocked_range<int> r) {
+                    for (int d = r.begin(); d < r.end(); d++) {
+                        const DeferredCompare& dc = bucket_pairs[d];
+                        std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
+                        std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
 
-                // TODO loop over vertices and edges rather than triangles to reduce duplicated checks
-                std::vector<common::Triangle<real>> a_tris = a_bucket->getTriangles();
-                std::vector<common::Triangle<real>> b_tris = b_bucket->getTriangles();
-                for (int a_i = 0; a_i < a_tris.size(); a_i++) {
-                    common::Triangle<real>& a_tri = a_tris[a_i];
-					common::Triangle<real> A = a_tri.transformed(a.future_state.getTransformation().cast<real>());
+                        std::vector<real> a_epss = a_bucket->getEps();
+                        std::vector<real> b_epss = b_bucket->getEps();
+                        std::vector<real> a_inner_epss = a_bucket->getInnerEps();
+                        std::vector<real> b_inner_epss = b_bucket->getInnerEps();
 
-                    for (int b_i = 0; b_i < b_tris.size(); b_i++) {
-                        common::Triangle<real>& b_tri = b_tris[b_i];
-                        common::Triangle<real> B = b_tri.transformed(b.future_state.getTransformation().cast<real>());
+                        // TODO loop over vertices and edges rather than triangles to reduce duplicated checks
+                        std::vector<common::Triangle<real>> a_tris = a_bucket->getTriangles();
+                        std::vector<common::Triangle<real>> b_tris = b_bucket->getTriangles();
+                        for (int a_i = 0; a_i < a_tris.size(); a_i++) {
+                            common::Triangle<real>& a_tri = a_tris[a_i];
+                            common::Triangle<real> A = a_tri.transformed(a.future_state.getTransformation().cast<real>());
 
-                        auto [dist, P, Q] = _comparisonDist(A, B);
-						if (dist < search_dist + a_epss[a_i] + b_epss[b_i]) {
-							Contact<real> ci(P, Q, a.geo_eps + a_epss[a_i], b.geo_eps + b_epss[b_i], a_inner_epss[a_i], b_inner_epss[b_i], a, b);
-							hits.push_back(ci);
-						}
+                            for (int b_i = 0; b_i < b_tris.size(); b_i++) {
+                                common::Triangle<real>& b_tri = b_tris[b_i];
+                                common::Triangle<real> B = b_tri.transformed(b.future_state.getTransformation().cast<real>());
+
+                                auto [dist, P, Q] = _comparisonDist(A, B);
+                                if (dist < search_dist + a_epss[a_i] + b_epss[b_i]) {
+                                    Contact<real> ci(P, Q, a.geo_eps + a_epss[a_i], b.geo_eps + b_epss[b_i], a_inner_epss[a_i], b_inner_epss[b_i], a, b);
+                                    hits.push_back(ci);
+                                }
+                            }
+                        }
                     }
-				}
+                });
+            });
+                        
+            for (int d = 0; d < bucket_pairs.size(); d++) {
+                for (int t = 0; t < hits_tmp[d].size(); t++) {
+                    hits.push_back(hits_tmp[d][t]);
+                }
                 pair_used_out.push_back(hits.size());
-			}
+            }
 		};
 
         template<int branching, class real>
@@ -290,35 +331,54 @@ namespace Delta2 {
             pair_used_out.reserve(bucket_pairs.size());
             pair_used_out.clear();
 
-			for (const DeferredCompare& dc : bucket_pairs) {
-				std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
-				std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
+            std::vector<std::vector<Contact<real>>> hits_tmp;
+            for (int d = 0; d < bucket_pairs.size(); d++) {
+                hits_tmp.push_back({});
+            }
 
-				std::vector<real> a_epss = a_bucket->getEps();
-				std::vector<real> b_epss = b_bucket->getEps();
-				std::vector<real> a_inner_epss = a_bucket->getInnerEps();
-				std::vector<real> b_inner_epss = b_bucket->getInnerEps();
+            int max_concurrency = std::min(tbb::info::default_concurrency(), (int)bucket_pairs.size() / parallel_grain_size);
+            tbb::task_arena arena(max_concurrency);
+            arena.execute([&] {
+                tbb::parallel_for(tbb::blocked_range<int>(0, bucket_pairs.size(), parallel_grain_size),
+                                [&](tbb::blocked_range<int> r) {
+                    for (int d = r.begin(); d < r.end(); d++) {
+                        const DeferredCompare& dc = bucket_pairs[d];
+                        std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
+                        std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
 
-                // TODO loop over vertices and edges rather than triangles to reduce duplicated checks
-                std::vector<common::Triangle<real>> a_tris = a_bucket->getTriangles();
-                std::vector<common::Triangle<real>> b_tris = b_bucket->getTriangles();
-                for (int a_i = 0; a_i < a_tris.size(); a_i++) {
-                    common::Triangle<real>& a_tri = a_tris[a_i];
-					common::Triangle<real> A = a_tri.transformed(a.current_state.getTransformation().cast<real>());
+                        std::vector<real> a_epss = a_bucket->getEps();
+                        std::vector<real> b_epss = b_bucket->getEps();
+                        std::vector<real> a_inner_epss = a_bucket->getInnerEps();
+                        std::vector<real> b_inner_epss = b_bucket->getInnerEps();
 
-                    for (int b_i = 0; b_i < b_tris.size(); b_i++) {
-                        common::Triangle<real>& b_tri = b_tris[b_i];
-                        common::Triangle<real> B = b_tri.transformed(b.current_state.getTransformation().cast<real>());
+                        // TODO loop over vertices and edges rather than triangles to reduce duplicated checks
+                        std::vector<common::Triangle<real>> a_tris = a_bucket->getTriangles();
+                        std::vector<common::Triangle<real>> b_tris = b_bucket->getTriangles();
+                        for (int a_i = 0; a_i < a_tris.size(); a_i++) {
+                            common::Triangle<real>& a_tri = a_tris[a_i];
+                            common::Triangle<real> A = a_tri.transformed(a.current_state.getTransformation().cast<real>());
 
-                        auto [dist, P, Q] = _comparisonDist(A, B);
-						if (dist < search_dist + a_epss[a_i] + b_epss[b_i]) {
-							Contact<real> ci(P, Q, a.geo_eps + a_epss[a_i], b.geo_eps + b_epss[b_i], a_inner_epss[a_i], b_inner_epss[b_i], a, b);
-							hits.push_back(ci);
-						}
+                            for (int b_i = 0; b_i < b_tris.size(); b_i++) {
+                                common::Triangle<real>& b_tri = b_tris[b_i];
+                                common::Triangle<real> B = b_tri.transformed(b.current_state.getTransformation().cast<real>());
+
+                                auto [dist, P, Q] = _comparisonDist(A, B);
+                                if (dist < search_dist + a_epss[a_i] + b_epss[b_i]) {
+                                    Contact<real> ci(P, Q, a.geo_eps + a_epss[a_i], b.geo_eps + b_epss[b_i], a_inner_epss[a_i], b_inner_epss[b_i], a, b);
+                                    hits.push_back(ci);
+                                }
+                            }
+                        }
                     }
-				}
+                });
+            });
+                        
+            for (int d = 0; d < bucket_pairs.size(); d++) {
+                for (int t = 0; t < hits_tmp[d].size(); t++) {
+                    hits.push_back(hits_tmp[d][t]);
+                }
                 pair_used_out.push_back(hits.size());
-			}
+            }
 		};
 
         template<int branching, class real>
@@ -327,35 +387,53 @@ namespace Delta2 {
             pair_used_out.reserve(bucket_pairs.size());
             pair_used_out.clear();
 
-			for (const DeferredCompare& dc : bucket_pairs) {
-				std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
-				std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
+            std::vector<std::vector<Contact<real>>> hits_tmp;
+            for (int d = 0; d < bucket_pairs.size(); d++) {
+                hits_tmp.push_back({});
+            }
 
-				std::vector<real> a_epss = a_bucket->getEps();
-				std::vector<real> b_epss = b_bucket->getEps();
-				std::vector<real> a_inner_epss = a_bucket->getInnerEps();
-				std::vector<real> b_inner_epss = b_bucket->getInnerEps();
+            int max_concurrency = std::min(tbb::info::default_concurrency(), (int)bucket_pairs.size() / parallel_grain_size);
+            tbb::task_arena arena(max_concurrency);
+            arena.execute([&] {
+                tbb::parallel_for(tbb::blocked_range<int>(0, bucket_pairs.size(), parallel_grain_size),
+                                [&](tbb::blocked_range<int> r) {
+                    for (int d = r.begin(); d < r.end(); d++) {
+                        const DeferredCompare& dc = bucket_pairs[d];
+                        std::shared_ptr<model::Bucket> a_bucket = a.mesh->getSurrogateTree().getBucket(dc.a.bucket_id);
+                        std::shared_ptr<model::Bucket> b_bucket = b.mesh->getSurrogateTree().getBucket(dc.b.bucket_id);
 
-                // TODO loop over vertices and edges rather than triangles to reduce duplicated checks
-                std::vector<common::Triangle<real>> a_tris = a_bucket->getTriangles();
-                std::vector<common::Triangle<real>> b_tris = b_bucket->getTriangles();
-                for (int a_i = 0; a_i < a_tris.size(); a_i++) {
-                    common::Triangle<real>& a_tri = a_tris[a_i];
-					common::Triangle<real> A = a_tri.transformed(a.last_state.getTransformation().cast<real>());
+                        std::vector<real> a_epss = a_bucket->getEps();
+                        std::vector<real> b_epss = b_bucket->getEps();
+                        std::vector<real> a_inner_epss = a_bucket->getInnerEps();
+                        std::vector<real> b_inner_epss = b_bucket->getInnerEps();
 
-                    for (int b_i = 0; b_i < b_tris.size(); b_i++) {
-                        common::Triangle<real>& b_tri = b_tris[b_i];
-                        common::Triangle<real> B = b_tri.transformed(b.last_state.getTransformation().cast<real>());
+                        // TODO loop over vertices and edges rather than triangles to reduce duplicated checks
+                        std::vector<common::Triangle<real>> a_tris = a_bucket->getTriangles();
+                        std::vector<common::Triangle<real>> b_tris = b_bucket->getTriangles();
+                        for (int a_i = 0; a_i < a_tris.size(); a_i++) {
+                            common::Triangle<real>& a_tri = a_tris[a_i];
+                            common::Triangle<real> A = a_tri.transformed(a.last_state.getTransformation().cast<real>());
 
-                        auto [dist, P, Q] = _comparisonDist(A, B);
-						if (dist < search_dist + a_epss[a_i] + b_epss[b_i]) {
-							Contact<real> ci(P, Q, a.geo_eps + a_epss[a_i], b.geo_eps + b_epss[b_i], a_inner_epss[a_i], b_inner_epss[b_i], a, b);
-							hits.push_back(ci);
-						}
+                            for (int b_i = 0; b_i < b_tris.size(); b_i++) {
+                                common::Triangle<real>& b_tri = b_tris[b_i];
+                                common::Triangle<real> B = b_tri.transformed(b.last_state.getTransformation().cast<real>());
+
+                                auto [dist, P, Q] = _comparisonDist(A, B);
+                                if (dist < search_dist + a_epss[a_i] + b_epss[b_i]) {
+                                    Contact<real> ci(P, Q, a.geo_eps + a_epss[a_i], b.geo_eps + b_epss[b_i], a_inner_epss[a_i], b_inner_epss[b_i], a, b);
+                                    hits.push_back(ci);
+                                }
+                            }
+                        }
                     }
-				}
+                });
+            });
+            for (int d = 0; d < bucket_pairs.size(); d++) {
+                for (int t = 0; t < hits_tmp[d].size(); t++) {
+                    hits.push_back(hits_tmp[d][t]);
+                }
                 pair_used_out.push_back(hits.size());
-			}
+            }
 		};
     }
 }
