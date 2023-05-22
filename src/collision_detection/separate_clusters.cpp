@@ -679,7 +679,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                             double toc_start_contact = std::max(0.0, c.toc - (rel_vel.norm() * max_time_step_for_pair) / interaction_dist);
                             b.min_toc = std::min((float)toc_start_contact, b.min_toc);
                             // double toc_start_contact = std::max(0.0, 1.0 - (rel_vel.norm() * max_time_step_for_pair) / interaction_dist);
-                            double new_step = common::lerp(toc_start_contact, c.toc, 0.75);
+                            double new_step = common::lerp(toc_start_contact, c.toc, 0.9);
                             globals::logger.printf(4, "A new_step: %f\n", new_step);
                             min_scaling_seen = std::min(min_scaling_seen, new_step);
                             // This is only correct if the velocity is perpendicular to the face tangent. Otherwise it's an underestimate of the toc (which is safe).
@@ -701,7 +701,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
 
                                             b.min_toc = std::min(b.min_toc, (float)std::max(0.0, c.toc * (1.0 - depth / proj_dist)));
 
-                                            double new_step = common::lerp(c.toc * (1.0 - depth / proj_dist), c.toc, 0.5);
+                                            double new_step = common::lerp(c.toc * (1.0 - depth / proj_dist), c.toc, 0.9);
                                             globals::logger.printf(4, "B new_step: %f\n", new_step);
                                             min_scaling_seen = std::min(min_scaling_seen, new_step);
                                             if (max_time_step_for_pair * new_step < 1e-6) {
@@ -727,7 +727,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                                     double tangent_vel = std::sqrt(rel_vel.norm()*rel_vel.norm() - proj_vel*proj_vel);
                                     double tangent_dist = tangent_vel * max_time_step_for_pair;
                                     
-                                    const double d = 0.5; // Constant to control how quickly timestep size decreases with tangental velocity
+                                    const double d = 0.9; // Constant to control how quickly timestep size decreases with tangental velocity
                                     const double limit = d * (globals::opt.time_step_size - max_time_step_for_pair) / globals::opt.time_step_size;
                                     double new_step = tangent_dist < limit ? 1.0 : (d * interaction_dist) / ((tangent_dist-limit) + d * interaction_dist); // Passes through (0,1) ie. no tangental velocity => no timestep reduction here
                                     if (new_step < min_scaling_seen) {

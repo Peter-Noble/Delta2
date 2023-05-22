@@ -51,23 +51,27 @@ int main(int argc, char *argv[]) {
     globals::logger.printf(0, "Main\n");
     // globals::itt_handles.disable_detailed_domain();
 
-    int threads = tbb::info::default_concurrency();
-    if (globals::opt.threads > 0) {
-        threads = globals::opt.threads;
-    }
-    tbb::global_control global_limit(tbb::global_control::max_allowed_parallelism, threads);  // TODO Does this do something?
-
     int opt_result = globals::opt.fromArgs(argc, argv);
     if (opt_result > 0) {
         return opt_result;
     }
-    
+    globals::logger.priority = globals::opt.print_priority;
+
+    int threads = tbb::info::default_concurrency();
+    if (globals::opt.threads > 0) {
+        threads = globals::opt.threads;
+    } else {
+        globals::opt.threads = tbb::info::default_concurrency();
+    }
+    globals::logger.printf(1, "Trying to limit threads to: %i\n", threads);
+    tbb::global_control global_limit(tbb::global_control::max_allowed_parallelism, threads);  // TODO Does this do something?
+    globals::logger.printf(1, "Default concurrency: %i\n", tbb::info::default_concurrency());
+    globals::logger.printf(1, "Global concurrency: %i\n", globals::opt.threads);
+
     if (std::getenv("EXPORT_DIR") == nullptr) {
         throw std::runtime_error("EXPORT_DIR environment variable not set");
     }
 
-    globals::logger.priority = globals::opt.print_priority;
-    
     strategy::FrictionIterative friction(globals::opt);
     strategy::SequentialImpulses contact_force(friction, globals::opt);
     strategy::ContactDetectionContinuousComparison contact_detection_continuous;

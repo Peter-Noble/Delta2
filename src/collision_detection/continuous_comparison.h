@@ -691,7 +691,7 @@ namespace Delta2 {
             __itt_string_handle* continuous_soup_bucket_task = __itt_string_handle_create("Continuous soup bucket");
             __itt_string_handle* continuous_soup_triangle_task = __itt_string_handle_create("Continuous soup triangle");
             
-            float search_dist = a.geo_eps + b.geo_eps;
+            float search_dist = (a.geo_eps + b.geo_eps) * 0.3;
             pair_used_out.reserve(bucket_pairs.size());
             pair_used_out.clear();
 
@@ -771,7 +771,7 @@ namespace Delta2 {
 			int total_vert_tri = 0;
             int total_edge_edge = 0;
             
-            real search_dist = a.geo_eps + b.geo_eps;
+            real search_dist = (a.geo_eps + b.geo_eps) * 0.3;
             pair_used_out.reserve(bucket_pairs.size());
             pair_used_out.clear();
 
