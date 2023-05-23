@@ -122,383 +122,575 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     //     }
     // }
     if (!success && !forced_advance) {
-        if (!forced_advance) {
-            globals::logger.printf(2, "%i: Failed but didn't force advance\n", cluster_id);
-        }
-        globals::logger.printf(3, "%i: Fail\n", cluster_id);
-        // Interpolate current_new back to 50% between last_start and current_start
-        // Set future_new to current_start
-        // Step forward from there to the current_start (recursive call)
-        // Store current_new (to use in last_final)
-        // Set timestep size to step_size_start / 2.0 and project new future state
-        // Step forward (recursive call)
-        // Step forward (recursive call)
-        // Set last_final to the stored current_new and each of the particles last_time_step_size to min(last_time_step_size, step_size_start / 2.0)
-        
-        // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, roll_back_to_valid_current_state_task);
-
-        bool failed_at_current = true;
-        bool failed_at_last = false;
-        bool first_rollback = true;
-
-        double second_step_size = 0.0;
-        
-
-        tbb::task_group task_group_check_last;
-
-        for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
-        {
-            task_group_check_last.run([&, b_i] {
-                // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_last_task);
-                if (!failed_at_last) {
-                    collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
-
-                    int a_id = cluster.particles.getLocalID(b.A.first); // geo id
-                    int b_id = cluster.particles.getLocalID(b.B.first);
-
-                    Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
-                    Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
-
-                    std::vector<collision::Contact<double>> Cs = collision::compareTreesFullLast<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], contact_detection);
-
-                    for (collision::Contact<double> &c : Cs)
-                    {
-                        if ((c.A - c.B).norm() < 1e-4) {
-                            failed_at_last = true;
-                        }
-                    }
-                }
-                // __itt_task_end(globals::itt_handles.detailed_domain);
-            });
-        }
-
-        task_group_check_last.wait();
-
-        std::vector<double> tmp_orig_times;
-        for (Particle* p : cluster.particles) {
-            tmp_orig_times.push_back(p->current_state.getTime());
-        }
-
-        bool rolling_back = false;
-        bool rolling_back_to_start = false;
-
-        int c = 0;
-        const int max_c = 4;
-        while (failed_at_current) {
-            c++;
-            if (c > max_c) {
-                globals::logger.printf(3, "%i: Can't find valid last state\n", cluster_id);
-                // #ifndef NDEBUG
-                // throw std::runtime_error("Can't find valid last state");
-                // #endif
-                break;
+        if (globals::opt.disable_dynamic_rollback) {
+            if (!forced_advance) {
+                globals::logger.printf(2, "%i: Failed but didn't force advance\n", cluster_id);
             }
-            failed_at_current = false;
+            globals::logger.printf(3, "%i: Fail\n", cluster_id);
+            // Interpolate current_new back to 50% between last_start and current_start
+            // Set future_new to current_start
+            // Step forward from there to the current_start (recursive call)
+            // Store current_new (to use in last_final)
+            // Set timestep size to step_size_start / 2.0 and project new future state
+            // Step forward (recursive call)
+            // Step forward (recursive call)
+            // Set last_final to the stored current_new and each of the particles last_time_step_size to min(last_time_step_size, step_size_start / 2.0)
+
+            // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, roll_back_to_valid_current_state_task);
+
+            int pre_substep_levels = 2 + depth;
+            const int pre_substeps = std::pow(2, pre_substep_levels);
+            double second_step_size = cluster.step_size / pre_substeps;
 
             double new_min_time = 0.0;
             for (Particle* p : cluster.particles) {
                 if (!p->is_static) {
-                    // assert(p->current_state.getTime() - p->last_state.getTime() > 1e-6);
-                    new_min_time = std::max(new_min_time, common::lerp(p->last_state.getTime(), p->current_state.getTime(), std::pow(0.5, c)));
-                    if (new_min_time - p->last_state.getTime() < 1e-5) {
-                        c = max_c;
-                    }
+                    new_min_time = std::max(new_min_time, p->last_state.getTime());
                 }
             }
+            cluster.min_current_time = new_min_time;
+            cluster.step_size = cluster.step_size / pre_substeps;
 
-            cluster.min_current_time = new_min_time; // in the next stepRecursive call all the particles will get rolled back to this time
-            // globals::logger.printf(3, "Rolling back to %f\n", cluster.min_current_time);
-
-            double step_size;
             for (Particle* p : cluster.particles) {
                 if (!p->is_static) {
                     p->future_state = p->current_state;
-                    if (c == max_c) {
-                        p->current_state = p->last_state;
-                        rolling_back = true;
-                        rolling_back_to_start = true;
-                        cluster.min_current_time = p->current_state.getTime();
-                    }
-                    else {
-                        p->current_state = p->current_state.interpolate(p->last_state, new_min_time);
-                        rolling_back = true;
-                    }
-                    // cluster.min_current_time = std::min(cluster.min_current_time, p->current_state.getTime());
-                    step_size = p->future_state.getTime() - p->current_state.getTime();
-                    // assert(step_size > 0.0);
+                    p->current_state = p->current_state.interpolate(p->last_state, new_min_time);
+                    p->projectFutureState(cluster.step_size);
+                }
+            }
+                    
+            // __itt_task_end(globals::itt_handles.detailed_domain);
+
+                // stepRecursive(cluster, false, depth + 1);
+                // for (Particle* p : cluster.particles) {
+                //     if (!p->is_static) {
+                //         cluster.min_current_time = p->current_state.getTime();
+                //         p->projectFutureState(cluster.step_size);
+                //     }
+                // }
+                // stepRecursive(cluster, false, depth + 1);
+                // for (Particle* p : cluster.particles) {
+                //     if (!p->is_static) {
+                //         cluster.min_current_time = p->current_state.getTime();
+                //         p->projectFutureState(cluster.step_size * 2);
+                //     }
+                // }
+                // cluster.step_size *= 2;
+                // stepRecursive(cluster, false, depth + 1);
+                // for (Particle* p : cluster.particles) {
+                //     if (!p->is_static) {
+                //         cluster.min_current_time = p->current_state.getTime();
+                //     }
+                // }
+
+            stepRecursive(cluster, false, depth + 1);
+            for (Particle* p : cluster.particles) {
+                if (!p->is_static) {
+                    p->projectFutureState(cluster.step_size);
+                    cluster.min_current_time = p->current_state.getTime();
                 }
             }
 
-            tbb::task_group task_group;
-
-            common::Edge failed_at(Eigen::Vector3d({0,0,0}), Eigen::Vector3d({0,0,0}));
-
-            for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
-            {
-                task_group.run([&, b_i] {
-                    // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_current_task);
-                    if (!failed_at_current) {
-                        collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
-
-                        int a_id = cluster.particles.getLocalID(b.A.first); // geo id
-                        int b_id = cluster.particles.getLocalID(b.B.first);
-
-                        Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
-                        Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
-
-                        std::vector<collision::Contact<double>> Cs = collision::compareTreesFullCurrent<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], contact_detection);
-                        // std::vector<collision::Contact<double>> filtered = collision::filterContacts<double>(Cs, 0.0);
-
-                        // std::vector<collision::Contact<double>> Csl = collision::compareTreesFullLast<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], contact_detection);
-
-                        // bool failed_at_last = false;
-                        // for (collision::Contact<double> &c : Csl)
-                        // {
-                        //     if ((c.A - c.B).norm() < 1e-4) {
-                        //         failed_at_current = failed_at_last;
-                        //     }
-                        // }
-
-                        for (collision::Contact<double> &c : Cs)
-                        {
-                            // if ((c.A - c.B).norm() < 1e-4 && failed_at_last) {
-                            if ((c.A - c.B).norm() < 1e-4) {
-                                failed_at_current = true;
-                                failed_at = common::Edge(c.A, c.B);
-                            }
-                        }
+            for (int sl = 0; sl < pre_substep_levels; sl++) {
+                stepRecursive(cluster, false, depth + 1);
+                cluster.step_size *= 2;
+                for (Particle* p : cluster.particles) {
+                    if (!p->is_static) {
+                        p->projectFutureState(cluster.step_size);
+                        cluster.min_current_time = p->current_state.getTime();
                     }
-                    // __itt_task_end(globals::itt_handles.detailed_domain);
-                });
+                }
             }
 
-            task_group.wait();
-            cluster.step_size = step_size;
-
-            // if (failed_at_current) {
-            //     common::Viewer view;
-            //     for (Particle* p : cluster.particles) {
-            //         view.addParticle(*p);
-            //     }
-            //     view.addEdge(failed_at);
-            //     view.show();
-            // }
-
-            if (!first_rollback) {
+            std::vector<State> last_state_final;
+            for (Particle* p : cluster.particles) {
+                if (!p->is_static) {
+                    last_state_final.push_back(p->current_state);
+                }
             }
 
-            first_rollback = false;
+            int sub_steps = 4;
 
-            // if (!failed_at_current) {
-            //     globals::logger.printf(3, "Rolling back to %.4f.  First time step: %.4f, second time step: %.4f.  Original current: %.4f\n", new_min_time, step_size, second_step_size);
-            // }
-            if (failed_at_current) {
-                second_step_size += step_size;
-            }
-        }
-        // __itt_task_end(globals::itt_handles.detailed_domain);
+            cluster.step_size = start_step / (double) sub_steps;
 
-        if (rolling_back && !rolling_back_to_start) {
-            globals::logger.printf(3, "%i: Rolling back at %f. Cluster of %i\n", cluster_id, cluster.min_current_time, cluster.particles.size());
-        }
-        if (rolling_back_to_start) {
-            globals::logger.printf(3, "%i: Rolling back to last at %f. Cluster of %i\n", cluster_id, cluster.min_current_time, cluster.particles.size());
-        }
+            for (Particle* p : cluster.particles) {
+                if (!p->is_static) {
+                    cluster.min_current_time = p->current_state.getTime();
+                    p->projectFutureState(cluster.step_size);
 
-        for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
-            if (!cluster.particles[p_i].is_static) {
-                double current_time = cluster.particles[p_i].current_state.getTime();
-
-                second_step_size = time - current_time - cluster.step_size;
-
-                double advanced = cluster.step_size + second_step_size;
-                double difference = current_time + advanced - time;
-                assert(difference < 1e-5);
-            }
-        }
-        for (Particle* p : cluster.particles) {
-            assert(p->current_state.getTime() + (cluster.step_size + second_step_size) - time < 1e-5);
-        }
-
-        // second_step_size -= cluster.step_size;
-
-        // globals::logger.printf(3, "Before after first valid\n");
-        // for (Particle* p : cluster.particles) {
-        //     if (!p->is_static) {
-        //         globals::logger.printf(3, "Particle %i last: %.4f, current: %.4f, future: %.4f, cluster step: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), cluster.step_size);
-        //     }
-        // }
-
-        // std::vector<collision::Cluster> after_first_valid_separated_clusters = separateClusterByTimestep(cluster);
-        std::vector<collision::Cluster> after_first_valid_separated_clusters = {};
-
-        if (after_first_valid_separated_clusters.size() > 1) {
-            tbb::task_group after_valid_task_group;
-
-            for (int sub_ci = 0; sub_ci < after_first_valid_separated_clusters.size(); sub_ci++) {
-                after_valid_task_group.run([&, sub_ci] {
-                    // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_after_first_valid_sep_task);
-                    stepRecursive(after_first_valid_separated_clusters[sub_ci], false, depth + 1);
-                    // __itt_task_end(globals::itt_handles.detailed_domain);
-                });
+                    assert(std::fabs((p->current_state.getTime() + sub_steps * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                }
             }
 
-            after_valid_task_group.wait();
-        }
-        else {
-            // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_after_first_valid_task);
-            stepRecursive(cluster, false, depth + 1);
-            // __itt_task_end(globals::itt_handles.detailed_domain);
-        }
-
-
-        cluster.step_size = second_step_size;
-        for (Particle* p : cluster.particles) {
-            if (!p->is_static) {
-                cluster.min_current_time = p->current_state.getTime();
-                p->projectFutureState(cluster.step_size);
-
-                assert(std::fabs(p->current_state.getTime() + cluster.step_size - time) < 1e-5);
-            }
-        }
-
-        if (second_step_size > 0.0) {
-            // globals::logger.printf(3, "Before after first invalid\n");
+            // globals::logger.printf(3, "Before sub stepping\n");
             // for (Particle* p : cluster.particles) {
             //     if (!p->is_static) {
             //         globals::logger.printf(3, "Particle %i last: %.4f, current: %.4f, future: %.4f, cluster step: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), cluster.step_size);
             //     }
             // }
 
-            // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_after_first_invalid_task);
-            stepRecursive(cluster, false, depth + 1);
+            // double time = std::numeric_limits<double>::infinity();
+
+            // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_div_task);
+            for (int s = 0; s < sub_steps; s++) {
+                // std::vector<collision::Cluster> sub_step_separated_clusters = separateClusterByTimestep(cluster, s * cluster.step_size);
+                std::vector<collision::Cluster> sub_step_separated_clusters = {};
+                if (sub_step_separated_clusters.size() > 1) {
+                    tbb::task_group sub_step_task_group;
+                    globals::logger.printf(3, "%i: Separating sub step clusters into %i\n", cluster_id, sub_step_separated_clusters.size());
+
+                    for (int sub_ci = 0; sub_ci < sub_step_separated_clusters.size(); sub_ci++) {
+                        sub_step_task_group.run([&, sub_ci] {
+
+                        for (Particle* p : sub_step_separated_clusters[sub_ci].particles) {
+                            if (!p->is_static) {
+                                assert(std::fabs((p->current_state.getTime() + (sub_steps - s) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                            }
+                        }
+
+                        // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_div_sep_task);
+                        stepRecursive(sub_step_separated_clusters[sub_ci], false, depth + 1);
+                        // __itt_task_end(globals::itt_handles.detailed_domain);
+                    
+                        for (Particle* p : sub_step_separated_clusters[sub_ci].particles) {
+                            if (!p->is_static) {
+                                assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                            }
+                        }
+
+                        });
+                    }
+
+                    sub_step_task_group.wait();
+                }
+                else {
+                    double target_time_tmp;
+                    double t0_tmp;
+                    for (Particle* p : cluster.particles) {
+                        if (!p->is_static) {
+                            assert(std::fabs((p->current_state.getTime() + (sub_steps - s) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                            t0_tmp = p->current_state.getTime();
+                            target_time_tmp = t0_tmp + cluster.step_size;
+                        }
+                    }
+
+                    stepRecursive(cluster, false, depth + 1);
+
+                    for (Particle* p : cluster.particles) {
+                        if (!p->is_static) {
+                            assert(std::fabs(p->current_state.getTime() - (t0_tmp + cluster.step_size) < 1e-5));
+                            assert(std::fabs(p->current_state.getTime() - target_time_tmp) < 1e-5);
+                            assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                        }
+                    }
+                }
+
+                for (Particle* p : cluster.particles) {
+                    if (!p->is_static) {
+                        cluster.min_current_time = p->current_state.getTime();
+                        // globals::logger.printf(3, "Step 3 %i, last: %f, current: %f, future: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
+
+                        assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                    }
+                }
+            }
             // __itt_task_end(globals::itt_handles.detailed_domain);
+
+            // for (Particle* p : cluster.particles) {
+            //     if (!p->is_static) {
+            //         if (!(std::fabs(p->current_state.getTime() - (time + orig_step_size)) < 1e-5)) {
+            //             globals::logger.printf(3, "Particle: %i, current: %.4f, target: %.4f\n", p->id, p->current_state.getTime(), time + orig_step_size);
+            //         }
+            //         assert(std::fabs(p->current_state.getTime() - (time + orig_step_size)) < 1e-5);
+            //     }
+            // }
+
+            int i = 0;
+            for (Particle* p : cluster.particles) {
+                if (!p->is_static) {
+                    p->last_state = last_state_final[i++];
+                    p->last_time_step_size = std::min(p->last_time_step_size, start_step / 2.0);
+                }
+            }   
+        } else {
+            if (!forced_advance) {
+                globals::logger.printf(2, "%i: Failed but didn't force advance\n", cluster_id);
+            }
+            globals::logger.printf(3, "%i: Fail\n", cluster_id);
+            // Interpolate current_new back to 50% between last_start and current_start
+            // Set future_new to current_start
+            // Step forward from there to the current_start (recursive call)
+            // Store current_new (to use in last_final)
+            // Set timestep size to step_size_start / 2.0 and project new future state
+            // Step forward (recursive call)
+            // Step forward (recursive call)
+            // Set last_final to the stored current_new and each of the particles last_time_step_size to min(last_time_step_size, step_size_start / 2.0)
             
+            // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, roll_back_to_valid_current_state_task);
+
+            bool failed_at_current = true;
+            bool failed_at_last = false;
+            bool first_rollback = true;
+
+            double second_step_size = 0.0;
+            
+
+            // tbb::task_group task_group_check_last;
+
+            // for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
+            // {
+            //     task_group_check_last.run([&, b_i] {
+            //         // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_last_task);
+            //         if (!failed_at_last) {
+            //             collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
+
+            //             int a_id = cluster.particles.getLocalID(b.A.first); // geo id
+            //             int b_id = cluster.particles.getLocalID(b.B.first);
+
+            //             Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
+            //             Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
+
+            //             std::vector<collision::Contact<double>> Cs = collision::compareTreesFullLast<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], contact_detection);
+
+            //             for (collision::Contact<double> &c : Cs)
+            //             {
+            //                 if ((c.A - c.B).norm() < 1e-4) {
+            //                     failed_at_last = true;
+            //                 }
+            //             }
+            //         }
+            //         // __itt_task_end(globals::itt_handles.detailed_domain);
+            //     });
+            // }
+
+            // task_group_check_last.wait();
+
+            std::vector<double> tmp_orig_times;
+            for (Particle* p : cluster.particles) {
+                tmp_orig_times.push_back(p->current_state.getTime());
+            }
+
+            bool rolling_back = false;
+            bool rolling_back_to_start = false;
+
+            int c = 0;
+            const int max_c = 4;
+            while (failed_at_current) {
+                c++;
+                if (c > max_c) {
+                    globals::logger.printf(3, "%i: Can't find valid last state\n", cluster_id);
+                    // #ifndef NDEBUG
+                    // throw std::runtime_error("Can't find valid last state");
+                    // #endif
+                    break;
+                }
+                failed_at_current = false;
+
+                double new_min_time = 0.0;
+                for (Particle* p : cluster.particles) {
+                    if (!p->is_static) {
+                        // assert(p->current_state.getTime() - p->last_state.getTime() > 1e-6);
+                        new_min_time = std::max(new_min_time, common::lerp(p->last_state.getTime(), p->current_state.getTime(), std::pow(0.5, c)));
+                        if (new_min_time - p->last_state.getTime() < 1e-5) {
+                            c = max_c;
+                        }
+                    }
+                }
+
+                cluster.min_current_time = new_min_time; // in the next stepRecursive call all the particles will get rolled back to this time
+                // globals::logger.printf(3, "Rolling back to %f\n", cluster.min_current_time);
+
+                double step_size;
+                for (Particle* p : cluster.particles) {
+                    if (!p->is_static) {
+                        p->future_state = p->current_state;
+                        if (c == max_c) {
+                            p->current_state = p->last_state;
+                            rolling_back = true;
+                            rolling_back_to_start = true;
+                            cluster.min_current_time = p->current_state.getTime();
+                        }
+                        else {
+                            p->current_state = p->current_state.interpolate(p->last_state, new_min_time);
+                            rolling_back = true;
+                        }
+                        // cluster.min_current_time = std::min(cluster.min_current_time, p->current_state.getTime());
+                        step_size = p->future_state.getTime() - p->current_state.getTime();
+                        // assert(step_size > 0.0);
+                    }
+                }
+
+                tbb::task_group task_group;
+
+                common::Edge failed_at(Eigen::Vector3d({0,0,0}), Eigen::Vector3d({0,0,0}));
+
+                for (int b_i = 0; b_i < cluster.interations.size(); b_i++)
+                {
+                    task_group.run([&, b_i] {
+                        // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, compare_individual_pair_current_task);
+                        if (!failed_at_current) {
+                            collision::BroadPhaseCollision &b = cluster.interations[b_i]; 
+
+                            int a_id = cluster.particles.getLocalID(b.A.first); // geo id
+                            int b_id = cluster.particles.getLocalID(b.B.first);
+
+                            Eigen::Vector3d a_centre = cluster.particles[a_id].current_state.getTranslation();
+                            Eigen::Vector3d b_centre = cluster.particles[b_id].current_state.getTranslation();
+
+                            std::vector<collision::Contact<double>> Cs = collision::compareTreesFullCurrent<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], contact_detection);
+                            // std::vector<collision::Contact<double>> filtered = collision::filterContacts<double>(Cs, 0.0);
+
+                            // std::vector<collision::Contact<double>> Csl = collision::compareTreesFullLast<double, 8, 8>(cluster.particles[a_id], cluster.particles[b_id], contact_detection);
+
+                            // bool failed_at_last = false;
+                            // for (collision::Contact<double> &c : Csl)
+                            // {
+                            //     if ((c.A - c.B).norm() < 1e-4) {
+                            //         failed_at_current = failed_at_last;
+                            //     }
+                            // }
+
+                            for (collision::Contact<double> &c : Cs)
+                            {
+                                // if ((c.A - c.B).norm() < 1e-4 && failed_at_last) {
+                                if ((c.A - c.B).norm() < 1e-4) {
+                                    failed_at_current = true;
+                                    failed_at = common::Edge(c.A, c.B);
+                                }
+                            }
+                        }
+                        // __itt_task_end(globals::itt_handles.detailed_domain);
+                    });
+                }
+
+                task_group.wait();
+                cluster.step_size = step_size;
+
+                // if (failed_at_current) {
+                //     common::Viewer view;
+                //     for (Particle* p : cluster.particles) {
+                //         view.addParticle(*p);
+                //     }
+                //     view.addEdge(failed_at);
+                //     view.show();
+                // }
+
+                if (!first_rollback) {
+                }
+
+                first_rollback = false;
+
+                // if (!failed_at_current) {
+                //     globals::logger.printf(3, "Rolling back to %.4f.  First time step: %.4f, second time step: %.4f.  Original current: %.4f\n", new_min_time, step_size, second_step_size);
+                // }
+                if (failed_at_current) {
+                    second_step_size += step_size;
+                }
+            }
+            // __itt_task_end(globals::itt_handles.detailed_domain);
+
+            if (rolling_back && !rolling_back_to_start) {
+                globals::logger.printf(3, "%i: Rolling back at %f. Cluster of %i\n", cluster_id, cluster.min_current_time, cluster.particles.size());
+            }
+            if (rolling_back_to_start) {
+                globals::logger.printf(3, "%i: Rolling back to last at %f. Cluster of %i\n", cluster_id, cluster.min_current_time, cluster.particles.size());
+            }
+
+            for (int p_i = 0; p_i < cluster.particles.size(); p_i++) {
+                if (!cluster.particles[p_i].is_static) {
+                    double current_time = cluster.particles[p_i].current_state.getTime();
+
+                    second_step_size = time - current_time - cluster.step_size;
+
+                    double advanced = cluster.step_size + second_step_size;
+                    double difference = current_time + advanced - time;
+                    assert(difference < 1e-5);
+                }
+            }
+            for (Particle* p : cluster.particles) {
+                assert(p->current_state.getTime() + (cluster.step_size + second_step_size) - time < 1e-5);
+            }
+
+            // second_step_size -= cluster.step_size;
+
+            // globals::logger.printf(3, "Before after first valid\n");
+            // for (Particle* p : cluster.particles) {
+            //     if (!p->is_static) {
+            //         globals::logger.printf(3, "Particle %i last: %.4f, current: %.4f, future: %.4f, cluster step: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), cluster.step_size);
+            //     }
+            // }
+
+            // std::vector<collision::Cluster> after_first_valid_separated_clusters = separateClusterByTimestep(cluster);
+            std::vector<collision::Cluster> after_first_valid_separated_clusters = {};
+
+            if (after_first_valid_separated_clusters.size() > 1) {
+                tbb::task_group after_valid_task_group;
+
+                for (int sub_ci = 0; sub_ci < after_first_valid_separated_clusters.size(); sub_ci++) {
+                    after_valid_task_group.run([&, sub_ci] {
+                        // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_after_first_valid_sep_task);
+                        stepRecursive(after_first_valid_separated_clusters[sub_ci], false, depth + 1);
+                        // __itt_task_end(globals::itt_handles.detailed_domain);
+                    });
+                }
+
+                after_valid_task_group.wait();
+            }
+            else {
+                // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_after_first_valid_task);
+                stepRecursive(cluster, false, depth + 1);
+                // __itt_task_end(globals::itt_handles.detailed_domain);
+            }
+
+
+            cluster.step_size = second_step_size;
+            for (Particle* p : cluster.particles) {
+                if (!p->is_static) {
+                    cluster.min_current_time = p->current_state.getTime();
+                    p->projectFutureState(cluster.step_size);
+
+                    assert(std::fabs(p->current_state.getTime() + cluster.step_size - time) < 1e-5);
+                }
+            }
+
+            if (second_step_size > 0.0) {
+                // globals::logger.printf(3, "Before after first invalid\n");
+                // for (Particle* p : cluster.particles) {
+                //     if (!p->is_static) {
+                //         globals::logger.printf(3, "Particle %i last: %.4f, current: %.4f, future: %.4f, cluster step: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), cluster.step_size);
+                //     }
+                // }
+
+                // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_after_first_invalid_task);
+                stepRecursive(cluster, false, depth + 1);
+                // __itt_task_end(globals::itt_handles.detailed_domain);
+                
+                for (Particle* p : cluster.particles) {
+                    if (!p->is_static) {
+                        // Should be back to the same current time
+                        assert(std::fabs(p->current_state.getTime() - time) < 1e-5);
+                    }
+                }
+            }
+
             for (Particle* p : cluster.particles) {
                 if (!p->is_static) {
                     // Should be back to the same current time
                     assert(std::fabs(p->current_state.getTime() - time) < 1e-5);
                 }
             }
-        }
 
-        for (Particle* p : cluster.particles) {
-            if (!p->is_static) {
-                // Should be back to the same current time
-                assert(std::fabs(p->current_state.getTime() - time) < 1e-5);
-            }
-        }
-
-        std::vector<State> last_state_final;
-        for (Particle* p : cluster.particles) {
-            if (!p->is_static) {
-                last_state_final.push_back(p->current_state);
-            }
-        }
-
-        int sub_steps = 2;
-
-        cluster.step_size = start_step / (double) sub_steps;
-
-        for (Particle* p : cluster.particles) {
-            if (!p->is_static) {
-                cluster.min_current_time = p->current_state.getTime();
-                p->projectFutureState(cluster.step_size);
-
-                assert(std::fabs((p->current_state.getTime() + sub_steps * cluster.step_size) - (time + orig_step_size)) < 1e-5);
-            }
-        }
-
-        // globals::logger.printf(3, "Before sub stepping\n");
-        // for (Particle* p : cluster.particles) {
-        //     if (!p->is_static) {
-        //         globals::logger.printf(3, "Particle %i last: %.4f, current: %.4f, future: %.4f, cluster step: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), cluster.step_size);
-        //     }
-        // }
-
-        // double time = std::numeric_limits<double>::infinity();
-
-        // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_div_task);
-        for (int s = 0; s < sub_steps; s++) {
-            // std::vector<collision::Cluster> sub_step_separated_clusters = separateClusterByTimestep(cluster, s * cluster.step_size);
-            std::vector<collision::Cluster> sub_step_separated_clusters = {};
-            if (sub_step_separated_clusters.size() > 1) {
-                tbb::task_group sub_step_task_group;
-                globals::logger.printf(3, "%i: Separating sub step clusters into %i\n", cluster_id, sub_step_separated_clusters.size());
-
-                for (int sub_ci = 0; sub_ci < sub_step_separated_clusters.size(); sub_ci++) {
-                    sub_step_task_group.run([&, sub_ci] {
-
-                    for (Particle* p : sub_step_separated_clusters[sub_ci].particles) {
-                        if (!p->is_static) {
-                            assert(std::fabs((p->current_state.getTime() + (sub_steps - s) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
-                        }
-                    }
-
-                    // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_div_sep_task);
-                    stepRecursive(sub_step_separated_clusters[sub_ci], false, depth + 1);
-                    // __itt_task_end(globals::itt_handles.detailed_domain);
-                
-                    for (Particle* p : sub_step_separated_clusters[sub_ci].particles) {
-                        if (!p->is_static) {
-                            assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
-                        }
-                    }
-
-                    });
-                }
-
-                sub_step_task_group.wait();
-            }
-            else {
-                double target_time_tmp;
-                double t0_tmp;
-                for (Particle* p : cluster.particles) {
-                    if (!p->is_static) {
-                        assert(std::fabs((p->current_state.getTime() + (sub_steps - s) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
-                        t0_tmp = p->current_state.getTime();
-                        target_time_tmp = t0_tmp + cluster.step_size;
-                    }
-                }
-
-                stepRecursive(cluster, false, depth + 1);
-
-                for (Particle* p : cluster.particles) {
-                    if (!p->is_static) {
-                        assert(std::fabs(p->current_state.getTime() - (t0_tmp + cluster.step_size) < 1e-5));
-                        assert(std::fabs(p->current_state.getTime() - target_time_tmp) < 1e-5);
-                        assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
-                    }
+            std::vector<State> last_state_final;
+            for (Particle* p : cluster.particles) {
+                if (!p->is_static) {
+                    last_state_final.push_back(p->current_state);
                 }
             }
+
+            int sub_steps = 2;
+
+            cluster.step_size = start_step / (double) sub_steps;
 
             for (Particle* p : cluster.particles) {
                 if (!p->is_static) {
                     cluster.min_current_time = p->current_state.getTime();
-                    // globals::logger.printf(3, "Step 3 %i, last: %f, current: %f, future: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
+                    p->projectFutureState(cluster.step_size);
 
-                    assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                    assert(std::fabs((p->current_state.getTime() + sub_steps * cluster.step_size) - (time + orig_step_size)) < 1e-5);
                 }
             }
-        }
-        // __itt_task_end(globals::itt_handles.detailed_domain);
 
-        // for (Particle* p : cluster.particles) {
-        //     if (!p->is_static) {
-        //         if (!(std::fabs(p->current_state.getTime() - (time + orig_step_size)) < 1e-5)) {
-        //             globals::logger.printf(3, "Particle: %i, current: %.4f, target: %.4f\n", p->id, p->current_state.getTime(), time + orig_step_size);
-        //         }
-        //         assert(std::fabs(p->current_state.getTime() - (time + orig_step_size)) < 1e-5);
-        //     }
-        // }
+            // globals::logger.printf(3, "Before sub stepping\n");
+            // for (Particle* p : cluster.particles) {
+            //     if (!p->is_static) {
+            //         globals::logger.printf(3, "Particle %i last: %.4f, current: %.4f, future: %.4f, cluster step: %.4f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime(), cluster.step_size);
+            //     }
+            // }
 
-        int i = 0;
-        for (Particle* p : cluster.particles) {
-            if (!p->is_static) {
-                p->last_state = last_state_final[i++];
-                p->last_time_step_size = std::min(p->last_time_step_size, start_step / 2.0);
+            // double time = std::numeric_limits<double>::infinity();
+
+            // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_div_task);
+            for (int s = 0; s < sub_steps; s++) {
+                // std::vector<collision::Cluster> sub_step_separated_clusters = separateClusterByTimestep(cluster, s * cluster.step_size);
+                std::vector<collision::Cluster> sub_step_separated_clusters = {};
+                if (sub_step_separated_clusters.size() > 1) {
+                    tbb::task_group sub_step_task_group;
+                    globals::logger.printf(3, "%i: Separating sub step clusters into %i\n", cluster_id, sub_step_separated_clusters.size());
+
+                    for (int sub_ci = 0; sub_ci < sub_step_separated_clusters.size(); sub_ci++) {
+                        sub_step_task_group.run([&, sub_ci] {
+
+                        for (Particle* p : sub_step_separated_clusters[sub_ci].particles) {
+                            if (!p->is_static) {
+                                assert(std::fabs((p->current_state.getTime() + (sub_steps - s) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                            }
+                        }
+
+                        // __itt_task_begin(globals::itt_handles.detailed_domain, __itt_null, __itt_null, step_rec_div_sep_task);
+                        stepRecursive(sub_step_separated_clusters[sub_ci], false, depth + 1);
+                        // __itt_task_end(globals::itt_handles.detailed_domain);
+                    
+                        for (Particle* p : sub_step_separated_clusters[sub_ci].particles) {
+                            if (!p->is_static) {
+                                assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                            }
+                        }
+
+                        });
+                    }
+
+                    sub_step_task_group.wait();
+                }
+                else {
+                    double target_time_tmp;
+                    double t0_tmp;
+                    for (Particle* p : cluster.particles) {
+                        if (!p->is_static) {
+                            assert(std::fabs((p->current_state.getTime() + (sub_steps - s) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                            t0_tmp = p->current_state.getTime();
+                            target_time_tmp = t0_tmp + cluster.step_size;
+                        }
+                    }
+
+                    stepRecursive(cluster, false, depth + 1);
+
+                    for (Particle* p : cluster.particles) {
+                        if (!p->is_static) {
+                            assert(std::fabs(p->current_state.getTime() - (t0_tmp + cluster.step_size) < 1e-5));
+                            assert(std::fabs(p->current_state.getTime() - target_time_tmp) < 1e-5);
+                            assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                        }
+                    }
+                }
+
+                for (Particle* p : cluster.particles) {
+                    if (!p->is_static) {
+                        cluster.min_current_time = p->current_state.getTime();
+                        // globals::logger.printf(3, "Step 3 %i, last: %f, current: %f, future: %f\n", p->id, p->last_state.getTime(), p->current_state.getTime(), p->future_state.getTime());
+
+                        assert(std::fabs((p->current_state.getTime() + (sub_steps - s - 1) * cluster.step_size) - (time + orig_step_size)) < 1e-5);
+                    }
+                }
             }
-        }        
+            // __itt_task_end(globals::itt_handles.detailed_domain);
+
+            // for (Particle* p : cluster.particles) {
+            //     if (!p->is_static) {
+            //         if (!(std::fabs(p->current_state.getTime() - (time + orig_step_size)) < 1e-5)) {
+            //             globals::logger.printf(3, "Particle: %i, current: %.4f, target: %.4f\n", p->id, p->current_state.getTime(), time + orig_step_size);
+            //         }
+            //         assert(std::fabs(p->current_state.getTime() - (time + orig_step_size)) < 1e-5);
+            //     }
+            // }
+
+            int i = 0;
+            for (Particle* p : cluster.particles) {
+                if (!p->is_static) {
+                    p->last_state = last_state_final[i++];
+                    p->last_time_step_size = std::min(p->last_time_step_size, start_step / 2.0);
+                }
+            }
+        }     
     } 
     // else {
     //     globals::logger.printf(3, "Success\n");

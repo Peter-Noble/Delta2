@@ -35,6 +35,7 @@ namespace Delta2 {
 			bool limit_clusters_per_step;
 			bool check_post_solve;
 			bool local_ts;
+			bool disable_dynamic_rollback;
 
 			int sequential_impulse_total_iterations;
 			int sequential_impulse_inner_iterations;
@@ -71,6 +72,7 @@ namespace Delta2 {
 				limit_clusters_per_step = false;
 				check_post_solve = false;
 				local_ts = false;
+				disable_dynamic_rollback = true;
 
 				print_priority = 0;
 
@@ -148,6 +150,12 @@ namespace Delta2 {
 				else {
 					printf("Local time step        false\n");
 				}
+				if (!disable_dynamic_rollback) {
+					printf("Dynamic rollback       true\n");
+				}
+				else {
+					printf("Dynamic rollback       false\n");
+				}
 				printf("Threads:               %i\n", threads);
 				printf("Print priority:        %i\n", print_priority);
 				printf("======== Time stepping ========\n");
@@ -214,6 +222,7 @@ namespace Delta2 {
 				app.add_flag("--limit_per_step", limit_clusters_per_step, "Limit the number of cluster handled per step to try and help load balancing");
 				app.add_flag("--check_post_solve", check_post_solve, "Redo contact detection after contact solve to see if it was successful");
 				app.add_flag("--local_ts", local_ts, "Local time stepping");
+				app.add_flag("--disable_dynamic_rollback", disable_dynamic_rollback, "Disable dynamic rollback");
 				app.add_option("--threads", threads, "Maximum threads");
 				app.add_option("--print_priority", print_priority, "Print priority (0-Startup, 1-Outer steps, 2-Debug");
 

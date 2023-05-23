@@ -35,6 +35,8 @@ double PDEExplicit::selectTimeStep(collision::Cluster& cluster) {
 
 bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
     // __itt_string_handle* compare_individual_pair_task = __itt_string_handle_create("Compare individual pair");
+    __itt_string_handle* pde_explicit_task = __itt_string_handle_create("PDE explicit");
+    __itt_string_handle* check_post_solve_task = __itt_string_handle_create("Check post solve");
     
     int cluster_id = -1;
     for (Particle* p : cluster.particles) {

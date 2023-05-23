@@ -9,7 +9,7 @@
 
 #include "tbb/tbb.h"
 
-const int parallel_grain_size = 250;
+const int parallel_grain_size = 50;
 
 namespace Delta2 {
 	namespace collision {
@@ -254,7 +254,7 @@ namespace Delta2 {
                                 auto [dist, P, Q] = _comparisonDist(A, B);
                                 if (dist < search_dist + a_epss[a_i] + b_epss[b_i]) {
                                     Contact<real> ci(P, Q, a.geo_eps + a_epss[a_i], b.geo_eps + b_epss[b_i], a_inner_epss[a_i], b_inner_epss[b_i], a, b);
-                                    hits.push_back(ci);
+                                    hits_tmp[d].push_back(ci);
                                 }
                             }
                         }
@@ -309,7 +309,7 @@ namespace Delta2 {
                                 auto [dist, P, Q] = _comparisonDist(A, B);
                                 if (dist < search_dist + a_epss[a_i] + b_epss[b_i]) {
                                     Contact<real> ci(P, Q, a.geo_eps + a_epss[a_i], b.geo_eps + b_epss[b_i], a_inner_epss[a_i], b_inner_epss[b_i], a, b);
-                                    hits.push_back(ci);
+                                    hits_tmp[d].push_back(ci);
                                 }
                             }
                         }
@@ -365,7 +365,7 @@ namespace Delta2 {
                                 auto [dist, P, Q] = _comparisonDist(A, B);
                                 if (dist < search_dist + a_epss[a_i] + b_epss[b_i]) {
                                     Contact<real> ci(P, Q, a.geo_eps + a_epss[a_i], b.geo_eps + b_epss[b_i], a_inner_epss[a_i], b_inner_epss[b_i], a, b);
-                                    hits.push_back(ci);
+                                    hits_tmp[d].push_back(ci);
                                 }
                             }
                         }
@@ -421,7 +421,7 @@ namespace Delta2 {
                                 auto [dist, P, Q] = _comparisonDist(A, B);
                                 if (dist < search_dist + a_epss[a_i] + b_epss[b_i]) {
                                     Contact<real> ci(P, Q, a.geo_eps + a_epss[a_i], b.geo_eps + b_epss[b_i], a_inner_epss[a_i], b_inner_epss[b_i], a, b);
-                                    hits.push_back(ci);
+                                    hits_tmp[d].push_back(ci);
                                 }
                             }
                         }

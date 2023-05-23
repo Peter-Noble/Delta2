@@ -679,7 +679,7 @@ void collision::fineCollisionClustersWithTimeStepSelection(Cluster& cluster) {
                             double toc_start_contact = std::max(0.0, c.toc - (rel_vel.norm() * max_time_step_for_pair) / interaction_dist);
                             b.min_toc = std::min((float)toc_start_contact, b.min_toc);
                             // double toc_start_contact = std::max(0.0, 1.0 - (rel_vel.norm() * max_time_step_for_pair) / interaction_dist);
-                            double new_step = common::lerp(toc_start_contact, c.toc, 0.75);
+                            double new_step = common::lerp(toc_start_contact, c.toc, 0.5);
                             globals::logger.printf(4, "A new_step: %f\n", new_step);
                             min_scaling_seen = std::min(min_scaling_seen, new_step);
                             // This is only correct if the velocity is perpendicular to the face tangent. Otherwise it's an underestimate of the toc (which is safe).
