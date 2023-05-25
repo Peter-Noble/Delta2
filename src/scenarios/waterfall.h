@@ -24,10 +24,57 @@ namespace Delta2 {
             Delta2::common::sphere(4, 6, V, F);
             std::shared_ptr<Delta2::MeshData> S2(new Delta2::MeshData(V, F, globals::opt));
 
+            std::vector<std::shared_ptr<Delta2::MeshData>> large;
+            {
+                std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(std::string(std::getenv("MESH_DIR")) + "/rocks/1.obj", globals::opt));
+                large.push_back(M);
+            };
+            {
+                std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(std::string(std::getenv("MESH_DIR")) + "/rocks/2.obj", globals::opt));
+                large.push_back(M);
+            };
+            {
+                std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(std::string(std::getenv("MESH_DIR")) + "/rocks/3.obj", globals::opt));
+                large.push_back(M);
+            };
+            {
+                std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(std::string(std::getenv("MESH_DIR")) + "/rocks/4.obj", globals::opt));
+                large.push_back(M);
+            };
+            {
+                std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(std::string(std::getenv("MESH_DIR")) + "/rocks/5.obj", globals::opt));
+                large.push_back(M);
+            };
+
+            std::vector<std::shared_ptr<Delta2::MeshData>> medium;
+            {
+                std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(std::string(std::getenv("MESH_DIR")) + "/rocks/med_1.obj", globals::opt));
+                medium.push_back(M);
+            };
+            {
+                std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(std::string(std::getenv("MESH_DIR")) + "/rocks/med_2.obj", globals::opt));
+                medium.push_back(M);
+            };
+
+            std::vector<std::shared_ptr<Delta2::MeshData>> small;
+            {
+                std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(std::string(std::getenv("MESH_DIR")) + "/rocks/small_1.obj", globals::opt));
+                small.push_back(M);
+            };
+            {
+                std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(std::string(std::getenv("MESH_DIR")) + "/rocks/small_2.obj", globals::opt));
+                small.push_back(M);
+            };
+
             int scenario_size = 1;
             if (globals::opt.scenario_size >= 0) {
                 scenario_size = globals::opt.scenario_size;
             }
+            bool use_hopper_particles = false;
+            if (globals::opt.scenario_lod > 0) {
+                use_hopper_particles = true;
+            }
+
             const double x_spacing = 4.1;
             double x_offset = scenario_size / 2.0 * x_spacing;
 
@@ -52,26 +99,51 @@ namespace Delta2 {
                 }
             }
 
-
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < scenario_size; x++) {
-                    if (globals::opt.rand_float(1.0) < 0.5) {
-                        auto& p = particles.emplace_back(C, 1.0, 10.0, 0.25);
-                        p.current_state.setTranslation(x * Eigen::Vector3d({x_spacing, 0, 0}) + Eigen::Vector3d({-x_offset, -y_z_offset + y_z_spacing * y + 1, -y_z_offset + y_z_spacing * y + 5}));
-                        p.current_state.setRotation(Delta2::common::eulerAnglesToQuaternion(Eigen::Vector3d({globals::opt.rand_float(90)/360.0*igl::PI*2.0, globals::opt.rand_float(90)/360.0*igl::PI*2.0, globals::opt.rand_float(90)/360.0*igl::PI*2.0})));
-                        p.current_state.setVelocity(Eigen::Vector3d({0, -0.1, 0}));
+            if (use_hopper_particles) {
+                for (int px = 0; px < scenario_size; px++) {
+                    for (int py = 0; py < 5; py++) {
+                        for (int pz = 0; pz < 2; pz++) {
+                            if ((px + py + pz) % 2 != 0) {
+                                auto& p = particles.emplace_back(large[Delta2::globals::opt.rand(large.size())], 1.0, 1.0, 0.25);
+                                p.current_state.setTranslation(Eigen::Vector3d({px * x_spacing - x_offset, py * 3.0, pz * 2.5 + 25}));
+                            }
+                        }
+                        for (int pz = 0; pz < 3; pz++) {
+                            if ((px + py + pz) % 2 != 0) {
+                                auto& p = particles.emplace_back(medium[Delta2::globals::opt.rand(medium.size())], 1.0, 1.0, 0.25);
+                                p.current_state.setTranslation(Eigen::Vector3d({px * x_spacing - x_offset, py * 5, 4 + pz * 1.75 + 25}));
+                            }
+                        }
+                        for (int pz = 0; pz < 6; pz++) {
+                            if ((px + py + pz) % 2 != 0) {
+                                auto& p = particles.emplace_back(small[Delta2::globals::opt.rand(small.size())], 1.0, 1.0, 0.25);
+                                p.current_state.setTranslation(Eigen::Vector3d({px * x_spacing - x_offset, py * 4.0, 10 + pz * 1 + 25}));
+                            }
+                        }
                     }
                 }
             }
-
-            for (int y = 0; y < 4; y++) {
-                for (int z = 0; z < 40; z++) {
+            else {
+                for (int y = 0; y < height; y++) {
                     for (int x = 0; x < scenario_size; x++) {
-                        if (globals::opt.rand_float(1.0) < 0.2) {
+                        if (globals::opt.rand_float(1.0) < 0.5) {
                             auto& p = particles.emplace_back(C, 1.0, 10.0, 0.25);
-                            p.current_state.setTranslation(x * Eigen::Vector3d({x_spacing, 0, 0}) + Eigen::Vector3d({-x_offset, 20 - y * 4+2, 28 + z * 10}));
+                            p.current_state.setTranslation(x * Eigen::Vector3d({x_spacing, 0, 0}) + Eigen::Vector3d({-x_offset, -y_z_offset + y_z_spacing * y + 1, -y_z_offset + y_z_spacing * y + 5}));
                             p.current_state.setRotation(Delta2::common::eulerAnglesToQuaternion(Eigen::Vector3d({globals::opt.rand_float(90)/360.0*igl::PI*2.0, globals::opt.rand_float(90)/360.0*igl::PI*2.0, globals::opt.rand_float(90)/360.0*igl::PI*2.0})));
-                            p.current_state.setVelocity(Eigen::Vector3d({0, -0.5, -globals::opt.rand_float(1.0)}));
+                            p.current_state.setVelocity(Eigen::Vector3d({0, -0.1, 0}));
+                        }
+                    }
+                }
+
+                for (int y = 0; y < 4; y++) {
+                    for (int z = 0; z < 40; z++) {
+                        for (int x = 0; x < scenario_size; x++) {
+                            if (globals::opt.rand_float(1.0) < 0.2) {
+                                auto& p = particles.emplace_back(C, 1.0, 10.0, 0.25);
+                                p.current_state.setTranslation(x * Eigen::Vector3d({x_spacing, 0, 0}) + Eigen::Vector3d({-x_offset, 20 - y * 4+2, 28 + z * 10}));
+                                p.current_state.setRotation(Delta2::common::eulerAnglesToQuaternion(Eigen::Vector3d({globals::opt.rand_float(90)/360.0*igl::PI*2.0, globals::opt.rand_float(90)/360.0*igl::PI*2.0, globals::opt.rand_float(90)/360.0*igl::PI*2.0})));
+                                p.current_state.setVelocity(Eigen::Vector3d({0, -0.5, -globals::opt.rand_float(1.0)}));
+                            }
                         }
                     }
                 }

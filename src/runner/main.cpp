@@ -49,7 +49,7 @@ void guiThread(common::AnimationViewer* view) {
 
 int main(int argc, char *argv[]) {
     globals::logger.printf(0, "Main\n");
-    // globals::itt_handles.disable_detailed_domain();
+    globals::itt_handles.disable_detailed_domain();
 
     int opt_result = globals::opt.fromArgs(argc, argv);
     if (opt_result > 0) {
