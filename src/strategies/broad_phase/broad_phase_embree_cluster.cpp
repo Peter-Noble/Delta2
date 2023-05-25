@@ -720,7 +720,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
 
 void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
     __itt_string_handle* broad_phase_step_task = __itt_string_handle_create("Broad phase step");
-    __itt_string_handle* select_time_step_task = __itt_string_handle_create("Select time phase");
+    __itt_string_handle* select_time_step_task = __itt_string_handle_create("Select time step phase");
     __itt_string_handle* separate_collision_clusters_task = __itt_string_handle_create("Separate collision cluster phase");
     __itt_string_handle* select_and_sort_task = __itt_string_handle_create("Select and sort clusters phase");
     __itt_string_handle* outer_step_task = __itt_string_handle_create("Outer step phase");

@@ -49,7 +49,7 @@ void guiThread(common::AnimationViewer* view) {
 
 int main(int argc, char *argv[]) {
     globals::logger.printf(0, "Main\n");
-    // globals::itt_handles.disable_detailed_domain();
+    globals::itt_handles.disable_detailed_domain();
 
     int threads = tbb::info::default_concurrency();
     if (globals::opt.threads > 0) {
