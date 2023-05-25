@@ -1,7 +1,7 @@
 import re
 import os
 
-towers = [2, 4, 6, 8, 10, 12]
+towers = [1,2,4,6,8,12,16]
 
 path = "/nobackup/wxmv95/problem_size_scaling/hoppers/stdout"
 prefix = "stdout"

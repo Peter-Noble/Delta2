@@ -1,21 +1,21 @@
 import re
 import os
 
-rows = [8, 16, 24, 32, 40, 48, 56, 64]
-towers = [2, 4, 6, 8, 10, 12, 14, 16]
+hoppers = [5, 10, 20, 40, 80, 160]
+threads = [1, 2, 4, 8, 16, 32, 48, 64, 80, 96, 112, 128]
 
-path = "/nobackup/wxmv95/problem_size_scaling/round_tower/stdout"
+path = "/nobackup/wxmv95/thread_scaling/waterfall/stdout"
 prefix = "stdout"
 extension = "log"
 
 files = [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f)) and f.split('.')[-1] == extension and f.split('.')[0].startswith(prefix)]
 
 files.sort(key=lambda x: x.split('.')[1])
-most_recent = files[-(len(rows) * len(towers)):]
+most_recent = files[-(len(hoppers) * len(threads)):]
 
 print(most_recent)
 
-data = {t: {r: () for r in rows} for t in towers}
+data = {t: {r: () for r in hoppers} for t in threads}
 print(data)
 for file in most_recent:
     print(f"Opening file {file}")
@@ -33,4 +33,4 @@ for file in most_recent:
     print(check_towers, check_rows)
     data[check_towers][check_rows] = ((check_rows, check_towers, user, system, elapsed, percent, page_faults))
 
-print([[data[t][r] for r in rows] for t in towers])
+print([[data[t][r] for r in hoppers] for t in threads])

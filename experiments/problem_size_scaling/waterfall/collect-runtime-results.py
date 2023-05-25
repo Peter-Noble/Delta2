@@ -1,7 +1,7 @@
 import re
 import os
 
-towers = [2, 4, 6, 8, 10, 12]
+towers = [1,2,4,8,16,32,48]
 
 path = "/nobackup/wxmv95/problem_size_scaling/waterfall/stdout"
 prefix = "stdout"
