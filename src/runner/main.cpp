@@ -51,12 +51,6 @@ int main(int argc, char *argv[]) {
     globals::logger.printf(0, "Main\n");
     // globals::itt_handles.disable_detailed_domain();
 
-    int threads = tbb::info::default_concurrency();
-    if (globals::opt.threads > 0) {
-        threads = globals::opt.threads;
-    }
-    tbb::global_control global_limit(tbb::global_control::max_allowed_parallelism, threads);  // TODO Does this do something?
-
     int opt_result = globals::opt.fromArgs(argc, argv);
     if (opt_result > 0) {
         return opt_result;
@@ -67,6 +61,15 @@ int main(int argc, char *argv[]) {
     }
 
     globals::logger.priority = globals::opt.print_priority;
+
+    int threads = tbb::info::default_concurrency();
+    if (globals::opt.threads > 0) {
+        threads = globals::opt.threads;
+    }
+    globals::opt.threads = threads;
+    tbb::global_control global_limit(tbb::global_control::max_allowed_parallelism, threads);  // TODO Does this do something?
+
+    globals::logger.printf(1, "Threads: %i\n", threads);
     
     strategy::FrictionIterative friction(globals::opt);
     strategy::SequentialImpulses contact_force(friction, globals::opt);
