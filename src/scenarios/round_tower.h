@@ -36,7 +36,7 @@ namespace Delta2 {
                 Eigen::Vector3d offset({100 * i, 0, 0});
 
                 {
-                    auto& p = particles.emplace_back(P, 1.0, 1.0, 0.25);
+                    auto& p = particles.emplace_back(P, 1.0, 1.0, globals::opt.geo_eps);
                     p.is_static = true;
                     p.current_state.setTranslation(offset);
                 }
@@ -45,14 +45,14 @@ namespace Delta2 {
                     for (int x = 0; x < ring_num; x++) {
                         const Eigen::Quaterniond rot = common::eulerAnglesToQuaternion(Eigen::Vector3d({0, 0, common::degToRad((x+z/2.0)*360.0/ring_num)}));
                         Eigen::Vector3d pos_r = common::transform(Eigen::Vector3d({r, 0, 0}), rot);
-                        auto& p = particles.emplace_back(M, 4.0, 1.0, 0.25);  // heavy cube (Aluminium) 2700
+                        auto& p = particles.emplace_back(M, 4.0, 1.0, globals::opt.geo_eps);  // heavy cube (Aluminium) 2700
                         p.current_state.setTranslation(offset + pos_r + Eigen::Vector3d({0, 0, z * 2.05 + 1.025}));
                         p.current_state.setRotation(rot);
                     }
                 }
 
                 {
-                    auto& p = particles.emplace_back(S, 50.0, 1.0, 0.25);
+                    auto& p = particles.emplace_back(S, 50.0, 1.0, globals::opt.geo_eps);
                     p.current_state.setTranslation(offset + Eigen::Vector3d({r + 10, 0, 6}));
                     p.current_state.setVelocity({-100, 0, 3});
                 }

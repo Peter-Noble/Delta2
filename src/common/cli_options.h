@@ -72,7 +72,7 @@ namespace Delta2 {
 				limit_clusters_per_step = false;
 				check_post_solve = false;
 				local_ts = false;
-				disable_dynamic_rollback = true;
+				disable_dynamic_rollback = false;
 
 				print_priority = 0;
 

@@ -70,12 +70,12 @@ namespace Delta2 {
                 for (int y = 0; y < 1; y++) {
                     Eigen::Vector3d centre = {24.6 * x, 24.6 * y, 0};
                     {
-                        auto& p = particles.emplace_back(P, 1.0, 1.0, 0.25);
+                        auto& p = particles.emplace_back(P, 1.0, 1.0, globals::opt.geo_eps);
                         p.current_state.setTranslation(centre + Eigen::Vector3d({0, 0, -25}));
                         p.is_static = true;
                     }
                     {
-                        auto& p = particles.emplace_back(H, 1.0, 1.0, 0.25);
+                        auto& p = particles.emplace_back(H, 1.0, 1.0, globals::opt.geo_eps);
                         p.current_state.setRotation(common::eulerAnglesToQuaternion(Eigen::Vector3d({common::degToRad(90.0), 0, 0})));
                         p.current_state.setTranslation(centre);
                         p.is_static = true;
@@ -84,22 +84,22 @@ namespace Delta2 {
                         for (int py = -2; py < 3; py++) {
                             for (int pz = 0; pz < 2; pz++) {
                                 if ((px + py + pz) % 2 != 0) {
-                                    auto& p = particles.emplace_back(large[Delta2::globals::opt.rand(large.size())], 1.0, 1.0, 0.25);
-                                    // auto& p = particles.emplace_back(C, 1.0, 1.0, 0.25);
+                                    auto& p = particles.emplace_back(large[Delta2::globals::opt.rand(large.size())], 1.0, 1.0, globals::opt.geo_eps);
+                                    // auto& p = particles.emplace_back(C, 1.0, 1.0, globals::opt.geo_eps);
                                     p.current_state.setTranslation(centre + Eigen::Vector3d({px * 3.0, py * 3.0, pz * 2.5}));
                                 }
                             }
                             for (int pz = 0; pz < 3; pz++) {
                                 if ((px + py + pz) % 2 != 0) {
-                                    auto& p = particles.emplace_back(medium[Delta2::globals::opt.rand(medium.size())], 1.0, 1.0, 0.25);
-                                    // auto& p = particles.emplace_back(C, 1.0, 1.0, 0.25);
+                                    auto& p = particles.emplace_back(medium[Delta2::globals::opt.rand(medium.size())], 1.0, 1.0, globals::opt.geo_eps);
+                                    // auto& p = particles.emplace_back(C, 1.0, 1.0, globals::opt.geo_eps);
                                     p.current_state.setTranslation(centre + Eigen::Vector3d({px * 5, py * 5, 4 + pz * 1.75}));
                                 }
                             }
                             for (int pz = 0; pz < 6; pz++) {
                                 if ((px + py + pz) % 2 != 0) {
-                                    auto& p = particles.emplace_back(small[Delta2::globals::opt.rand(small.size())], 1.0, 1.0, 0.25);
-                                    // auto& p = particles.emplace_back(C, 1.0, 1.0, 0.25);
+                                    auto& p = particles.emplace_back(small[Delta2::globals::opt.rand(small.size())], 1.0, 1.0, globals::opt.geo_eps);
+                                    // auto& p = particles.emplace_back(C, 1.0, 1.0, globals::opt.geo_eps);
                                     p.current_state.setTranslation(centre + Eigen::Vector3d({px * 4.0, py * 4.0, 10 + pz * 1}));
                                 }
                             }

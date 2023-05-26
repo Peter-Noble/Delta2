@@ -29,12 +29,12 @@ namespace Delta2 {
             for (int x = 0; x < scenario_size; x++) {
                 double separation = globals::opt.rand_float(1.9) + 0.1;
                 {
-                    auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+                    auto& p = particles.emplace_back(M, 1.0, 10.0, globals::opt.geo_eps);
                     p.current_state.setTranslation(x * Eigen::Vector3d({offset, 0, 0}) + Eigen::Vector3d({0.5 - recentre, -2, 0}));
                     p.current_state.setVelocity({0, separation, 0});
                 }
                 {
-                    auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+                    auto& p = particles.emplace_back(M, 1.0, 10.0, globals::opt.geo_eps);
                     p.current_state.setTranslation(x * Eigen::Vector3d({offset, 0, 0}) + Eigen::Vector3d({-0.5 - recentre, 2, 0}));
                     p.current_state.setVelocity({0, -separation, 0});
                 }

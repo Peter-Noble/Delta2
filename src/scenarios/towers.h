@@ -25,7 +25,7 @@ namespace Delta2 {
             {
                 Delta2::common::plane(std::max(10.0, std::max(max_x * spacing_x, max_y * spacing_y * 2)), V, F);
                 std::shared_ptr<Delta2::MeshData> M(new Delta2::MeshData(V, F, globals::opt, true));
-                auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+                auto& p = particles.emplace_back(M, 1.0, 10.0, globals::opt.geo_eps);
                 p.is_static = true;
             }
 
@@ -35,7 +35,7 @@ namespace Delta2 {
             for (int y = 0; y < max_y; y++) {
                 for (int x = 0; x < max_x; x++) {
                     for (int i = 0; i < max_i; i++) {
-                        auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+                        auto& p = particles.emplace_back(M, 1.0, 10.0, globals::opt.geo_eps);
                         p.current_state.setTranslation({-(max_x / 2 * spacing_x) + x * spacing_x, -(max_y / 2 * spacing_y) + y * spacing_y + (i * -y * tilt_offset) * 0.2, 1.1 + i * 2.1});
                         p.current_state.setRotation(Delta2::common::eulerAnglesToQuaternion(Eigen::Vector3d({0.0, 0.0, (double)globals::opt.rand_float(3.141598*2.0)})));
                     }

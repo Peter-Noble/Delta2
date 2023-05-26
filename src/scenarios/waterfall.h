@@ -85,13 +85,13 @@ namespace Delta2 {
             for (int i = 0; i < height; i++) {
                 for (int x = 0; x < scenario_size; x++) {
                     {
-                        auto& p = particles.emplace_back(P, 1.0, 10.0, 0.25);
+                        auto& p = particles.emplace_back(P, 1.0, 10.0, globals::opt.geo_eps);
                         p.current_state.setTranslation(x * Eigen::Vector3d({x_spacing, 0, 0}) + Eigen::Vector3d({-x_offset, 2 - y_z_offset + i * y_z_spacing, 0.41 - y_z_offset + i * y_z_spacing}));
                         p.current_state.setRotation(Delta2::common::eulerAnglesToQuaternion(Eigen::Vector3d({2.0/360.0*igl::PI*2.0, 0, 0})));
                         p.is_static = true;
                     }
                     {
-                        auto& p = particles.emplace_back(P, 1.0, 10.0, 0.25);
+                        auto& p = particles.emplace_back(P, 1.0, 10.0, globals::opt.geo_eps);
                         p.current_state.setTranslation(x * Eigen::Vector3d({x_spacing, 0, 0}) + Eigen::Vector3d({-x_offset, -y_z_offset + 4.5 + i * y_z_spacing, -y_z_offset + 2.81 + i * y_z_spacing}));
                         p.current_state.setRotation(Delta2::common::eulerAnglesToQuaternion(Eigen::Vector3d({80.0/360.0*igl::PI*2.0, 0, 0})));
                         p.is_static = true;
@@ -104,19 +104,19 @@ namespace Delta2 {
                     for (int py = 0; py < 5; py++) {
                         for (int pz = 0; pz < 2; pz++) {
                             if ((px + py + pz) % 2 != 0) {
-                                auto& p = particles.emplace_back(large[Delta2::globals::opt.rand(large.size())], 1.0, 1.0, 0.25);
+                                auto& p = particles.emplace_back(large[Delta2::globals::opt.rand(large.size())], 1.0, 1.0, globals::opt.geo_eps);
                                 p.current_state.setTranslation(Eigen::Vector3d({px * x_spacing - x_offset, py * 3.0, pz * 2.5 + 25}));
                             }
                         }
                         for (int pz = 0; pz < 3; pz++) {
                             if ((px + py + pz) % 2 != 0) {
-                                auto& p = particles.emplace_back(medium[Delta2::globals::opt.rand(medium.size())], 1.0, 1.0, 0.25);
+                                auto& p = particles.emplace_back(medium[Delta2::globals::opt.rand(medium.size())], 1.0, 1.0, globals::opt.geo_eps);
                                 p.current_state.setTranslation(Eigen::Vector3d({px * x_spacing - x_offset, py * 5, 4 + pz * 1.75 + 25}));
                             }
                         }
                         for (int pz = 0; pz < 6; pz++) {
                             if ((px + py + pz) % 2 != 0) {
-                                auto& p = particles.emplace_back(small[Delta2::globals::opt.rand(small.size())], 1.0, 1.0, 0.25);
+                                auto& p = particles.emplace_back(small[Delta2::globals::opt.rand(small.size())], 1.0, 1.0, globals::opt.geo_eps);
                                 p.current_state.setTranslation(Eigen::Vector3d({px * x_spacing - x_offset, py * 4.0, 10 + pz * 1 + 25}));
                             }
                         }
@@ -127,7 +127,7 @@ namespace Delta2 {
                 for (int y = 0; y < height; y++) {
                     for (int x = 0; x < scenario_size; x++) {
                         if (globals::opt.rand_float(1.0) < 0.5) {
-                            auto& p = particles.emplace_back(C, 1.0, 10.0, 0.25);
+                            auto& p = particles.emplace_back(C, 1.0, 10.0, globals::opt.geo_eps);
                             p.current_state.setTranslation(x * Eigen::Vector3d({x_spacing, 0, 0}) + Eigen::Vector3d({-x_offset, -y_z_offset + y_z_spacing * y + 1, -y_z_offset + y_z_spacing * y + 5}));
                             p.current_state.setRotation(Delta2::common::eulerAnglesToQuaternion(Eigen::Vector3d({globals::opt.rand_float(90)/360.0*igl::PI*2.0, globals::opt.rand_float(90)/360.0*igl::PI*2.0, globals::opt.rand_float(90)/360.0*igl::PI*2.0})));
                             p.current_state.setVelocity(Eigen::Vector3d({0, -0.1, 0}));
@@ -139,7 +139,7 @@ namespace Delta2 {
                     for (int z = 0; z < 40; z++) {
                         for (int x = 0; x < scenario_size; x++) {
                             if (globals::opt.rand_float(1.0) < 0.2) {
-                                auto& p = particles.emplace_back(C, 1.0, 10.0, 0.25);
+                                auto& p = particles.emplace_back(C, 1.0, 10.0, globals::opt.geo_eps);
                                 p.current_state.setTranslation(x * Eigen::Vector3d({x_spacing, 0, 0}) + Eigen::Vector3d({-x_offset, 20 - y * 4+2, 28 + z * 10}));
                                 p.current_state.setRotation(Delta2::common::eulerAnglesToQuaternion(Eigen::Vector3d({globals::opt.rand_float(90)/360.0*igl::PI*2.0, globals::opt.rand_float(90)/360.0*igl::PI*2.0, globals::opt.rand_float(90)/360.0*igl::PI*2.0})));
                                 p.current_state.setVelocity(Eigen::Vector3d({0, -0.5, -globals::opt.rand_float(1.0)}));
@@ -155,12 +155,12 @@ namespace Delta2 {
             // for (int x = 0; x < scenario_size; x++) {
             //     double separation = globals::opt.rand_float(1.9) + 0.1;
             //     {
-            //         auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+            //         auto& p = particles.emplace_back(M, 1.0, 10.0, globals::opt.geo_eps);
             //         p.current_state.setTranslation(x * Eigen::Vector3d({offset, 0, 0}) + Eigen::Vector3d({0.5 - recentre, -2, 0}));
             //         p.current_state.setVelocity({0, separation, 0});
             //     }
             //     {
-            //         auto& p = particles.emplace_back(M, 1.0, 10.0, 0.25);
+            //         auto& p = particles.emplace_back(M, 1.0, 10.0, globals::opt.geo_eps);
             //         p.current_state.setTranslation(x * Eigen::Vector3d({offset, 0, 0}) + Eigen::Vector3d({-0.5 - recentre, 2, 0}));
             //         p.current_state.setVelocity({0, -separation, 0});
             //     }

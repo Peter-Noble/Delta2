@@ -59,10 +59,12 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     
     double orig_step_size = cluster.step_size;
     double time = std::numeric_limits<double>::infinity();
+    bool is_first = true;
     for (Particle* p : cluster.particles) {
         if (!p->is_static) {
-            if (std::isinf(time)) {
+            if (is_first) {
                 time = p->current_state.getTime();
+                is_first = false;
             }
             else {
                 assert(std::fabs(p->current_state.getTime() - time) < 1e-5);
@@ -105,7 +107,7 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                 assert(std::fabs(p->current_state.getTime() - (time + cluster.step_size)) < 1e-5);
             }
         }
-        globals::logger.printf(2, "local pde claims correct advance\n");
+        globals::logger.printf(2, "%i: local pde claims correct advance\n", cluster_id);
     }
     else {
         for (Particle* p : cluster.particles) {
@@ -183,11 +185,24 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                 //     }
                 // }
 
+            double tmp_target_time = cluster.min_current_time + cluster.step_size;
             stepRecursive(cluster, false, depth + 1);
             for (Particle* p : cluster.particles) {
                 if (!p->is_static) {
                     p->projectFutureState(cluster.step_size);
                     cluster.min_current_time = p->current_state.getTime();
+                }
+            }
+            for (Particle* p : cluster.particles) {
+                if (!p->is_static) {
+                    if (tmp_target_time > p->current_state.getTime() + 1e-6) {
+                        globals::logger.printf(1, "%f, %f\n", time, p->current_state.getTime());
+                        throw std::runtime_error("Particle is behind during redo");
+                    }
+                    if (tmp_target_time < p->current_state.getTime() - 1e-6) {
+                        globals::logger.printf(1, "%f, %f\n", time, p->current_state.getTime());
+                        throw std::runtime_error("Particle is ahead during redo");
+                    }
                 }
             }
 
@@ -206,6 +221,14 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
             for (Particle* p : cluster.particles) {
                 if (!p->is_static) {
                     last_state_final.push_back(p->current_state);
+                    if (time > p->current_state.getTime() + 1e-6) {
+                        globals::logger.printf(1, "%f, %f\n", time, p->current_state.getTime());
+                        throw std::runtime_error("Particle is behind after redo");
+                    }
+                    if (time < p->current_state.getTime() - 1e-6) {
+                        globals::logger.printf(1, "%f, %f\n", time, p->current_state.getTime());
+                        throw std::runtime_error("Particle is ahead after redo");
+                    }
                 }
             }
 
@@ -310,6 +333,12 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                 if (!p->is_static) {
                     p->last_state = last_state_final[i++];
                     p->last_time_step_size = std::min(p->last_time_step_size, start_step / 2.0);
+                    if (target_time > p->current_state.getTime() + 1e-6) {
+                        throw std::runtime_error("Particle is behind target time");
+                    }
+                    if (target_time < p->current_state.getTime() - 1e-6) {
+                        throw std::runtime_error("Particle is ahead target time");
+                    }
                 }
             }   
         } else {
@@ -994,8 +1023,13 @@ void BroadPhaseEmbreeCluster::step(model::ParticleHandler& particles) {
 
     if (!globals::opt.local_ts) {
         for (Particle* p : particles) {
-            if (!p->is_static && std::fabs(fine_min_final_time - p->current_state.getTime()) > 1e-6) {
-                throw std::runtime_error("Time is different but no local ts");
+            if (!p->is_static && fine_min_final_time > p->current_state.getTime() + 1e-6) {
+                globals::logger.printf(1, "%f, %f\n", fine_min_final_time, p->current_state.getTime());
+                throw std::runtime_error("Particle is behind but no local ts");
+            }
+            if (!p->is_static && fine_min_final_time < p->current_state.getTime() - 1e-6) {
+                globals::logger.printf(1, "%f, %f\n", fine_min_final_time, p->current_state.getTime());
+                throw std::runtime_error("Particle is ahead but no local ts");
             }
         }
     }
