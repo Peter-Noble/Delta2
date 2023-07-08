@@ -36,6 +36,7 @@ namespace Delta2 {
 			bool check_post_solve;
 			bool local_ts;
 			bool disable_dynamic_rollback;
+			bool collect_stats;
 
 			int sequential_impulse_total_iterations;
 			int sequential_impulse_inner_iterations;
@@ -73,6 +74,7 @@ namespace Delta2 {
 				check_post_solve = false;
 				local_ts = false;
 				disable_dynamic_rollback = false;
+				collect_stats = false;
 
 				print_priority = 0;
 
@@ -156,6 +158,12 @@ namespace Delta2 {
 				else {
 					printf("Dynamic rollback       false\n");
 				}
+				if (collect_stats) {
+					printf("Collect stats          true\n");
+				}
+				else {
+					printf("Collect stats          false\n");
+				}
 				printf("Threads:               %i\n", threads);
 				printf("Print priority:        %i\n", print_priority);
 				printf("======== Time stepping ========\n");
@@ -225,6 +233,7 @@ namespace Delta2 {
 				app.add_flag("--disable_dynamic_rollback", disable_dynamic_rollback, "Disable dynamic rollback");
 				app.add_option("--threads", threads, "Maximum threads");
 				app.add_option("--print_priority", print_priority, "Print priority (0-Startup, 1-Outer steps, 2-Debug");
+				app.add_flag("--collect_stats", collect_stats, "Collect stats");
 
 				app.add_option("-c,--cluster_sep_factor", cluster_separation_factor, "Multiply the min time-of-contact by this factor before separating clusters");
 

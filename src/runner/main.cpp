@@ -40,6 +40,7 @@ std::vector<std::tuple<Eigen::Vector3d, Eigen::Vector3d, Eigen::Vector3d>> globa
 Delta2::common::Options globals::opt;
 Delta2::common::IttHandles globals::itt_handles;
 Delta2::common::Logger globals::logger;
+Delta2::globals::Stats globals::stats;
 
 #if !defined(NOGL)
 void guiThread(common::AnimationViewer* view) {
@@ -158,6 +159,10 @@ int main(int argc, char *argv[]) {
     }
 
     globals::logger.printf(0, "================ Done ================\n");
+
+    if (globals::opt.collect_stats) {
+        globals::stats.print();
+    }
 
     #if !defined(NOGL)
     if (globals::opt.gui) {

@@ -92,10 +92,18 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
     if (forced_advance) {
         globals::logger.printf(3, "%i: Forced advance\n", cluster_id);
         collision::resolvePenetrationsPBD(cluster, true);
+        globals::logger.printf(3, "Resolved 6\n", cluster_id);
+    }
+    if (globals::opt.collect_stats) {
+        globals::Step s;
+        s.depth = depth;
+        s.size = cluster.step_size;
+        globals::stats.addTimestep(s);
     }
     success = _local_pde.step(cluster, forced_advance);
     if (forced_advance) {
         collision::resolvePenetrationsPBD(cluster, true);
+        globals::logger.printf(3, "Resolved 5\n", cluster_id);
     }
     // __itt_task_end(globals::itt_handles.detailed_domain);
 
@@ -540,6 +548,13 @@ void BroadPhaseEmbreeCluster::stepRecursive(Delta2::collision::Cluster& cluster,
                 assert(p->current_state.getTime() + (cluster.step_size + second_step_size) - time < 1e-5);
             }
 
+            if (globals::opt.collect_stats) {
+                globals::Rollback r;
+                r.parent_step = orig_step_size;
+                r.rollback_by = cluster.step_size + second_step_size;
+                globals::stats.addRollback(r);
+            }
+            
             // second_step_size -= cluster.step_size;
 
             // globals::logger.printf(3, "Before after first valid\n");
