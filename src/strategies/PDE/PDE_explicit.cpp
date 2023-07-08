@@ -35,8 +35,6 @@ double PDEExplicit::selectTimeStep(collision::Cluster& cluster) {
 
 bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
     // __itt_string_handle* compare_individual_pair_task = __itt_string_handle_create("Compare individual pair");
-    __itt_string_handle* pde_explicit_task = __itt_string_handle_create("PDE explicit");
-    __itt_string_handle* check_post_solve_task = __itt_string_handle_create("Check post solve");
     
     int cluster_id = -1;
     for (Particle* p : cluster.particles) {
@@ -136,6 +134,21 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
     //     }
     // }
 
+    globals::logger.printf(2, "Stepping cluster of size %i with %i interactions and %i hits\n", cluster.particles.size(), cluster.interations.size(), hits.size());
+
+    if (globals::opt.collect_stats) {
+        // globals::Step s;
+        // s.depth = depth;
+        // s.size = cluster.step_size;
+        // globals::stats.addStep(s);
+
+        globals::ClusterInfo c;
+        c.num_particles = cluster.particles.size();
+        c.num_interactions = cluster.interations.size();
+        c.num_contacts = hits.size();
+        globals::stats.addCluster(c);
+    }
+
     task_group.wait();
     
     bool is_step_intersection_resolved = false;
@@ -145,36 +158,10 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
             globals::logger.printf(3, "%i: Failed before contact solve and resolving\n", cluster_id);
             globals::logger.printf(3, "%i: Failed a: %i, failed b: %i\n", cluster_id, cluster.particles[failed_a_id].id, cluster.particles[failed_b_id].id);
 
-            // {
-            //     common::Viewer view;
-
-            //     view.addParticleFuture(cluster.particles[failed_a_id]);
-            //     view.addParticleFuture(cluster.particles[failed_b_id]);
-
-            //     view.show();
-            // }
-
             collision::resolvePenetrationsPBD(cluster, false);
             globals::logger.printf(3, "Resolved\n", cluster_id);
 
             is_step_intersection_resolved = true;
-
-            // Eigen::Vector3d aT = cluster.particles[failed_a_id].future_state.getTranslation();
-            // Eigen::Vector3d bT = cluster.particles[failed_b_id].future_state.getTranslation();
-
-            // globals::logger.printf(3, "bT: %f, %f, %f\n", aT.x(), aT.y(), aT.z());
-            // globals::logger.printf(3, "aT: %f, %f, %f\n", bT.x(), bT.y(), bT.z());
-
-            // {
-            //     common::Viewer view;
-
-            //     view.addParticleFuture(cluster.particles[failed_a_id]);
-            //     view.addParticleFuture(cluster.particles[failed_b_id]);
-
-            //     view.show();
-            // }
-
-            // throw std::runtime_error(std::to_string(cluster_id) + std::string(": Failed before contact solve on tiny timestep"));
         }
         else {
             globals::logger.printf(3, "%i: Failed before contact solve and rolling back\n", cluster_id);
@@ -187,21 +174,8 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
         if (allow_fail) {
             globals::logger.printf(2, "%i: Failed after contact force solve\n", cluster_id);
             if (cluster.step_size < 1e-8) {
-                // if (cluster.step_size < 1e-8) {
-                //     double last_time, current_time;
-                //     for (Particle* p : cluster.particles) {
-                //         if (!p->is_static) {
-                //             last_time = p->last_state.getTime();
-                //             current_time = p->current_state.getTime();
-                //         }
-                //     }
-                //     if (current_time - last_time < 1e-8) {
-                //         globals::logger.printf(2, "%i: Resolving post solve fail\n", cluster_id);
-                //         collision::resolvePenetrationsPBD(cluster, false);
-                //     }
-                // }
-
                 collision::resolvePenetrationsPBD(cluster, false);
+                globals::logger.printf(3, "Resolved 2\n", cluster_id);
             }
             else {
                 return false;
@@ -209,6 +183,7 @@ bool PDEExplicit::step(collision::Cluster& cluster, bool allow_fail) {
         }
         else {
             collision::resolvePenetrationsPBD(cluster, true);
+            globals::logger.printf(3, "Resolved 3\n", cluster_id);
             // return false;
         }
     }
